@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ok.ru Video ID Parser</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+  <style>
+    :root {
+      --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+      --font-sans: system-ui, -apple-system, sans-serif;
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+
+      --bg-page: #f0ede6;
+      --bg-surface: #faf9f6;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --bg-success: #eaf3de;
+      --bg-warning: #faeeda;
+      --bg-info: #e6f1fb;
+      --bg-danger: #fcebeb;
+
+      --text-primary: #1a1a18;
+      --text-secondary: #5f5e5a;
+      --text-muted: #888780;
+      --text-success: #3b6d11;
+      --text-warning: #854f0b;
+      --text-info: #185fa5;
+      --text-danger: #a32d2d;
+      --text-link: #185fa5;
+
+      --border-faint: rgba(0, 0, 0, 0.10);
+      --border-light: rgba(0, 0, 0, 0.18);
+      --border-medium: rgba(0, 0, 0, 0.28);
+      --border-info: #b5d4f4;
+      --border-success: #c0dd97;
+      --border-danger: #f7c1c1;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2.5rem 1rem 4rem;
+    }
+
+    .tool {
+      background: var(--bg-card);
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 720px;
+      padding: 1.75rem 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Header */
+    .tool-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 1.25rem;
+      border-bottom: 0.5px solid var(--border-faint);
+    }
+
+    .tool-header i {
+      font-size: 20px;
+      color: var(--text-secondary);
+    }
+
+    .tool-title {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    /* Sections */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .field-label i {
+      font-size: 14px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      border: 0.5px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: var(--font-sans);
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      border: none;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tab-btn i {
+      font-size: 15px;
+    }
+
+    .tab-btn+.tab-btn {
+      border-left: 0.5px solid var(--border-medium);
+    }
+
+    .tab-btn:hover {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background: var(--text-primary);
+      color: var(--bg-card);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Inputs */
+    textarea,
+    input[type="text"],
+    input[type="url"] {
+      width: 100%;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      padding: 9px 12px;
+      border: 0.5px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    textarea {
+      resize: vertical;
+      height: 140px;
+      line-height: 1.5;
+    }
+
+    textarea:focus,
+    input[type="text"]:focus,
+    input[type="url"]:focus {
+      border-color: var(--text-info);
+      box-shadow: 0 0 0 3px var(--bg-info);
+    }
+
+    textarea::placeholder,
+    input::placeholder {
+      color: var(--text-muted);
+    }
+
+    /* URL input with icon */
+    .input-icon-wrap {
+      position: relative;
+    }
+
+    .input-icon-wrap i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 15px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .input-icon-wrap input {
+      padding-left: 34px;
+    }
+
+    /* Note box */
+    .note {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .note i {
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .note-warning {
+      background: var(--bg-warning);
+      color: var(--text-warning);
+      border: 0.5px solid #f0c070;
+    }
+
+    .note-info {
+      background: var(--bg-info);
+      color: var(--text-info);
+      border: 0.5px solid var(--border-info);
+    }
+
+    .note-success {
+      background: var(--bg-success);
+      color: var(--text-success);
+      border: 0.5px solid var(--border-success);
+    }
+
+    .note-danger {
+      background: var(--bg-danger);
+      color: var(--text-danger);
+      border: 0.5px solid var(--border-danger);
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-family: var(--font-sans);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background .12s, color .12s, transform .1s;
+      border: 0.5px solid var(--border-medium);
+    }
+
+    button i {
+      font-size: 15px;
+    }
+
+    button:active {
+      transform: scale(.98);
+    }
+
+    .btn-primary {
+      background: var(--text-primary);
+      color: var(--bg-card);
+      border-color: var(--text-primary);
+    }
+
+    .btn-primary:hover {
+      background: #333330;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-surface);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border-color: var(--border-light);
+      padding: 5px 12px;
+      font-size: 12px;
+    }
+
+    .btn-ghost i {
+      font-size: 14px;
+    }
+
+    .btn-ghost:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .btn-loading {
+      opacity: .65;
+      pointer-events: none;
+    }
+
+    /* Badge / stats */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      padding: 3px 10px;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 0.5px solid var(--border-light);
+      color: var(--text-secondary);
+    }
+
+    .badge i {
+      font-size: 13px;
+    }
+
+    /* Output boxes */
+    .out-box {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 9px 12px;
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      word-break: break-all;
+      line-height: 1.6;
+      min-height: 38px;
+    }
+
+    .out-url {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 9px 12px;
+      border: 0.5px solid var(--border-info);
+      border-radius: var(--radius-md);
+      background: var(--bg-info);
+      color: var(--text-info);
+      word-break: break-all;
+      line-height: 1.6;
+      min-height: 38px;
+    }
+
+    .out-url a {
+      color: var(--text-link);
+      text-decoration: none;
+    }
+
+    .out-url a:hover {
+      text-decoration: underline;
+    }
+
+    /* Copy success */
+    .copy-ok {
+      font-size: 12px;
+      color: var(--text-success);
+      opacity: 0;
+      transition: opacity .3s;
+    }
+
+    /* Search */
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-wrap i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-wrap input {
+      padding-left: 32px;
+    }
+
+    /* List */
+    .out-list {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      max-height: 260px;
+      overflow-y: auto;
+      border: 0.5px solid var(--border-light);
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .list-row {
+      display: flex;
+      gap: 16px;
+      padding: 6px 12px;
+      border-bottom: 0.5px solid var(--border-faint);
+    }
+
+    .list-row:last-child {
+      border-bottom: none;
+    }
+
+    .list-id {
+      color: var(--text-muted);
+      min-width: 135px;
+      flex-shrink: 0;
+    }
+
+    mark {
+      background: var(--bg-warning);
+      color: var(--text-warning);
+      border-radius: 2px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    /* Divider */
+    .divider {
+      border: none;
+      border-top: 0.5px solid var(--border-faint);
+      margin: 0;
+    }
+
+    /* Spinner */
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .spin {
+      display: inline-block;
+      animation: spin .7s linear infinite;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="tool">
+
+    <div class="tool-header">
+      <i class="ti ti-brand-okru" aria-hidden="true"></i>
+      <span class="tool-title">Ok.ru Video ID Parser</span>
+    </div>
+
+    <!-- Source tabs -->
+    <div class="field">
+      <div class="field-label"><i class="ti ti-database-import" aria-hidden="true"></i>Source</div>
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" role="tab" aria-selected="true" onclick="switchTab('html')" id="tab-html">
+          <i class="ti ti-code" aria-hidden="true"></i>HTML
+        </button>
+        <button class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('url')" id="tab-url">
+          <i class="ti ti-world" aria-hidden="true"></i>URL ok.ru
+        </button>
+      </div>
+
+      <!-- Panel HTML -->
+      <div class="tab-panel active" id="panel-html">
+        <div class="note note-info">
+          <i class="ti ti-info-circle" aria-hidden="true"></i>
+          <span>Ouvre la page ok.ru, inspecte la div <code>.portlet</code> (clic droit → Inspecter), puis copie-colle le
+            HTML ici.</span>
+        </div>
+        <textarea id="htmlInput" placeholder="<div class=&quot;portlet&quot;>…"></textarea>
+      </div>
+
+      <!-- Panel URL -->
+      <div class="tab-panel" id="panel-url">
+        <div class="note note-warning">
+          <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+          <span><strong>Limitation CORS :</strong> ok.ru bloque les requêtes cross-origin depuis un navigateur. Le fetch
+            direct échouera probablement. Utilise de préférence l'onglet HTML ci-dessus, ou un proxy/extension.</span>
+        </div>
+        <div class="input-icon-wrap">
+          <i class="ti ti-link" aria-hidden="true"></i>
+          <input type="url" id="urlInput" placeholder="https://ok.ru/video/c12345" autocomplete="off">
+        </div>
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="fetchUrl()" id="btnFetch">
+            <i class="ti ti-download" aria-hidden="true"></i>Charger la page
+          </button>
+          <span id="fetchStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Parse button -->
+    <div class="btn-row">
+      <button class="btn-primary" onclick="parse()" id="btnParse">
+        <i class="ti ti-arrows-sort" aria-hidden="true"></i>Parser
+      </button>
+      <button class="btn-secondary" onclick="clearAll()">
+        <i class="ti ti-trash" aria-hidden="true"></i>Clear
+      </button>
+      <span id="stats" style="display:none" class="badge">
+        <i class="ti ti-info-circle" aria-hidden="true"></i>
+        <span id="statsText"></span>
+      </span>
+    </div>
+
+    <!-- Results -->
+    <div id="resultSection" style="display:none;flex-direction:column;gap:1.25rem">
+
+      <!-- Filtered list -->
+      <div class="field">
+        <div class="section-head">
+          <div class="field-label" style="margin:0"><i class="ti ti-list" aria-hidden="true"></i>Liste triée</div>
+          <span id="filterCount" style="font-size:11px;color:var(--text-muted)"></span>
+        </div>
+        <div class="search-wrap">
+          <i class="ti ti-search" aria-hidden="true"></i>
+          <input type="text" id="filterInput" placeholder="Filtrer par label…" oninput="applyFilter()">
+        </div>
+        <div id="outputList" class="out-list"></div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- Video IDs -->
+      <div class="field">
+        <div class="field-label"><i class="ti ti-hash" aria-hidden="true"></i>Video IDs</div>
+        <div id="outputIds" class="out-box"></div>
+        <div class="btn-row">
+          <button class="btn-ghost" onclick="copyField('outputIds','copyMsgIds')">
+            <i class="ti ti-copy" aria-hidden="true"></i>Copier
+          </button>
+          <span id="copyMsgIds" class="copy-ok">Copié !</span>
+        </div>
+      </div>
+
+      <!-- Labels -->
+      <div class="field">
+        <div class="field-label"><i class="ti ti-tag" aria-hidden="true"></i>Labels encodés</div>
+        <div id="outputLabels" class="out-box"></div>
+        <div class="btn-row">
+          <button class="btn-ghost" onclick="copyField('outputLabels','copyMsgLabels')">
+            <i class="ti ti-copy" aria-hidden="true"></i>Copier
+          </button>
+          <span id="copyMsgLabels" class="copy-ok">Copié !</span>
+        </div>
+      </div>
+
+      <!-- URL -->
+      <div class="field">
+        <div class="field-label"><i class="ti ti-external-link" aria-hidden="true"></i>URL de lecture</div>
+        <div id="outputUrl" class="out-url"></div>
+        <div class="btn-row">
+          <button class="btn-ghost" onclick="copyUrl()">
+            <i class="ti ti-copy" aria-hidden="true"></i>Copier
+          </button>
+          <button class="btn-ghost" onclick="openUrl()">
+            <i class="ti ti-external-link" aria-hidden="true"></i>Ouvrir
+          </button>
+          <span id="copyMsgUrl" class="copy-ok">Copié !</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let allVideos = [];
+    let currentIds = [];
+    let currentLabels = [];
+
+    /* ── tabs ── */
+    function switchTab(name) {
+      ['html', 'url'].forEach(t => {
+        document.getElementById('panel-' + t).classList.toggle('active', t === name);
+        const btn = document.getElementById('tab-' + t);
+        btn.classList.toggle('active', t === name);
+        btn.setAttribute('aria-selected', t === name);
+      });
+    }
+
+    /* ── fetch URL ── */
+    async function fetchUrl() {
+      const url = document.getElementById('urlInput').value.trim();
+      if (!url) return;
+      const btn = document.getElementById('btnFetch');
+      const status = document.getElementById('fetchStatus');
+      btn.classList.add('btn-loading');
+      btn.innerHTML = '<i class="ti ti-loader spin" aria-hidden="true"></i>Chargement…';
+      status.className = '';
+      status.textContent = '';
+
+      try {
+        /* Tentative via un proxy CORS public — remplace par ton propre proxy si besoin */
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const html = await res.text();
+        /* Extrait la div.portlet si présente */
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const portlet = tmp.querySelector('.portlet') || tmp;
+        document.getElementById('htmlInput').value = portlet.outerHTML;
+        switchTab('html');
+        setStatus(status, 'success', 'ti-circle-check', 'HTML récupéré — vérifie puis clique Parser.');
+      } catch (err) {
+        const msg = err.name === 'TimeoutError'
+          ? 'Délai dépassé.'
+          : err.message.includes('Failed to fetch') || err.message.includes('NetworkError')
+            ? 'Bloqué par CORS ou réseau. Copie le HTML manuellement.'
+            : 'Erreur : ' + err.message;
+        setStatus(status, 'danger', 'ti-alert-circle', msg);
+      } finally {
+        btn.classList.remove('btn-loading');
+        btn.innerHTML = '<i class="ti ti-download" aria-hidden="true"></i>Charger la page';
+      }
+    }
+
+    function setStatus(el, type, icon, text) {
+      el.className = 'note note-' + type;
+      el.style.cssText = 'display:inline-flex;gap:6px;align-items:center;font-size:12px;padding:5px 10px;margin-left:4px';
+      el.innerHTML = '<i class="ti ' + icon + '" aria-hidden="true"></i>' + escHtml(text);
+    }
+
+    /* ── parse ── */
+    function extractEpNumber(label) {
+      const m = label.match(/\d+/g);
+      return m ? parseInt(m[m.length - 1], 10) : 999999;
+    }
+
+    function naturalCompare(a, b) {
+      return a.localeCompare(b, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      });
+    }
+
+
+    function extractVideos(html) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const anchors = doc.querySelectorAll('a.video-card_n[href^="/video/"]');
+      const seen = new Set();
+      const results = [];
+      anchors.forEach(a => {
+        const m = (a.getAttribute('href') || '').match(/^\/video\/(\d+)$/);
+        if (!m) return;
+        const videoId = m[1];
+        if (seen.has(videoId)) return;
+        seen.add(videoId);
+        results.push({ videoId, label: a.textContent.trim() });
+      });
+      return results;
+    }
+
+    function parse() {
+      const html = document.getElementById('htmlInput').value.trim();
+      if (!html) return;
+      const videos = extractVideos(html);
+      allVideos = [...videos].sort((a, b) => naturalCompare(a.label, b.label)); //extractEpNumber(a.label) - extractEpNumber(b.label));
+      const statsEl = document.getElementById('stats');
+      statsEl.style.display = 'inline-flex';
+      document.getElementById('statsText').textContent = videos.length + ' trouvées · ' + allVideos.length + ' uniques';
+      document.getElementById('filterInput').value = '';
+      updateOutputs(allVideos, '');
+      document.getElementById('resultSection').style.display = 'flex';
+    }
+
+    function updateOutputs(filtered, query) {
+      currentIds = filtered.map(v => v.videoId);
+      currentLabels = filtered.map(v => encodeURIComponent(v.label));
+
+      document.getElementById('outputIds').textContent = currentIds.join(',');
+      document.getElementById('outputLabels').textContent = currentLabels.join(',');
+
+      const url = buildUrl(currentIds, currentLabels);
+      const urlEl = document.getElementById('outputUrl');
+      urlEl.innerHTML = url
+        ? '<a href="' + escHtml(url) + '" target="_blank" rel="noopener">' + escHtml(url) + '</a>'
+        : '';
+
+      const countEl = document.getElementById('filterCount');
+      countEl.textContent = query ? filtered.length + ' / ' + allVideos.length : '';
+
+      document.getElementById('outputList').innerHTML = filtered.length
+        ? filtered.map(v =>
+          '<div class="list-row">' +
+          '<span class="list-id">' + escHtml(v.videoId) + '</span>' +
+          '<span>' + hlMatch(v.label, query) + '</span>' +
+          '</div>'
+        ).join('')
+        : '<div style="color:var(--text-muted);font-size:12px;padding:8px 12px">Aucun résultat</div>';
+    }
+
+    function applyFilter() {
+      const q = document.getElementById('filterInput').value.trim();
+      const filtered = q
+        ? allVideos.filter(v => v.label.toLowerCase().includes(q.toLowerCase()))
+        : allVideos;
+      updateOutputs(filtered, q);
+    }
+
+    function buildUrl(ids, labels) {
+      if (!ids.length) return '';
+      return 'https://ok.ru/video/' + ids[0] + '?video_ids=' + ids.join(',') + '&labels=' + labels.join(',');
+    }
+
+    /* ── copy / open ── */
+    function copyField(id, msgId) {
+      navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => flash(msgId));
+    }
+    function copyUrl() {
+      navigator.clipboard.writeText(buildUrl(currentIds, currentLabels)).then(() => flash('copyMsgUrl'));
+    }
+    function openUrl() {
+      const url = buildUrl(currentIds, currentLabels);
+      if (url) window.open(url, '_blank', 'noopener');
+    }
+    function flash(id) {
+      const el = document.getElementById(id);
+      el.style.opacity = '1';
+      setTimeout(() => el.style.opacity = '0', 2000);
+    }
+
+    /* ── clear ── */
+    function clearAll() {
+      document.getElementById('htmlInput').value = '';
+      document.getElementById('urlInput').value = '';
+      document.getElementById('stats').style.display = 'none';
+      document.getElementById('filterInput').value = '';
+      document.getElementById('resultSection').style.display = 'none';
+      document.getElementById('fetchStatus').textContent = '';
+      allVideos = []; currentIds = []; currentLabels = [];
+    }
+
+    /* ── utils ── */
+    function escHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function hlMatch(text, q) {
+      if (!q) return escHtml(text);
+      const idx = text.toLowerCase().indexOf(q.toLowerCase());
+      if (idx === -1) return escHtml(text);
+      return escHtml(text.slice(0, idx)) +
+        '<mark>' + escHtml(text.slice(idx, idx + q.length)) + '</mark>' +
+        escHtml(text.slice(idx + q.length));
+    }
+  </script>
+</body>
+
+</html>
