@@ -500,6 +500,10 @@
             align-items: center;
             justify-content: space-between;
             padding: 8px 8px 7px 12px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #141414;   /* ← évite la transparence lors du scroll */
         }
        .lp-okru-sidebar-collapse-btn {
             width: 22px;
