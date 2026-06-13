@@ -154,16 +154,26 @@
 
     <script src="../src/link-player.js"></script>
     <script>
+        function getTheme() {
+            const saved = localStorage.getItem('theme');
+            if (saved) return saved;
+
+            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+
+        console.log("Theme de l'appareil", getTheme());
+        
         new LinkPlayer({
             scope: '#scope',
             embedBaseUrl: "https://okru-embed.vercel.app/?id=",
             // wrapEmbed: iframe => `<div class="video-container">${iframe}</div>`,
-            onChange: (url) => {
-                console.log("change", url);
+            onChange: (url, link) => {
+                console.log("change", url, link);
             },
             onError: msg => console.warn('[LinkedEmbed]', msg),
         });
     </script>
+
 </body>
 
 </html>

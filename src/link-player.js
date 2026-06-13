@@ -671,6 +671,7 @@
             height: 18px;
             flex-shrink: 0;
         }
+            
         `;
         document.head.appendChild(s);
     }
@@ -844,7 +845,8 @@
             return iframeHtml.match(/src="([^"]+)"/)?.[1] ?? null;
         }
 
-        _mountEmbed(container, url, autoplay) {
+        _mountEmbed(container, link, autoplay) {
+            const url = link.href;
             // ── Ok.ru with playlist ───────────────────────────────────────────
             if (isOkruUrl(url)) {
                 const ids = parseOkruIds(url);
@@ -869,7 +871,7 @@
                     container.classList.add('lp-okru-playlist-active');
                     const layout = buildOkruPlaylistLayout(iframeSrc, ids, this._okruBase);
                     container.appendChild(layout);
-                    this._options.onChange?.(url);
+                    this._options.onChange?.(url, link);
                     return;
                 }
             }
@@ -897,7 +899,7 @@
                 ? this._options.wrapEmbed(iframeHtml)
                 : iframeHtml;
 
-            this._options.onChange?.(url);
+            this._options.onChange?.(url, link);
         }
 
         _attachTooltip(link) {
@@ -922,13 +924,13 @@
 
                 if (link.hasAttribute('data-show-on-init')) {
                     const container = this._resolveTargetContainer(link);
-                    if (container) this._mountEmbed(container, link.href, autoplay);
+                    if (container) this._mountEmbed(container, link, autoplay);
                 }
 
                 link.addEventListener('click', e => {
                     e.preventDefault();
                     const container = this._resolveTargetContainer(link);
-                    if (container) this._mountEmbed(container, link.href, autoplay);
+                    if (container) this._mountEmbed(container, link, autoplay);
                 });
 
                 this._attachTooltip(link);
