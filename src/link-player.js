@@ -731,9 +731,16 @@
     }
 
     // Sur tactile, le bouton toggle n'a pas de :hover fiable. On déclenche son
-    // affichage temporaire au tap sur la zone iframe (quand la sidebar est
-    // repliée), puis on le masque après un délai.
-    function attachOkruToggleTouchReveal(wrap, iframeSlot) {
+    // affichage temporaire au tap, puis on le masque après un délai.
+    //
+    // Note : un <iframe> est un document distinct, donc un tap sur son contenu
+    // ne déclenche JAMAIS pointerdown/touchstart sur les éléments hôtes qui le
+    // contiennent (iframeSlot est presque entièrement recouvert par l'iframe).
+    // On écoute donc sur `wrap` en phase de capture : ça couvre la sidebar et
+    // toute zone hôte autour de l'iframe. Pour capter aussi les taps qui
+    // atterrissent sur l'iframe elle-même, on ajoute un calque transparent
+    // au-dessus, qui relaie ensuite le tap au lecteur en redevenant inerte.
+    function attachOkruToggleTouchReveal(wrap, iframeSlot, iframe) {
         if (!isTouchDevice()) return;
         let hideTimer = null;
 
@@ -746,10 +753,31 @@
             }, OKRU_TOGGLE_VISIBLE_DELAY);
         };
 
-        iframeSlot.addEventListener('pointerdown', e => {
-            // Ne pas intercepter un tap directement sur le bouton toggle lui-même.
+        const onPointerDown = e => {
             if (e.target.closest && e.target.closest('.lp-okru-toggle')) return;
             reveal();
+        };
+
+        // Couvre les taps hors iframe (sidebar, bords du slot).
+        wrap.addEventListener('pointerdown', onPointerDown, true);
+        wrap.addEventListener('touchstart', onPointerDown, true);
+
+        // Couvre les taps sur l'iframe elle-même via un calque transparent :
+        // un premier tap révèle le bouton et est absorbé, le tap suivant
+        // atteint normalement le lecteur (le calque se rend inerte ensuite).
+        const catcher = document.createElement('div');
+        Object.assign(catcher.style, {
+            position: 'absolute',
+            inset: '0',
+            zIndex: '6',
+            background: 'transparent',
+        });
+        iframeSlot.appendChild(catcher);
+
+        catcher.addEventListener('pointerup', () => {
+            reveal();
+            catcher.style.pointerEvents = 'none';
+            setTimeout(() => { catcher.style.pointerEvents = ''; }, OKRU_TOGGLE_VISIBLE_DELAY);
         });
     }
 
@@ -859,7 +887,7 @@
         wrap.appendChild(iframeSlot);
         wrap.appendChild(sidebar);
 
-        attachOkruToggleTouchReveal(wrap, iframeSlot);
+        attachOkruToggleTouchReveal(wrap, iframeSlot, iframe);
 
         return wrap;
     }
