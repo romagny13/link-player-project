@@ -19,6 +19,17 @@
     const TOOLTIP_ID = 'linkplayer-tooltip';
     const TOOLTIP_STYLES_ID = 'linkplayer-tooltip-styles';
     const OKRU_PLAYLIST_STYLES_ID = 'linkplayer-okru-playlist-styles';
+    const OKRU_TOGGLE_VISIBLE_DELAY = 2500;
+
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Device detection
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function isTouchDevice() {
+        if (typeof window === 'undefined' || !window.matchMedia) return false;
+        return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    }
 
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -433,6 +444,28 @@
         setTimeout(() => { tooltip.style.display = 'none'; }, 150);
     }
 
+    function isTooltipVisible(tooltip) {
+        return !!tooltip && tooltip.style.display !== 'none';
+    }
+
+    // Garde-fou global : ferme le tooltip si un tap a lieu hors du lien/tooltip.
+    // Utile sur les appareils hybrides (souris + tactile) où mouseleave peut
+    // ne pas se déclencher de façon fiable après un tap.
+    let _tooltipOutsideHandlerAttached = false;
+
+    function attachTooltipOutsideTapHandler(tooltip) {
+        if (_tooltipOutsideHandlerAttached) return;
+        _tooltipOutsideHandlerAttached = true;
+
+        document.addEventListener('pointerdown', e => {
+            if (!isTooltipVisible(tooltip)) return;
+            const target = e.target;
+            if (tooltip.contains(target)) return;
+            if (target.closest && target.closest('a[data-link]')) return;
+            hideTooltip(tooltip);
+        }, true);
+    }
+
 
     // ─────────────────────────────────────────────────────────────────────────
     // Ok.ru playlist sidebar
@@ -664,6 +697,10 @@
             opacity: 1;
             pointer-events: auto;
         }
+        .lp-okru-wrap.lp-okru-toggle-visible .lp-okru-toggle {
+            opacity: 1;
+            pointer-events: auto;
+        }
         .lp-okru-toggle:hover { opacity: 0.8; }
         .lp-okru-toggle svg {
             display: block;
@@ -691,6 +728,29 @@
         const CHROME = 66; // num + gap + arrow + paddings
         const width = Math.min(Math.max(Math.ceil(maxPx) + CHROME, 176), 280);
         return `${width}px`;
+    }
+
+    // Sur tactile, le bouton toggle n'a pas de :hover fiable. On déclenche son
+    // affichage temporaire au tap sur la zone iframe (quand la sidebar est
+    // repliée), puis on le masque après un délai.
+    function attachOkruToggleTouchReveal(wrap, iframeSlot) {
+        if (!isTouchDevice()) return;
+        let hideTimer = null;
+
+        const reveal = () => {
+            if (!wrap.querySelector('.lp-okru-sidebar-collapsed')) return;
+            wrap.classList.add('lp-okru-toggle-visible');
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => {
+                wrap.classList.remove('lp-okru-toggle-visible');
+            }, OKRU_TOGGLE_VISIBLE_DELAY);
+        };
+
+        iframeSlot.addEventListener('pointerdown', e => {
+            // Ne pas intercepter un tap directement sur le bouton toggle lui-même.
+            if (e.target.closest && e.target.closest('.lp-okru-toggle')) return;
+            reveal();
+        });
     }
 
     function buildOkruPlaylistLayout(iframeSrc, ids, okruBase) {
@@ -784,18 +844,22 @@
         // collapse via header button
         header.querySelector('.lp-okru-sidebar-collapse-btn').addEventListener('click', () => {
             sidebar.classList.add('lp-okru-sidebar-collapsed');
-            // toggle devient visible au hover wrap (géré par CSS)
+            wrap.classList.remove('lp-okru-toggle-visible');
+            // toggle devient visible au hover wrap (géré par CSS), ou au tap sur mobile
         });
 
         // expand via toggle
         toggle.addEventListener('click', () => {
             sidebar.classList.remove('lp-okru-sidebar-collapsed');
+            wrap.classList.remove('lp-okru-toggle-visible');
         });
 
         iframeSlot.appendChild(toggle);
 
         wrap.appendChild(iframeSlot);
         wrap.appendChild(sidebar);
+
+        attachOkruToggleTouchReveal(wrap, iframeSlot);
 
         return wrap;
     }
@@ -904,8 +968,13 @@
 
         _attachTooltip(link) {
             if (this._options.tooltip === false) return;
+            // Pas de tooltip de survol sur tactile : il n'y a pas de "hover" avant
+            // le tap, et mouseenter/mouseleave ne se comportent pas de façon fiable.
+            if (isTouchDevice()) return;
+
             if (!this._tooltip) this._tooltip = getTooltipEl();
             const tooltip = this._tooltip;
+            attachTooltipOutsideTapHandler(tooltip);
             let timer = null;
 
             link.addEventListener('mouseenter', () => {
@@ -939,6 +1008,8 @@
     }
 
     LinkPlayer._internal = {
+        // device
+        isTouchDevice,
         // detect
         isYouTubeUrl,
         isDailymotionUrl,
