@@ -536,32 +536,36 @@
             position: sticky;
             top: 0;
             z-index: 1;
-            background: #141414;   /* ← évite la transparence lors du scroll */
+            background: #141414;   
         }
        .lp-okru-sidebar-collapse-btn {
-            width: 22px;
-            height: 22px;
+            width: 26px;
+            height: 26px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: none;
-            border: 1px solid #252525;
-            border-radius: 4px;
+            background: rgba(247, 147, 30, 0.08);
+            border: 1px solid rgba(247, 147, 30, 0.35);
+            border-radius: 5px;
             cursor: pointer;
-            color: #444;
-            transition: color .12s, background .12s, border-color .12s;
+            color: #f7931e;
+            transition: color .12s, background .12s, border-color .12s, transform .12s;
             padding: 0;
             flex-shrink: 0;
         }
         .lp-okru-sidebar-collapse-btn:hover {
-            color: #aaa;
-            background: rgba(255,255,255,0.06);
-            border-color: #444;
+            color: #fff;
+            background: #f7931e;
+            border-color: #f7931e;
+            transform: scale(1.08);
+        }
+        .lp-okru-sidebar-collapse-btn:active {
+            transform: scale(0.95);
         }
         .lp-okru-sidebar-collapse-btn svg {
             display: block;
-            width: 10px;
-            height: 10px;
+            width: 11px;
+            height: 11px;
         }
         .lp-okru-item {
             display: flex;
@@ -693,22 +697,23 @@
             opacity: 0;
             pointer-events: none;
         }
-        .lp-okru-wrap:has(.lp-okru-sidebar-collapsed):hover .lp-okru-toggle {
-            opacity: 1;
-            pointer-events: auto;
-        }
+        .lp-okru-wrap:has(.lp-okru-sidebar-collapsed) .lp-okru-toggle,
         .lp-okru-wrap.lp-okru-toggle-visible .lp-okru-toggle {
             opacity: 1;
             pointer-events: auto;
         }
-        .lp-okru-toggle:hover { opacity: 0.8; }
+        .lp-okru-wrap:not(:has(.lp-okru-sidebar-collapsed)) .lp-okru-toggle {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        .lp-okru-toggle:hover {
+           opacity: 0.8 !important;
+        }
         .lp-okru-toggle svg {
-            display: block;
             width: 18px;
             height: 18px;
             flex-shrink: 0;
         }
-            
         `;
         document.head.appendChild(s);
     }
@@ -730,41 +735,33 @@
         return `${width}px`;
     }
 
-    // Sur tactile, le bouton toggle n'a pas de :hover fiable. On déclenche son
-    // affichage temporaire au tap, puis on le masque après un délai.
-    //
-    // Note : un <iframe> est un document distinct, donc un tap sur son contenu
-    // ne déclenche JAMAIS pointerdown/touchstart sur les éléments hôtes qui le
-    // contiennent (iframeSlot est presque entièrement recouvert par l'iframe).
-    // On écoute donc sur `wrap` en phase de capture : ça couvre la sidebar et
-    // toute zone hôte autour de l'iframe. Pour capter aussi les taps qui
-    // atterrissent sur l'iframe elle-même, on ajoute un calque transparent
-    // au-dessus, qui relaie ensuite le tap au lecteur en redevenant inerte.
     function attachOkruToggleTouchReveal(wrap, iframeSlot, iframe) {
         if (!isTouchDevice()) return;
+    
         let hideTimer = null;
-
+    
         const reveal = () => {
-            if (!wrap.querySelector('.lp-okru-sidebar-collapsed')) return;
+            const sidebar = wrap.querySelector('.lp-okru-sidebar');
+            if (!sidebar || !sidebar.classList.contains('lp-okru-sidebar-collapsed')) return;
+    
             wrap.classList.add('lp-okru-toggle-visible');
+            
             clearTimeout(hideTimer);
             hideTimer = setTimeout(() => {
                 wrap.classList.remove('lp-okru-toggle-visible');
             }, OKRU_TOGGLE_VISIBLE_DELAY);
         };
-
+    
         const onPointerDown = e => {
-            if (e.target.closest && e.target.closest('.lp-okru-toggle')) return;
+            // Ne pas révéler si on clique sur le toggle lui-même
+            if (e.target.closest('.lp-okru-toggle')) return;
             reveal();
         };
-
-        // Couvre les taps hors iframe (sidebar, bords du slot).
+    
         wrap.addEventListener('pointerdown', onPointerDown, true);
         wrap.addEventListener('touchstart', onPointerDown, true);
-
-        // Couvre les taps sur l'iframe elle-même via un calque transparent :
-        // un premier tap révèle le bouton et est absorbé, le tap suivant
-        // atteint normalement le lecteur (le calque se rend inerte ensuite).
+    
+        // Calque pour capturer les taps sur l'iframe
         const catcher = document.createElement('div');
         Object.assign(catcher.style, {
             position: 'absolute',
@@ -773,13 +770,52 @@
             background: 'transparent',
         });
         iframeSlot.appendChild(catcher);
-
+    
         catcher.addEventListener('pointerup', () => {
             reveal();
             catcher.style.pointerEvents = 'none';
-            setTimeout(() => { catcher.style.pointerEvents = ''; }, OKRU_TOGGLE_VISIBLE_DELAY);
+            setTimeout(() => { 
+                catcher.style.pointerEvents = ''; 
+            }, OKRU_TOGGLE_VISIBLE_DELAY);
         });
     }
+
+    // function attachOkruToggleTouchReveal(wrap, iframeSlot, iframe) {
+    //     if (!isTouchDevice()) return;
+    //     let hideTimer = null;
+
+    //     const reveal = () => {
+    //         if (!wrap.querySelector('.lp-okru-sidebar-collapsed')) return;
+    //         wrap.classList.add('lp-okru-toggle-visible');
+    //         clearTimeout(hideTimer);
+    //         hideTimer = setTimeout(() => {
+    //             wrap.classList.remove('lp-okru-toggle-visible');
+    //         }, OKRU_TOGGLE_VISIBLE_DELAY);
+    //     };
+
+    //     const onPointerDown = e => {
+    //         if (e.target.closest && e.target.closest('.lp-okru-toggle')) return;
+    //         reveal();
+    //     };
+
+    //     wrap.addEventListener('pointerdown', onPointerDown, true);
+    //     wrap.addEventListener('touchstart', onPointerDown, true);
+
+    //     const catcher = document.createElement('div');
+    //     Object.assign(catcher.style, {
+    //         position: 'absolute',
+    //         inset: '0',
+    //         zIndex: '6',
+    //         background: 'transparent',
+    //     });
+    //     iframeSlot.appendChild(catcher);
+
+    //     catcher.addEventListener('pointerup', () => {
+    //         reveal();
+    //         catcher.style.pointerEvents = 'none';
+    //         setTimeout(() => { catcher.style.pointerEvents = ''; }, OKRU_TOGGLE_VISIBLE_DELAY);
+    //     });
+    // }
 
     function buildOkruPlaylistLayout(iframeSrc, ids, okruBase) {
         injectOkruPlaylistStyles();
