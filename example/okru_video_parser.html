@@ -289,6 +289,11 @@
       transform: scale(.98);
     }
 
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
     .btn-primary {
       background: var(--text-primary);
       color: var(--bg-card);
@@ -325,6 +330,29 @@
       color: var(--text-primary);
     }
 
+    .btn-toggle {
+      background: transparent;
+      color: var(--text-secondary);
+      border-color: var(--border-light);
+      padding: 5px 12px;
+      font-size: 12px;
+    }
+
+    .btn-toggle i {
+      font-size: 14px;
+    }
+
+    .btn-toggle:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .btn-toggle.active {
+      background: var(--text-primary);
+      color: var(--bg-card);
+      border-color: var(--text-primary);
+    }
+
     .btn-loading {
       opacity: .65;
       pointer-events: none;
@@ -345,6 +373,13 @@
 
     .badge i {
       font-size: 13px;
+    }
+
+    .badge-select {
+      background: var(--bg-info);
+      border-color: var(--border-info);
+      color: var(--text-info);
+      font-weight: 500;
     }
 
     /* Output boxes */
@@ -410,6 +445,31 @@
       padding-left: 32px;
     }
 
+    /* Selection toolbar */
+    .select-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .select-all-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .select-all-wrap input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: var(--text-primary);
+    }
+
     /* List */
     .out-list {
       font-family: var(--font-mono);
@@ -424,13 +484,31 @@
 
     .list-row {
       display: flex;
-      gap: 16px;
+      align-items: center;
+      gap: 12px;
       padding: 6px 12px;
       border-bottom: 0.5px solid var(--border-faint);
+      transition: background .1s;
     }
 
     .list-row:last-child {
       border-bottom: none;
+    }
+
+    .list-row:hover {
+      background: var(--bg-card);
+    }
+
+    .list-row.is-unselected {
+      opacity: .45;
+    }
+
+    .list-row input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+      cursor: pointer;
+      accent-color: var(--text-primary);
     }
 
     .list-id {
@@ -450,6 +528,8 @@
       align-items: center;
       justify-content: space-between;
       margin-bottom: 2px;
+      flex-wrap: wrap;
+      gap: 6px;
     }
 
     /* Divider */
@@ -551,8 +631,27 @@
         </div>
         <div class="search-wrap">
           <i class="ti ti-search" aria-hidden="true"></i>
-          <input type="text" id="filterInput" placeholder="Filtrer par label…" oninput="applyFilter()">
+          <input type="text" id="filterInput" placeholder="Filtrer par label… ex: matrix, top gun" oninput="applyFilter()">
         </div>
+        <div style="font-size:11px;color:var(--text-muted)">Sépare plusieurs termes par une virgule — un label correspondant à au moins un des termes sera affiché.</div>
+
+        <div class="select-toolbar">
+          <label class="select-all-wrap">
+            <input type="checkbox" id="masterCheckbox" onchange="toggleMaster()">
+            <span id="masterLabel">Tout (dé)sélectionner</span>
+          </label>
+          <button class="btn-ghost" onclick="selectVisible(true)">
+            <i class="ti ti-checkbox" aria-hidden="true"></i>Sélectionner tout
+          </button>
+          <button class="btn-ghost" onclick="selectVisible(false)">
+            <i class="ti ti-square" aria-hidden="true"></i>Désélectionner tout
+          </button>
+          <button class="btn-toggle" onclick="toggleSortMode()" id="btnSortMode">
+            <i class="ti ti-arrows-sort" aria-hidden="true"></i><span id="sortModeLabel">Tri : alphabétique</span>
+          </button>
+          <span class="badge badge-select" id="selectCount"></span>
+        </div>
+
         <div id="outputList" class="out-list"></div>
       </div>
 
@@ -560,7 +659,7 @@
 
       <!-- Video IDs -->
       <div class="field">
-        <div class="field-label"><i class="ti ti-hash" aria-hidden="true"></i>Video IDs</div>
+        <div class="field-label"><i class="ti ti-hash" aria-hidden="true"></i>Video IDs (sélectionnés)<span id="sortModeNote" style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
         <div id="outputIds" class="out-box"></div>
         <div class="btn-row">
           <button class="btn-ghost" onclick="copyField('outputIds','copyMsgIds')">
@@ -572,7 +671,7 @@
 
       <!-- Labels -->
       <div class="field">
-        <div class="field-label"><i class="ti ti-tag" aria-hidden="true"></i>Labels encodés</div>
+        <div class="field-label"><i class="ti ti-tag" aria-hidden="true"></i>Labels encodés (sélectionnés)</div>
         <div id="outputLabels" class="out-box"></div>
         <div class="btn-row">
           <button class="btn-ghost" onclick="copyField('outputLabels','copyMsgLabels')">
@@ -584,7 +683,7 @@
 
       <!-- URL -->
       <div class="field">
-        <div class="field-label"><i class="ti ti-external-link" aria-hidden="true"></i>URL de lecture</div>
+        <div class="field-label"><i class="ti ti-external-link" aria-hidden="true"></i>URL de lecture (sélectionnés)</div>
         <div id="outputUrl" class="out-url"></div>
         <div class="btn-row">
           <button class="btn-ghost" onclick="copyUrl()">
@@ -601,7 +700,11 @@
   </div>
 
   <script>
-    let allVideos = [];
+    let allVideos = [];       // { videoId, label }
+    let selectedIds = new Set();
+    let selectionOrder = [];  // videoId list, in the order items were selected
+    let sortMode = 'alpha';   // 'alpha' | 'selection'
+    let lastFiltered = [];    // currently visible (filtered) videos
     let currentIds = [];
     let currentLabels = [];
 
@@ -659,18 +762,12 @@
     }
 
     /* ── parse ── */
-    function extractEpNumber(label) {
-      const m = label.match(/\d+/g);
-      return m ? parseInt(m[m.length - 1], 10) : 999999;
-    }
-
     function naturalCompare(a, b) {
       return a.localeCompare(b, undefined, {
         numeric: true,
         sensitivity: 'base'
       });
     }
-
 
     function extractVideos(html) {
       const parser = new DOMParser();
@@ -693,18 +790,142 @@
       const html = document.getElementById('htmlInput').value.trim();
       if (!html) return;
       const videos = extractVideos(html);
-      allVideos = [...videos].sort((a, b) => naturalCompare(a.label, b.label)); //extractEpNumber(a.label) - extractEpNumber(b.label));
+      allVideos = [...videos].sort((a, b) => naturalCompare(a.label, b.label));
+      selectedIds = new Set(allVideos.map(v => v.videoId)); // tout sélectionné par défaut
+      selectionOrder = allVideos.map(v => v.videoId);
       const statsEl = document.getElementById('stats');
       statsEl.style.display = 'inline-flex';
       document.getElementById('statsText').textContent = videos.length + ' trouvées · ' + allVideos.length + ' uniques';
       document.getElementById('filterInput').value = '';
-      updateOutputs(allVideos, '');
+      applyFilter();
       document.getElementById('resultSection').style.display = 'flex';
     }
 
-    function updateOutputs(filtered, query) {
-      currentIds = filtered.map(v => v.videoId);
-      currentLabels = filtered.map(v => encodeURIComponent(v.label));
+    /* ── selection ── */
+    function toggleSelection(videoId, checked) {
+      if (checked) {
+        selectedIds.add(videoId);
+        if (!selectionOrder.includes(videoId)) selectionOrder.push(videoId);
+      } else {
+        selectedIds.delete(videoId);
+        selectionOrder = selectionOrder.filter(id => id !== videoId);
+      }
+      renderList(lastFiltered, parseTerms(document.getElementById('filterInput').value.trim()));
+      refreshOutputs();
+    }
+
+    function selectVisible(checked) {
+      lastFiltered.forEach(v => {
+        if (checked) {
+          selectedIds.add(v.videoId);
+          if (!selectionOrder.includes(v.videoId)) selectionOrder.push(v.videoId);
+        } else {
+          selectedIds.delete(v.videoId);
+          selectionOrder = selectionOrder.filter(id => id !== v.videoId);
+        }
+      });
+      renderList(lastFiltered, parseTerms(document.getElementById('filterInput').value.trim()));
+      refreshOutputs();
+    }
+
+    function toggleSortMode() {
+      sortMode = sortMode === 'alpha' ? 'selection' : 'alpha';
+      const btn = document.getElementById('btnSortMode');
+      const label = document.getElementById('sortModeLabel');
+      const note = document.getElementById('sortModeNote');
+      if (sortMode === 'selection') {
+        label.textContent = 'Tri : ordre de sélection';
+        btn.classList.add('active');
+        note.textContent = ' — ordre de sélection';
+      } else {
+        label.textContent = 'Tri : alphabétique';
+        btn.classList.remove('active');
+        note.textContent = '';
+      }
+      refreshOutputs();
+    }
+
+    function toggleMaster() {
+      const master = document.getElementById('masterCheckbox');
+      selectVisible(master.checked);
+    }
+
+    function updateMasterCheckbox() {
+      const master = document.getElementById('masterCheckbox');
+      const total = lastFiltered.length;
+      const selectedInView = lastFiltered.filter(v => selectedIds.has(v.videoId)).length;
+      if (total === 0) {
+        master.checked = false;
+        master.indeterminate = false;
+      } else if (selectedInView === 0) {
+        master.checked = false;
+        master.indeterminate = false;
+      } else if (selectedInView === total) {
+        master.checked = true;
+        master.indeterminate = false;
+      } else {
+        master.checked = false;
+        master.indeterminate = true;
+      }
+    }
+
+    /* ── rendering ── */
+    function parseTerms(raw) {
+      return raw.split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+    }
+
+    function matchesTerms(label, terms) {
+      if (!terms.length) return true;
+      const lower = label.toLowerCase();
+      return terms.some(t => lower.includes(t.toLowerCase()));
+    }
+
+    function applyFilter() {
+      const raw = document.getElementById('filterInput').value.trim();
+      const terms = parseTerms(raw);
+      const filtered = terms.length
+        ? allVideos.filter(v => matchesTerms(v.label, terms))
+        : allVideos;
+      renderList(filtered, terms);
+      refreshOutputs();
+    }
+
+    function renderList(filtered, terms) {
+      lastFiltered = filtered;
+      terms = terms || [];
+
+      const countEl = document.getElementById('filterCount');
+      countEl.textContent = terms.length ? filtered.length + ' / ' + allVideos.length : '';
+
+      document.getElementById('outputList').innerHTML = filtered.length
+        ? filtered.map(v => {
+          const checked = selectedIds.has(v.videoId);
+          return '<label class="list-row' + (checked ? '' : ' is-unselected') + '">' +
+            '<input type="checkbox" ' + (checked ? 'checked' : '') +
+            ' onchange="toggleSelection(\'' + v.videoId + '\', this.checked)">' +
+            '<span class="list-id">' + escHtml(v.videoId) + '</span>' +
+            '<span>' + hlMatch(v.label, terms) + '</span>' +
+            '</label>';
+        }).join('')
+        : '<div style="color:var(--text-muted);font-size:12px;padding:8px 12px">Aucun résultat</div>';
+
+      updateMasterCheckbox();
+    }
+
+    function refreshOutputs() {
+      let selectedVideos;
+      if (sortMode === 'selection') {
+        selectedVideos = selectionOrder
+          .filter(id => selectedIds.has(id))
+          .map(id => allVideos.find(v => v.videoId === id))
+          .filter(Boolean);
+      } else {
+        selectedVideos = allVideos.filter(v => selectedIds.has(v.videoId));
+      }
+      currentIds = selectedVideos.map(v => v.videoId);
+      currentLabels = selectedVideos.map(v => encodeURIComponent(v.label));
 
       document.getElementById('outputIds').textContent = currentIds.join(',');
       document.getElementById('outputLabels').textContent = currentLabels.join(',');
@@ -715,25 +936,8 @@
         ? '<a href="' + escHtml(url) + '" target="_blank" rel="noopener">' + escHtml(url) + '</a>'
         : '';
 
-      const countEl = document.getElementById('filterCount');
-      countEl.textContent = query ? filtered.length + ' / ' + allVideos.length : '';
-
-      document.getElementById('outputList').innerHTML = filtered.length
-        ? filtered.map(v =>
-          '<div class="list-row">' +
-          '<span class="list-id">' + escHtml(v.videoId) + '</span>' +
-          '<span>' + hlMatch(v.label, query) + '</span>' +
-          '</div>'
-        ).join('')
-        : '<div style="color:var(--text-muted);font-size:12px;padding:8px 12px">Aucun résultat</div>';
-    }
-
-    function applyFilter() {
-      const q = document.getElementById('filterInput').value.trim();
-      const filtered = q
-        ? allVideos.filter(v => v.label.toLowerCase().includes(q.toLowerCase()))
-        : allVideos;
-      updateOutputs(filtered, q);
+      document.getElementById('selectCount').innerHTML =
+        '<i class="ti ti-checkbox" aria-hidden="true"></i>' + selectedIds.size + ' / ' + allVideos.length + ' sélectionnés';
     }
 
     function buildUrl(ids, labels) {
@@ -766,20 +970,48 @@
       document.getElementById('filterInput').value = '';
       document.getElementById('resultSection').style.display = 'none';
       document.getElementById('fetchStatus').textContent = '';
-      allVideos = []; currentIds = []; currentLabels = [];
+      allVideos = []; selectedIds = new Set(); selectionOrder = []; lastFiltered = [];
+      currentIds = []; currentLabels = [];
+      sortMode = 'alpha';
+      document.getElementById('sortModeLabel').textContent = 'Tri : alphabétique';
+      document.getElementById('btnSortMode').classList.remove('active');
+      document.getElementById('sortModeNote').textContent = '';
     }
 
     /* ── utils ── */
     function escHtml(s) {
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-    function hlMatch(text, q) {
-      if (!q) return escHtml(text);
-      const idx = text.toLowerCase().indexOf(q.toLowerCase());
-      if (idx === -1) return escHtml(text);
-      return escHtml(text.slice(0, idx)) +
-        '<mark>' + escHtml(text.slice(idx, idx + q.length)) + '</mark>' +
-        escHtml(text.slice(idx + q.length));
+    function hlMatch(text, terms) {
+      if (!terms || !terms.length) return escHtml(text);
+      const lower = text.toLowerCase();
+      // collect non-overlapping match ranges for every term
+      const ranges = [];
+      terms.forEach(t => {
+        if (!t) return;
+        const tl = t.toLowerCase();
+        let from = 0, idx;
+        while ((idx = lower.indexOf(tl, from)) !== -1) {
+          ranges.push([idx, idx + t.length]);
+          from = idx + t.length;
+        }
+      });
+      if (!ranges.length) return escHtml(text);
+      ranges.sort((a, b) => a[0] - b[0]);
+      // merge overlapping ranges
+      const merged = [ranges[0]];
+      for (let i = 1; i < ranges.length; i++) {
+        const last = merged[merged.length - 1];
+        if (ranges[i][0] <= last[1]) last[1] = Math.max(last[1], ranges[i][1]);
+        else merged.push(ranges[i]);
+      }
+      let out = '', cursor = 0;
+      merged.forEach(([start, end]) => {
+        out += escHtml(text.slice(cursor, start)) + '<mark>' + escHtml(text.slice(start, end)) + '</mark>';
+        cursor = end;
+      });
+      out += escHtml(text.slice(cursor));
+      return out;
     }
   </script>
 </body>
