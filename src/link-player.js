@@ -106,10 +106,12 @@
     const videoMatch = url.match(/(?:youtu\.be\/|[?&]v=)([^&]+)/);
     const playlistMatch = url.match(/[?&]list=([^&]+)/);
     const videoIdsMatch = url.match(/[?&]video_ids=([^&]+)/);
+    const tMatch = url.match(/[?&]t=(\d+)/);
     return {
       videoId: videoMatch ? videoMatch[1] : null,
       playlistId: playlistMatch ? playlistMatch[1] : null,
-      videoIds: videoIdsMatch ? videoIdsMatch[1].split(",") : null
+      videoIds: videoIdsMatch ? videoIdsMatch[1].split(",") : null,
+      startSeconds: tMatch ? parseInt(tMatch[1], 10) : null
     };
   }
 
@@ -143,17 +145,17 @@
       if (video) {
         const playlistIds = u.searchParams.has("video_ids")
           ? u.searchParams
-              .get("video_ids")
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
+            .get("video_ids")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
           : null;
         const rawLabels = u.search.match(/[?&]labels=([^&]*)/)?.[1];
         const labels = rawLabels
           ? rawLabels
-              .split(",")
-              .map((s) => decodeURIComponent(s.trim()))
-              .filter(Boolean)
+            .split(",")
+            .map((s) => decodeURIComponent(s.trim()))
+            .filter(Boolean)
           : null;
         return { type: "video", id: video[1], playlistIds, labels };
       }
@@ -178,11 +180,13 @@
         ids.playlistId ? { list: ids.playlistId } : {}
       );
       p.set("enablejsapi", "1");
+      if (ids.startSeconds != null) p.set("start", ids.startSeconds);
       return `https://www.youtube.com/embed/${ids.videoId}?${p}`;
     }
     if (ids.videoIds && ids.videoIds.length) {
       const p = buildParams(autoplay, { playlist: ids.videoIds.join(",") });
       p.set("enablejsapi", "1");
+      if (ids.startSeconds != null) p.set("start", ids.startSeconds);
       return `https://www.youtube.com/embed/videoseries?${p}`;
     }
     return null;
@@ -220,21 +224,21 @@
       if (video) {
         const playlistIds = u.searchParams.has("video_ids")
           ? u.searchParams
-              .get("video_ids")
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
+            .get("video_ids")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
           : null;
         const rawLabels = u.search.match(/[?&]labels=([^&]*)/)?.[1];
         const labels = rawLabels
           ? rawLabels
-              .split(",")
-              .map((s) => decodeURIComponent(s.trim()))
-              .filter(Boolean)
+            .split(",")
+            .map((s) => decodeURIComponent(s.trim()))
+            .filter(Boolean)
           : null;
         return { type: "video", id: video[1], playlistIds, labels };
       }
-    } catch {}
+    } catch { }
     return { type: null, id: null, playlistIds: null, labels: null };
   }
 
@@ -849,6 +853,7 @@
   }
 
   class LinkPlayer {
+    static VERSION = "1.0.8";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -1022,6 +1027,6 @@
     positionTooltip,
     isTooltipVisible
   };
-  
+
   return LinkPlayer;
 });
