@@ -107,14 +107,16 @@
     const playlistMatch = url.match(/[?&]list=([^&]+)/);
     const videoIdsMatch = url.match(/[?&]video_ids=([^&]+)/);
     const tMatch = url.match(/[?&]t=(\d+)/);
+    const indexMatch = url.match(/[?&]index=(\d+)/);
+
     return {
       videoId: videoMatch ? videoMatch[1] : null,
       playlistId: playlistMatch ? playlistMatch[1] : null,
       videoIds: videoIdsMatch ? videoIdsMatch[1].split(",") : null,
-      startSeconds: tMatch ? parseInt(tMatch[1], 10) : null
+      startSeconds: tMatch ? parseInt(tMatch[1], 10) : null,
+      index: indexMatch ? parseInt(indexMatch[1], 10) : null
     };
   }
-
   function parseDailymotionIds(url) {
     try {
       const u = new URL(url);
@@ -181,14 +183,18 @@
       );
       p.set("enablejsapi", "1");
       if (ids.startSeconds != null) p.set("start", ids.startSeconds);
+      if (ids.playlistId && ids.index != null) p.set("index", ids.index);
       return `https://www.youtube.com/embed/${ids.videoId}?${p}`;
     }
+
     if (ids.videoIds && ids.videoIds.length) {
       const p = buildParams(autoplay, { playlist: ids.videoIds.join(",") });
       p.set("enablejsapi", "1");
       if (ids.startSeconds != null) p.set("start", ids.startSeconds);
+      if (ids.index != null) p.set("index", ids.index);
       return `https://www.youtube.com/embed/videoseries?${p}`;
     }
+
     return null;
   }
 
@@ -853,7 +859,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.8";
+    static VERSION = "1.0.9";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
