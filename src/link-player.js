@@ -988,7 +988,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.10";
+    static VERSION = "1.0.12";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
