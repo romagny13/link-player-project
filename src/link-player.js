@@ -191,6 +191,59 @@
     return ids.id;
   }
 
+  // "S2", "(s2)", "S2E5", "Saison 2", "Season 2"
+  const SEASON_RE =
+    /\b(?:saison|season)\s*0*(\d{1,3})\b|\bs0*(\d{1,2})(?:\b|(?=e\d))/i;
+
+  function detectSeason(label) {
+    const m = SEASON_RE.exec(label || "");
+    return m ? parseInt(m[1] || m[2], 10) : null;
+  }
+
+  // Retourne [{ label, start, end }] (end exclu) ou null si pas de groupement utile
+  function buildOkruSeasonGroups(count, labels, counts) {
+    // 1) découpage explicite
+    if (counts && counts.length) {
+      const groups = [];
+      let start = 0;
+      counts.forEach((n, i) => {
+        if (n > 0 && start < count) {
+          const end = Math.min(start + n, count);
+          groups.push({ label: `Saison ${i + 1}`, start, end });
+          start = end;
+        }
+      });
+      if (start < count) groups.push({ label: "Autres", start, end: count });
+      return groups.length > 1 ? groups : null;
+    }
+
+    // 2) détection automatique depuis les labels
+    if (!labels || !labels.length) return null;
+    const seasons = Array.from({ length: count }, (_, i) =>
+      detectSeason(labels[i])
+    );
+    const firstDetected = seasons.find((s) => s != null);
+    if (firstDetected == null) return null;
+
+    let current = firstDetected > 1 ? 1 : null; // début sans marqueur => saison 1
+    const groups = [];
+    seasons.forEach((s, i) => {
+      if (s != null) current = s;
+      const last = groups[groups.length - 1];
+      if (last && last.key === current) {
+        last.end = i + 1;
+      } else {
+        groups.push({
+          key: current,
+          label: current == null ? "Autres" : `Saison ${current}`,
+          start: i,
+          end: i + 1
+        });
+      }
+    });
+    return groups.length > 1 ? groups : null;
+  }
+
   // IFRAME src
 
   function buildParams(autoplay, extra) {
@@ -483,15 +536,48 @@
   opacity: 1;
   pointer-events: auto;
 }
+
+.lp-okru-season-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--lp-okru-item-hover);
+  border-bottom: 1px solid var(--lp-okru-item-border);
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--lp-okru-text-muted);
+  transition: color .12s;
+}
+.lp-okru-season-header:hover { color: var(--lp-okru-text-active); }
+.lp-okru-season-title { flex: 1; }
+.lp-okru-season-count {
+  font-size: 10px;
+  color: var(--lp-okru-num);
+}
+.lp-okru-season-chevron {
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 5px 4px 0 4px;
+  border-color: var(--lp-okru-accent) transparent transparent transparent;
+  transition: transform .15s;
+  flex-shrink: 0;
+}
+.lp-okru-season-collapsed .lp-okru-season-chevron { transform: rotate(-90deg); }
+.lp-okru-season-collapsed .lp-okru-season-body { display: none; }
     `;
     document.head.appendChild(s);
   }
 
-  function buildOkruPlaylistLayout(iframeSrc, ids, okruBase, theme, startId) {
+  function buildOkruPlaylistLayout(iframeSrc, ids, okruBase, theme, opts = {}) {
     injectOkruPlaylistStyles();
 
     const allIds = getOkruPlaylist(ids);
-    const activeId = startId || ids.id;
+    const activeId = opts.startId || ids.id;
     const allLabels = ids.labels || [];
 
     const wrap = document.createElement("div");
@@ -536,10 +622,10 @@
 
     sidebar.appendChild(header);
 
-    allIds.forEach((videoId, index) => {
+    function createItem(videoId, index) {
       const item = document.createElement("div");
-      item.className = "lp-okru-item" + (videoId === activeId ? " lp-okru-active" : "");
-
+      item.className =
+        "lp-okru-item" + (videoId === activeId ? " lp-okru-active" : "");
       item.dataset.videoId = videoId;
 
       const num = document.createElement("span");
@@ -561,16 +647,59 @@
       item.appendChild(arrow);
 
       item.addEventListener("click", () => {
-        const newSrc = buildOkruEmbedSrc({ id: videoId }, false, okruBase);
-        iframe.src = newSrc;
+        iframe.src = buildOkruEmbedSrc({ id: videoId }, false, okruBase);
         sidebar
           .querySelectorAll(".lp-okru-item")
           .forEach((el) => el.classList.remove("lp-okru-active"));
         item.classList.add("lp-okru-active");
       });
 
-      sidebar.appendChild(item);
-    });
+      return item;
+    }
+
+    const groups =
+      opts.groupSeasons === false
+        ? null
+        : buildOkruSeasonGroups(allIds.length, allLabels, opts.seasonCounts);
+
+    if (!groups) {
+      allIds.forEach((videoId, i) => sidebar.appendChild(createItem(videoId, i)));
+    } else {
+      const activeIndex = allIds.indexOf(activeId);
+
+      groups.forEach((g) => {
+        const section = document.createElement("div");
+        section.className = "lp-okru-season";
+
+        const head = document.createElement("div");
+        head.className = "lp-okru-season-header";
+        head.innerHTML = `
+          <span class="lp-okru-season-chevron"></span>
+          <span class="lp-okru-season-title"></span>
+          <span class="lp-okru-season-count"></span>
+        `;
+        head.querySelector(".lp-okru-season-title").textContent = g.label;
+        head.querySelector(".lp-okru-season-count").textContent = g.end - g.start;
+
+        const body = document.createElement("div");
+        body.className = "lp-okru-season-body";
+        for (let i = g.start; i < g.end; i++) {
+          body.appendChild(createItem(allIds[i], i));
+        }
+
+        // seule la saison de la vidéo active est dépliée
+        if (!(activeIndex >= g.start && activeIndex < g.end)) {
+          section.classList.add("lp-okru-season-collapsed");
+        }
+        head.addEventListener("click", () =>
+          section.classList.toggle("lp-okru-season-collapsed")
+        );
+
+        section.appendChild(head);
+        section.appendChild(body);
+        sidebar.appendChild(section);
+      });
+    }
 
     const toggle = document.createElement("div");
     toggle.className = "lp-okru-toggle";
@@ -969,19 +1098,30 @@
         }
 
         if (ids.id && ids.playlistIds && ids.playlistIds.length > 0) {
+          const seasonCounts = link.dataset.seasons
+            ? link.dataset.seasons
+              .split(",")
+              .map((n) => parseInt(n, 10))
+              .filter((n) => n > 0)
+            : null;
+
           const layout = buildOkruPlaylistLayout(
             newSrc,
             ids,
             this._okruBase,
             this._theme,
-            startId
+            {
+              startId,
+              seasonCounts,
+              groupSeasons: this._options.groupSeasons // false pour désactiver
+            }
           );
           targetContainer.replaceChildren(layout);
-          // faire défiler la sidebar jusqu'à la vidéo active
           layout
             .querySelector(".lp-okru-active")
             ?.scrollIntoView({ block: "nearest" });
-        } else {
+        }
+        else {
           iframeHtml = buildIframe(newSrc, "Ok.ru player");
           targetContainer.innerHTML = iframeHtml;
         }
@@ -1029,6 +1169,8 @@
     parseOkruIds,
     getOkruPlaylist,
     resolveOkruStartId,
+    detectSeason,
+    buildOkruSeasonGroups,
     // builders
     buildYouTubeEmbedSrc,
     buildDailymotionEmbedSrc,
