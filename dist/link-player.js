@@ -159,12 +159,36 @@
             .map((s) => decodeURIComponent(s.trim()))
             .filter(Boolean)
           : null;
-        return { type: "video", id: video[1], playlistIds, labels };
+        const indexParam = u.searchParams.get("index");
+        const index = indexParam !== null ? parseInt(indexParam, 10) : null;
+        return {
+          type: "video",
+          id: video[1],
+          playlistIds,
+          labels,
+          index: Number.isNaN(index) ? null : index
+        };
       }
     } catch {
       /* noop */
     }
-    return { type: null, id: null, playlistIds: null, labels: null };
+    return { type: null, id: null, playlistIds: null, labels: null, index: null };
+  }
+
+  // Retourne la liste ordonnée des vidéos de la playlist
+  function getOkruPlaylist(ids) {
+    if (!ids.playlistIds || !ids.playlistIds.length) return [ids.id];
+    return ids.playlistIds.includes(ids.id)
+      ? [...ids.playlistIds]
+      : [ids.id, ...ids.playlistIds];
+  }
+
+  // Retourne l'id de la vidéo à lancer en premier (selon l'index)
+  function resolveOkruStartId(ids, indexOverride) {
+    const list = getOkruPlaylist(ids);
+    const index = indexOverride != null ? indexOverride : ids.index;
+    if (index != null && index >= 0 && index < list.length) return list[index];
+    return ids.id;
   }
 
   // IFRAME src
@@ -221,31 +245,6 @@
       `<iframe src="${src}" title="${title}" frameborder="0" ` +
       `allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>`
     );
-  }
-
-  function parseOkruIds(url) {
-    try {
-      const u = new URL(url);
-      const video = u.pathname.match(/^\/video\/([^/]+)/);
-      if (video) {
-        const playlistIds = u.searchParams.has("video_ids")
-          ? u.searchParams
-            .get("video_ids")
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-          : null;
-        const rawLabels = u.search.match(/[?&]labels=([^&]*)/)?.[1];
-        const labels = rawLabels
-          ? rawLabels
-            .split(",")
-            .map((s) => decodeURIComponent(s.trim()))
-            .filter(Boolean)
-          : null;
-        return { type: "video", id: video[1], playlistIds, labels };
-      }
-    } catch { }
-    return { type: null, id: null, playlistIds: null, labels: null };
   }
 
   function pauseYouTubeIframe(iframe) {
@@ -488,10 +487,11 @@
     document.head.appendChild(s);
   }
 
-  function buildOkruPlaylistLayout(iframeSrc, ids, okruBase, theme) {
+  function buildOkruPlaylistLayout(iframeSrc, ids, okruBase, theme, startId) {
     injectOkruPlaylistStyles();
 
-    const allIds = [ids.id, ...ids.playlistIds.filter((id) => id !== ids.id)];
+    const allIds = getOkruPlaylist(ids);
+    const activeId = startId || ids.id;
     const allLabels = ids.labels || [];
 
     const wrap = document.createElement("div");
@@ -538,8 +538,8 @@
 
     allIds.forEach((videoId, index) => {
       const item = document.createElement("div");
-      item.className =
-        "lp-okru-item" + (videoId === ids.id ? " lp-okru-active" : "");
+      item.className = "lp-okru-item" + (videoId === activeId ? " lp-okru-active" : "");
+
       item.dataset.videoId = videoId;
 
       const num = document.createElement("span");
@@ -859,7 +859,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.9";
+    static VERSION = "1.0.10";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -953,26 +953,41 @@
         this._options.onChange?.(url, link);
       } else if (urlType === "okru") {
         const ids = parseOkruIds(url);
-        newSrc = buildOkruEmbedSrc(ids, autoplay, this._okruBase);
+
+        // data-index prioritaire sur le paramètre ?index= de l'URL
+        const dataIndex =
+          link.dataset.index !== undefined ? parseInt(link.dataset.index, 10) : null;
+        const startId = resolveOkruStartId(
+          ids,
+          Number.isNaN(dataIndex) ? null : dataIndex
+        );
+
+        newSrc = buildOkruEmbedSrc({ id: startId }, autoplay, this._okruBase);
         if (currentIframe && newSrc === currentIframe.src) {
           targetContainer.innerHTML = "";
           return;
         }
-        // sidebar
+
         if (ids.id && ids.playlistIds && ids.playlistIds.length > 0) {
           const layout = buildOkruPlaylistLayout(
             newSrc,
             ids,
             this._okruBase,
-            this._theme
+            this._theme,
+            startId
           );
           targetContainer.replaceChildren(layout);
+          // faire défiler la sidebar jusqu'à la vidéo active
+          layout
+            .querySelector(".lp-okru-active")
+            ?.scrollIntoView({ block: "nearest" });
         } else {
           iframeHtml = buildIframe(newSrc, "Ok.ru player");
           targetContainer.innerHTML = iframeHtml;
         }
         this._options.onChange?.(url, link);
       }
+
     }
 
     scan() {
@@ -1012,6 +1027,8 @@
     parseYouTubeIds,
     parseDailymotionIds,
     parseOkruIds,
+    getOkruPlaylist,
+    resolveOkruStartId,
     // builders
     buildYouTubeEmbedSrc,
     buildDailymotionEmbedSrc,
