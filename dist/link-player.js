@@ -12,7 +12,7 @@
   const TOOLTIP_ID = "linkplayer-tooltip";
   const TOOLTIP_STYLES_ID = "linkplayer-tooltip-styles";
   const OKRU_PLAYLIST_STYLES_ID = "linkplayer-okru-playlist-styles";
-  const OKRU_TOGGLE_VISIBLE_DELAY = 2500;
+  const INLINE_TARGET_STYLES_ID = "linkplayer-inline-target-styles";
 
   function isTouchDevice() {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -20,8 +20,12 @@
   }
 
   function getTheme() {
-    const saved = localStorage.getItem("theme");
-    if (saved) return saved;
+    try {
+      const saved = localStorage.getItem("theme");
+      if (saved) return saved;
+    } catch {
+      /* localStorage indisponible (sandbox, mode privé...) */
+    }
 
     return window.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
@@ -39,6 +43,29 @@
     return scope.querySelectorAll("a[data-link]");
   }
 
+  function injectInlineTargetStyles() {
+    if (document.getElementById(INLINE_TARGET_STYLES_ID)) return;
+    const s = document.createElement("style");
+    s.id = INLINE_TARGET_STYLES_ID;
+    s.textContent = `
+.lp-inline-target {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+.lp-inline-target:empty { display: none; }
+.lp-inline-target iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+    `;
+    document.head.appendChild(s);
+  }
+
   function resolveTargetContainer(link) {
     // data-target attribute
     if (link.dataset.target)
@@ -47,6 +74,7 @@
     const next = link.nextElementSibling;
     if (next?.classList.contains("lp-inline-target")) return next;
     // create target
+    injectInlineTargetStyles();
     const div = document.createElement("div");
     div.className = "lp-inline-target";
     link.insertAdjacentElement("afterend", div);
@@ -102,10 +130,13 @@
     return null;
   }
 
+  // id vidéo : s'arrête à & ? # (ex: youtu.be/ID?si=...&t=110)
+  const YT_VIDEO_RE = /(?:youtu\.be\/|[?&]v=)([^&?#]+)/;
+
   function parseYouTubeIds(url) {
-    const videoMatch = url.match(/(?:youtu\.be\/|[?&]v=)([^&]+)/);
-    const playlistMatch = url.match(/[?&]list=([^&]+)/);
-    const videoIdsMatch = url.match(/[?&]video_ids=([^&]+)/);
+    const videoMatch = url.match(YT_VIDEO_RE);
+    const playlistMatch = url.match(/[?&]list=([^&#]+)/);
+    const videoIdsMatch = url.match(/[?&]video_ids=([^&#]+)/);
     const tMatch = url.match(/[?&]t=(\d+)/);
     const indexMatch = url.match(/[?&]index=(\d+)/);
 
@@ -117,6 +148,7 @@
       index: indexMatch ? parseInt(indexMatch[1], 10) : null
     };
   }
+
   function parseDailymotionIds(url) {
     try {
       const u = new URL(url);
@@ -140,6 +172,14 @@
     return { type: null, id: null, playlistId: null };
   }
 
+  function safeDecode(s) {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  }
+
   function parseOkruIds(url) {
     try {
       const u = new URL(url);
@@ -156,7 +196,7 @@
         const labels = rawLabels
           ? rawLabels
             .split(",")
-            .map((s) => decodeURIComponent(s.trim()))
+            .map((s) => safeDecode(s.trim()))
             .filter(Boolean)
           : null;
         const indexParam = u.searchParams.get("index");
@@ -201,7 +241,7 @@
   }
 
   // Retourne [{ label, start, end }] (end exclu) ou null si pas de groupement utile
-  function buildOkruSeasonGroups(count, labels, counts) {
+  function buildOkruSeasonGroups(count, labels, counts, seasonLabel = "Saison") {
     // 1) découpage explicite
     if (counts && counts.length) {
       const groups = [];
@@ -209,7 +249,7 @@
       counts.forEach((n, i) => {
         if (n > 0 && start < count) {
           const end = Math.min(start + n, count);
-          groups.push({ label: `Saison ${i + 1}`, start, end });
+          groups.push({ label: `${seasonLabel} ${i + 1}`, start, end });
           start = end;
         }
       });
@@ -235,7 +275,7 @@
       } else {
         groups.push({
           key: current,
-          label: current == null ? "Autres" : `Saison ${current}`,
+          label: current == null ? "Autres" : `${seasonLabel} ${current}`,
           start: i,
           end: i + 1
         });
@@ -287,8 +327,9 @@
 
   function buildOkruEmbedSrc(ids, autoplay, baseUrl) {
     if (!ids.id) return null;
-    const p = buildParams(autoplay);
-    return `${baseUrl}${ids.id}&${p}`;
+    const qs = buildParams(autoplay).toString();
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${ids.id}${qs ? sep + qs : ""}`;
   }
 
   // build html iframe
@@ -301,7 +342,7 @@
   }
 
   function pauseYouTubeIframe(iframe) {
-    if (!iframe) return;
+    if (!iframe || !iframe.contentWindow) return;
     if (iframe.src.includes("youtube.com")) {
       iframe.contentWindow.postMessage(
         JSON.stringify({ event: "command", func: "pauseVideo", args: [] }),
@@ -311,7 +352,7 @@
   }
 
   function pauseDailymotionIframe(iframe) {
-    if (!iframe) return;
+    if (!iframe || !iframe.contentWindow) return;
     if (iframe.src.includes("dailymotion.com")) {
       iframe.contentWindow.postMessage("pause", "https://www.dailymotion.com");
     }
@@ -516,14 +557,15 @@
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  color: #fff;
+  background: var(--lp-okru-toggle-bg);
+  color: var(--lp-okru-toggle-color);
   opacity: 0;
   pointer-events: none;
   transition: opacity .15s;
   padding: 0;
 }
 .lp-okru-toggle:hover {
-    opacity: 0.8 !important;
+  opacity: 0.8 !important;
 }
 .lp-okru-toggle svg { width: 18px; height: 18px; flex-shrink: 0; }
 
@@ -578,7 +620,12 @@
 
     const allIds = getOkruPlaylist(ids);
     const activeId = opts.startId || ids.id;
-    const allLabels = ids.labels || [];
+
+    // Si l'id de l'URL a été ajouté en tête (absent de video_ids), les labels
+    // (alignés sur video_ids) sont décalés d'un cran : on réaligne.
+    const offset = allIds.length - (ids.playlistIds ? ids.playlistIds.length : 0);
+    const rawLabels = ids.labels || [];
+    const allLabels = offset > 0 ? [...Array(offset).fill(""), ...rawLabels] : rawLabels;
 
     const wrap = document.createElement("div");
     wrap.className = "lp-okru-wrap";
@@ -597,14 +644,14 @@
 
     const sidebar = document.createElement("div");
     sidebar.className = "lp-okru-sidebar";
-    if (allLabels.length > 0) {
-      sidebar.style.width = getSidebarWidth(allLabels);
+    if (rawLabels.length > 0) {
+      sidebar.style.width = getSidebarWidth(rawLabels);
     }
 
     const header = document.createElement("div");
     header.className = "lp-okru-sidebar-header";
     header.innerHTML = `
-        <span style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4a4a4a;font-family:system-ui,sans-serif;">Playlist</span>
+        <span>Playlist</span>
         <span class="lp-okru-sidebar-collapse-btn" title="Hide playlist">
             <svg viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M2 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -634,8 +681,7 @@
 
       const label = document.createElement("span");
       label.className = "lp-okru-label";
-      const textContent =
-        allLabels.length > index ? allLabels[index] : `Video ${index + 1}`;
+      const textContent = allLabels[index] || `Video ${index + 1}`;
       label.textContent = textContent;
       item.title = textContent;
 
@@ -647,11 +693,13 @@
       item.appendChild(arrow);
 
       item.addEventListener("click", () => {
-        iframe.src = buildOkruEmbedSrc({ id: videoId }, false, okruBase);
+        // l'utilisateur vient de cliquer : on lance directement la lecture
+        iframe.src = buildOkruEmbedSrc({ id: videoId }, true, okruBase);
         sidebar
           .querySelectorAll(".lp-okru-item")
           .forEach((el) => el.classList.remove("lp-okru-active"));
         item.classList.add("lp-okru-active");
+        opts.onSelect?.(videoId, index);
       });
 
       return item;
@@ -660,7 +708,12 @@
     const groups =
       opts.groupSeasons === false
         ? null
-        : buildOkruSeasonGroups(allIds.length, allLabels, opts.seasonCounts);
+        : buildOkruSeasonGroups(
+          allIds.length,
+          allLabels,
+          opts.seasonCounts,
+          opts.seasonLabel || "Saison"
+        );
 
     if (!groups) {
       allIds.forEach((videoId, i) => sidebar.appendChild(createItem(videoId, i)));
@@ -736,9 +789,9 @@
   }
 
   function resolveYouTubeThumbnail(url) {
-    const video = url.match(/(?:youtu\.be\/|[?&]v=)([^&]+)/);
+    const video = url.match(YT_VIDEO_RE);
     if (video) return `https://img.youtube.com/vi/${video[1]}/hqdefault.jpg`;
-    const ids = url.match(/[?&]video_ids=([^&,]+)/);
+    const ids = url.match(/[?&]video_ids=([^&,#]+)/);
     if (ids) return `https://img.youtube.com/vi/${ids[1]}/hqdefault.jpg`;
     return null;
   }
@@ -751,8 +804,10 @@
 
   async function resolveOkruThumbnail(url) {
     try {
+      // on n'envoie que la partie sans query (video_ids / labels peuvent être énormes)
+      const cleanUrl = url.split("?")[0];
       const res = await fetch(
-        `https://ok.ru/oembed?url=${encodeURIComponent(url)}&format=json`
+        `https://ok.ru/oembed?url=${encodeURIComponent(cleanUrl)}&format=json`
       );
       if (!res.ok) return null;
       const data = await res.json();
@@ -783,7 +838,11 @@
             display: flex;
             align-items: center;
             padding: 0 12px;
+            height: auto;
             min-height: 42px;
+        }
+        #${TOOLTIP_ID}.lp-no-thumb .lp-tooltip-play {
+            display: none;
         }
         #${TOOLTIP_ID}.lp-no-thumb .lp-tooltip-title {
             position: static;
@@ -916,13 +975,22 @@
     tooltip.style.top = `${y}px`;
   }
 
+  // Évite les courses : timer de masquage + jeton pour ignorer les
+  // miniatures qui arrivent après qu'un autre lien a pris la main.
+  let _hideTimer = null;
+  let _tooltipToken = 0;
+
   async function showTooltip(tooltip, url, label, forcedThumb) {
+    clearTimeout(_hideTimer);
+    const token = ++_tooltipToken;
+
     const img = tooltip.querySelector(".lp-tooltip-img");
     const loader = tooltip.querySelector(".lp-tooltip-loader");
     const title = tooltip.querySelector(".lp-tooltip-title");
 
+    tooltip.classList.remove("lp-no-thumb");
     img.style.display = "none";
-    img.src = "";
+    img.removeAttribute("src");
     loader.style.display = "block";
     title.textContent = label || "";
 
@@ -933,20 +1001,23 @@
     });
 
     const thumbUrl = forcedThumb || (await resolveThumbnailCached(url));
+    if (token !== _tooltipToken) return;
+
     if (!thumbUrl) {
       loader.style.display = "none";
       tooltip.classList.add("lp-no-thumb");
       return;
     }
-    tooltip.classList.remove("lp-no-thumb");
 
     const image = new Image();
     image.onload = () => {
+      if (token !== _tooltipToken) return;
       loader.style.display = "none";
       img.src = thumbUrl;
       img.style.display = "block";
     };
     image.onerror = () => {
+      if (token !== _tooltipToken) return;
       loader.style.display = "none";
       tooltip.classList.add("lp-no-thumb");
     };
@@ -954,9 +1025,11 @@
   }
 
   function hideTooltip(tooltip) {
+    _tooltipToken++;
     tooltip.style.opacity = "0";
     tooltip.style.transform = "translateY(4px)";
-    setTimeout(() => {
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(() => {
       tooltip.style.display = "none";
     }, 150);
   }
@@ -988,7 +1061,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.12";
+    static VERSION = "1.0.13";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -1060,7 +1133,7 @@
         }
         if (currentIframe) {
           pauseYouTubeIframe(currentIframe);
-          if (newSrc && newSrc === currentIframe.src) {
+          if (newSrc === currentIframe.src) {
             targetContainer.innerHTML = "";
             return;
           }
@@ -1070,9 +1143,13 @@
         this._options.onChange?.(url, link);
       } else if (urlType === "dailymotion") {
         newSrc = buildDailymotionEmbedSrc(parseDailymotionIds(url), autoplay);
+        if (!newSrc) {
+          this._options.onError?.(`URL not supported : ${url}`);
+          return;
+        }
         if (currentIframe) {
           pauseDailymotionIframe(currentIframe);
-          if (newSrc && newSrc === currentIframe.src) {
+          if (newSrc === currentIframe.src) {
             targetContainer.innerHTML = "";
             return;
           }
@@ -1085,13 +1162,19 @@
 
         // data-index prioritaire sur le paramètre ?index= de l'URL
         const dataIndex =
-          link.dataset.index !== undefined ? parseInt(link.dataset.index, 10) : null;
+          link.dataset.index !== undefined
+            ? parseInt(link.dataset.index, 10)
+            : null;
         const startId = resolveOkruStartId(
           ids,
           Number.isNaN(dataIndex) ? null : dataIndex
         );
 
         newSrc = buildOkruEmbedSrc({ id: startId }, autoplay, this._okruBase);
+        if (!newSrc) {
+          this._options.onError?.(`URL not supported : ${url}`);
+          return;
+        }
         if (currentIframe && newSrc === currentIframe.src) {
           targetContainer.innerHTML = "";
           return;
@@ -1113,21 +1196,30 @@
             {
               startId,
               seasonCounts,
-              groupSeasons: this._options.groupSeasons // false pour désactiver
+              groupSeasons: this._options.groupSeasons, // false pour désactiver
+              seasonLabel: this._options.seasonLabel, // ex: "Season"
+              onSelect: (videoId, index) =>
+                this._options.onChange?.(url, link, { videoId, index })
             }
           );
           targetContainer.replaceChildren(layout);
-          layout
-            .querySelector(".lp-okru-active")
-            ?.scrollIntoView({ block: "nearest" });
-        }
-        else {
+
+          // fait défiler uniquement la sidebar (scrollIntoView ferait
+          // défiler toute la page)
+          const sb = layout.querySelector(".lp-okru-sidebar");
+          const active = layout.querySelector(".lp-okru-active");
+          if (sb && active) {
+            sb.scrollTop = Math.max(
+              0,
+              active.offsetTop - sb.clientHeight / 2 + active.offsetHeight / 2
+            );
+          }
+        } else {
           iframeHtml = buildIframe(newSrc, "Ok.ru player");
           targetContainer.innerHTML = iframeHtml;
         }
         this._options.onChange?.(url, link);
       }
-
     }
 
     scan() {
