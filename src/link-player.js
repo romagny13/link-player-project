@@ -13,6 +13,14 @@
   const TOOLTIP_STYLES_ID = "linkplayer-tooltip-styles";
   const OKRU_PLAYLIST_STYLES_ID = "linkplayer-okru-playlist-styles";
   const INLINE_TARGET_STYLES_ID = "linkplayer-inline-target-styles";
+  const OKRU_SIDEBAR_WIDTH_KEY = "linkplayer-okru-sidebar-width";
+  const OKRU_SIDEBAR_MIN_WIDTH = 140;
+  const TOOLTIP_THUMB_TIMEOUT = 3000;
+  const PROVIDER_LABELS = {
+    youtube: "YouTube",
+    dailymotion: "Dailymotion",
+    okru: "Ok.ru"
+  };
 
   function isTouchDevice() {
     if (typeof window === "undefined" || !window.matchMedia) return false;
@@ -434,7 +442,8 @@
   top: 0;
   right: 0;
   bottom: 0;
-  width: 176px;
+  width: var(--lp-okru-sidebar-w, 176px);
+  max-width: 70%;
   background: var(--lp-okru-bg);
   border-left: 1px solid var(--lp-okru-border);
   display: flex;
@@ -611,8 +620,129 @@
 }
 .lp-okru-season-collapsed .lp-okru-season-chevron { transform: rotate(-90deg); }
 .lp-okru-season-collapsed .lp-okru-season-body { display: none; }
+.lp-okru-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(min(var(--lp-okru-sidebar-w, 176px), 70%) - 5px);
+  width: 10px;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 1000;
+}
+.lp-okru-resize::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: var(--lp-okru-accent);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.lp-okru-resize:hover::after,
+.lp-okru-resize:focus-visible::after,
+.lp-okru-resizing .lp-okru-resize::after { opacity: .8; }
+.lp-okru-resize:focus-visible { outline: none; }
+
+.lp-okru-resizing { user-select: none; cursor: col-resize; }
+.lp-okru-resizing .lp-okru-iframe-slot iframe { pointer-events: none; }
+
+/* sidebar repliée : plus de poignée */
+.lp-okru-wrap.lp-okru-collapsed .lp-okru-resize { display: none; }
     `;
     document.head.appendChild(s);
+  }
+
+  function readSavedSidebarWidth() {
+    try {
+      const n = parseInt(localStorage.getItem(OKRU_SIDEBAR_WIDTH_KEY), 10);
+      return n >= OKRU_SIDEBAR_MIN_WIDTH ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveSidebarWidth(w) {
+    try {
+      localStorage.setItem(OKRU_SIDEBAR_WIDTH_KEY, String(w));
+    } catch {
+      /* noop */
+    }
+  }
+
+  function clearSavedSidebarWidth() {
+    try {
+      localStorage.removeItem(OKRU_SIDEBAR_WIDTH_KEY);
+    } catch {
+      /* noop */
+    }
+  }
+
+  function createOkruResizeHandle(wrap, sidebar, autoWidth, persist) {
+    const handle = document.createElement("div");
+    handle.className = "lp-okru-resize";
+    handle.tabIndex = 0;
+    handle.setAttribute("role", "separator");
+    handle.setAttribute("aria-orientation", "vertical");
+    handle.setAttribute("aria-label", "Resize playlist");
+    handle.title = "Drag to resize (double-click to reset)";
+
+    // largeur max = 70 % du player ; min = OKRU_SIDEBAR_MIN_WIDTH
+    function setWidth(px) {
+      const max = Math.max(
+        OKRU_SIDEBAR_MIN_WIDTH,
+        Math.floor(wrap.clientWidth * 0.7)
+      );
+      const w = Math.min(Math.max(Math.round(px), OKRU_SIDEBAR_MIN_WIDTH), max);
+      wrap.style.setProperty("--lp-okru-sidebar-w", `${w}px`);
+      return w;
+    }
+
+    let startX = 0;
+    let startW = 0;
+    let current = 0;
+
+    handle.addEventListener("pointerdown", (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      startX = e.clientX;
+      startW = sidebar.getBoundingClientRect().width;
+      current = startW;
+      handle.setPointerCapture(e.pointerId);
+      wrap.classList.add("lp-okru-resizing");
+      e.preventDefault();
+    });
+
+    handle.addEventListener("pointermove", (e) => {
+      if (!handle.hasPointerCapture(e.pointerId)) return;
+      // la sidebar est à droite : glisser vers la gauche l'agrandit
+      current = setWidth(startW + (startX - e.clientX));
+    });
+
+    const endDrag = (e) => {
+      if (!handle.hasPointerCapture(e.pointerId)) return;
+      handle.releasePointerCapture(e.pointerId);
+      wrap.classList.remove("lp-okru-resizing");
+      if (persist) saveSidebarWidth(current);
+    };
+    handle.addEventListener("pointerup", endDrag);
+    handle.addEventListener("pointercancel", endDrag);
+
+    handle.addEventListener("dblclick", () => {
+      wrap.style.setProperty("--lp-okru-sidebar-w", `${autoWidth}px`);
+      if (persist) clearSavedSidebarWidth();
+    });
+
+    handle.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const delta = e.key === "ArrowLeft" ? 16 : -16;
+      current = setWidth(sidebar.getBoundingClientRect().width + delta);
+      if (persist) saveSidebarWidth(current);
+    });
+
+    return handle;
   }
 
   function buildOkruPlaylistLayout(iframeSrc, ids, okruBase, theme, opts = {}) {
@@ -644,9 +774,12 @@
 
     const sidebar = document.createElement("div");
     sidebar.className = "lp-okru-sidebar";
-    if (rawLabels.length > 0) {
-      sidebar.style.width = getSidebarWidth(rawLabels);
-    }
+    const autoWidth =
+      rawLabels.length > 0 ? parseInt(getSidebarWidth(rawLabels), 10) : 176;
+    const resizable = opts.resizable !== false;
+    const persist = opts.persistWidth !== false;
+    const savedWidth = resizable && persist ? readSavedSidebarWidth() : null;
+    wrap.style.setProperty("--lp-okru-sidebar-w", `${savedWidth || autoWidth}px`);
 
     const header = document.createElement("div");
     header.className = "lp-okru-sidebar-header";
@@ -774,6 +907,9 @@
 
     wrap.appendChild(iframeSlot);
     wrap.appendChild(sidebar);
+    if (resizable) {
+      wrap.appendChild(createOkruResizeHandle(wrap, sidebar, autoWidth, persist));
+    }
 
     return wrap;
   }
@@ -830,26 +966,37 @@
     s.id = TOOLTIP_STYLES_ID;
     const h = TOOLTIP_IMG_SIZE.height;
     s.textContent = `
-        #${TOOLTIP_ID} {
+       #${TOOLTIP_ID} {
             position: relative;
             height: ${h}px;
+            background: #1a1a1a;
         }
+
+        /* Fallback sans miniature : même taille, placeholder aux couleurs du service */
         #${TOOLTIP_ID}.lp-no-thumb {
-            display: flex;
-            align-items: center;
-            padding: 0 12px;
-            height: auto;
-            min-height: 42px;
+            background: linear-gradient(135deg, var(--lp-fb-a, #2f2f2f), var(--lp-fb-b, #141414));
         }
-        #${TOOLTIP_ID}.lp-no-thumb .lp-tooltip-play {
-            display: none;
+        #${TOOLTIP_ID}[data-provider="youtube"]     { --lp-fb-a: #4d1414; --lp-fb-b: #141414; }
+        #${TOOLTIP_ID}[data-provider="dailymotion"] { --lp-fb-a: #123a63; --lp-fb-b: #101820; }
+        #${TOOLTIP_ID}[data-provider="okru"]        { --lp-fb-a: #5a3508; --lp-fb-b: #181108; }
+
+        #${TOOLTIP_ID}.lp-no-thumb::before {
+            content: attr(data-provider-label);
+            position: absolute;
+            top: 10px;
+            left: 12px;
+            font: 600 10px system-ui, sans-serif;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.55);
         }
+        #${TOOLTIP_ID}.lp-no-thumb .lp-tooltip-play { top: 42%; }
         #${TOOLTIP_ID}.lp-no-thumb .lp-tooltip-title {
-            position: static;
-            bottom: auto; left: auto; right: auto;
-            font-size: 13px;
-            text-shadow: none;
-            color: #ccc;
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            line-height: 1.3;
         }
         #${TOOLTIP_ID}::after {
             content: '';
@@ -945,7 +1092,6 @@
       position: "fixed",
       zIndex: "9999",
       width: `${TOOLTIP_IMG_SIZE.width}px`,
-      background: "#1a1a1a",
       borderRadius: "8px",
       overflow: "hidden",
       boxShadow: "0 8px 24px rgba(0,0,0,.55)",
@@ -988,6 +1134,10 @@
     const loader = tooltip.querySelector(".lp-tooltip-loader");
     const title = tooltip.querySelector(".lp-tooltip-title");
 
+    const provider = getUrlType(url);
+    tooltip.dataset.provider = provider || "";
+    tooltip.dataset.providerLabel = PROVIDER_LABELS[provider] || "";
+
     tooltip.classList.remove("lp-no-thumb");
     img.style.display = "none";
     img.removeAttribute("src");
@@ -1000,26 +1150,41 @@
       tooltip.style.transform = "translateY(0)";
     });
 
-    const thumbUrl = forcedThumb || (await resolveThumbnailCached(url));
+    const useFallback = () => {
+      loader.style.display = "none";
+      tooltip.classList.add("lp-no-thumb");
+    };
+
+    const thumbUrl =
+      forcedThumb ||
+      (await Promise.race([
+        resolveThumbnailCached(url),
+        new Promise((resolve) =>
+          setTimeout(() => resolve(null), TOOLTIP_THUMB_TIMEOUT)
+        )
+      ]));
     if (token !== _tooltipToken) return;
 
     if (!thumbUrl) {
-      loader.style.display = "none";
-      tooltip.classList.add("lp-no-thumb");
+      useFallback();
       return;
     }
 
     const image = new Image();
     image.onload = () => {
       if (token !== _tooltipToken) return;
+      // YouTube renvoie une image grise 120x90 quand la vidéo n'existe plus
+      if (provider === "youtube" && image.naturalWidth <= 120) {
+        useFallback();
+        return;
+      }
       loader.style.display = "none";
       img.src = thumbUrl;
       img.style.display = "block";
     };
     image.onerror = () => {
       if (token !== _tooltipToken) return;
-      loader.style.display = "none";
-      tooltip.classList.add("lp-no-thumb");
+      useFallback();
     };
     image.src = thumbUrl;
   }
@@ -1061,7 +1226,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.13";
+    static VERSION = "1.0.14";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -1198,6 +1363,8 @@
               seasonCounts,
               groupSeasons: this._options.groupSeasons, // false pour désactiver
               seasonLabel: this._options.seasonLabel, // ex: "Season"
+              resizable: this._options.resizable,       // false pour désactiver
+              persistWidth: this._options.persistWidth, // false pour ne pas mémoriser
               onSelect: (videoId, index) =>
                 this._options.onChange?.(url, link, { videoId, index })
             }
