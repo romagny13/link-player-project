@@ -1226,7 +1226,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.16";
+    static VERSION = "1.0.17";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -1341,7 +1341,7 @@
           this._options.onError?.(`URL not supported : ${url}`);
           return;
         }
-        if (newSrc === currentIframe.src) {
+        if (currentIframe && newSrc === currentIframe.src) {
           if (!this._options.autoplayOnClick) targetContainer.innerHTML = "";
           return;
         }
