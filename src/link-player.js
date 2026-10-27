@@ -1226,7 +1226,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.15";
+    static VERSION = "1.0.16";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -1299,7 +1299,8 @@
         if (currentIframe) {
           pauseYouTubeIframe(currentIframe);
           if (newSrc === currentIframe.src) {
-            targetContainer.innerHTML = "";
+            // avec autoplayOnClick, recliquer sur la vidéo en cours ne la supprime pas
+            if (!this._options.autoplayOnClick) targetContainer.innerHTML = "";
             return;
           }
         }
@@ -1315,7 +1316,7 @@
         if (currentIframe) {
           pauseDailymotionIframe(currentIframe);
           if (newSrc === currentIframe.src) {
-            targetContainer.innerHTML = "";
+            if (!this._options.autoplayOnClick) targetContainer.innerHTML = "";
             return;
           }
         }
@@ -1340,8 +1341,8 @@
           this._options.onError?.(`URL not supported : ${url}`);
           return;
         }
-        if (currentIframe && newSrc === currentIframe.src) {
-          targetContainer.innerHTML = "";
+        if (newSrc === currentIframe.src) {
+          if (!this._options.autoplayOnClick) targetContainer.innerHTML = "";
           return;
         }
 
