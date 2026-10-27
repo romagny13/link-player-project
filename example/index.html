@@ -53,6 +53,19 @@
             color: #fff;
         }
 
+        .demo-note {
+            font-size: .8rem;
+            color: #888;
+            margin-bottom: .75rem;
+        }
+
+        .demo-note code {
+            color: #ccc;
+            background: #1c1c1c;
+            padding: .1rem .35rem;
+            border-radius: 3px;
+        }
+
         /* ── embed container ── */
         .video-container {
             position: relative;
@@ -98,14 +111,16 @@
 
     <div id="scope">
         <h2>YouTube</h2>
+        <p class="demo-note">
+            Option <code>autoplayOnClick: true</code>: the first video is displayed paused on load,
+            then each click on a link starts playback.
+        </p>
         <div class="link-list">
-            <a href="https://www.youtube.com/watch?v=FVhqw12-BVo" data-link data-target="target" data-show-on-init
-                data-autoplay>
-                Vidéo 1 (autoplay)
+            <a href="https://www.youtube.com/watch?v=FVhqw12-BVo" data-link data-target="target" data-show-on-init>
+                Video 1 (paused on load, plays on click)
             </a>
-            <a href="https://youtu.be/wPw_5Qtf0wc?si=ndSj0Q6XzixxAllF&t=110" data-link data-target="target"
-                data-autoplay>
-                Vidéo avec temps de début
+            <a href="https://youtu.be/wPw_5Qtf0wc?si=ndSj0Q6XzixxAllF&t=110" data-link data-target="target">
+                Video with start time
             </a>
             <a href="https://www.youtube.com/watch?v=k98esvB9E40&list=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y" data-link
                 data-target="target">
@@ -185,6 +200,7 @@
         new LinkPlayer({
             scope: '#scope',
             embedBaseUrl: "https://okru-embed.vercel.app/?id=",
+            autoplayOnClick: true,
             // theme:"light",
             // wrapEmbed: iframe => `<div class="video-container">${iframe}</div>`,
             onChange: (url, link) => {

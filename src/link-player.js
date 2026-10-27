@@ -1226,7 +1226,7 @@
   }
 
   class LinkPlayer {
-    static VERSION = "1.0.14";
+    static VERSION = "1.0.15";
     constructor(options = {}) {
       this._options = options;
       this._scope = resolveScope(options.scope);
@@ -1390,22 +1390,23 @@
     }
 
     scan() {
-      // on recupere tous les links avec attribut data-link
       const links = getLinks(this._scope);
       links.forEach((link) => {
-        // autoplay
-        const autoplay = link.hasAttribute("data-autoplay");
+        // affichage initial : autoplay seulement si data-autoplay est présent
+        const initAutoplay = link.hasAttribute("data-autoplay");
+        // clic : toujours lancer la lecture si l'option est activée
+        const clickAutoplay =
+          this._options.autoplayOnClick === true || initAutoplay;
 
-        // show on init
         if (link.hasAttribute("data-show-on-init")) {
           const container = resolveTargetContainer(link);
-          if (container) this._mountEmbed(container, link, autoplay);
+          if (container) this._mountEmbed(container, link, initAutoplay);
         }
 
         link.addEventListener("click", (e) => {
           e.preventDefault();
           const container = resolveTargetContainer(link);
-          if (container) this._mountEmbed(container, link, autoplay);
+          if (container) this._mountEmbed(container, link, clickAutoplay);
         });
 
         this._attachTooltip(link);
