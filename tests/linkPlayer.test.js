@@ -54,7 +54,9 @@ const ytFetch = ({ ids = ["a", "b"], privateIds = [] } = {}) =>
           channelTitle: "Chan",
           thumbnails: { medium: { url: `https://t/${id}.jpg` } }
         },
-        status: { privacyStatus: privateIds.includes(id) ? "private" : "public" }
+        status: {
+          privacyStatus: privateIds.includes(id) ? "private" : "public"
+        }
       }))
     });
   });
@@ -199,7 +201,13 @@ describe("groupBySeason", () => {
 
   it("groups by explicit season markers in titles", () => {
     const groups = groupBySeason(
-      titles("S01E01 Pilot", "S01E02 Next", "Season 2 Episode 1", "S2E2", "Bonus")
+      titles(
+        "S01E01 Pilot",
+        "S01E02 Next",
+        "Season 2 Episode 1",
+        "S2E2",
+        "Bonus"
+      )
     );
     expect(groups).toEqual([
       { key: 1, label: "Season 1", start: 0, end: 2 },
@@ -222,7 +230,11 @@ describe("groupBySeason", () => {
 
   it("labels leading unmarked items 'Other' when season 1 comes later", () => {
     const groups = groupBySeason(titles("Intro", "S1E1", "S2E1"));
-    expect(groups.map((g) => g.label)).toEqual(["Other", "Season 1", "Season 2"]);
+    expect(groups.map((g) => g.label)).toEqual([
+      "Other",
+      "Season 1",
+      "Season 2"
+    ]);
   });
 
   it("uses provided season counts when available", () => {
@@ -251,7 +263,10 @@ describe("groupBySeason", () => {
 /* ───────────────────────── providers ───────────────────────── */
 
 describe("YouTubeProvider", () => {
-  const yt = new YouTubeProvider({ apiKey: null, origin: "https://example.com" });
+  const yt = new YouTubeProvider({
+    apiKey: null,
+    origin: "https://example.com"
+  });
 
   describe("canHandle", () => {
     it.each([
@@ -297,7 +312,9 @@ describe("YouTubeProvider", () => {
     });
 
     it("parses video_ids list", () => {
-      const p = yt.parse("https://www.youtube.com/watch_videos?video_ids=a,b,c");
+      const p = yt.parse(
+        "https://www.youtube.com/watch_videos?video_ids=a,b,c"
+      );
       expect(p.videoIds).toEqual(["a", "b", "c"]);
     });
 
@@ -355,7 +372,9 @@ describe("YouTubeProvider", () => {
     });
 
     it("reads start= on embeds", () => {
-      expect(yt.parse("https://www.youtube.com/embed/abc?start=30").startSeconds).toBe(30);
+      expect(
+        yt.parse("https://www.youtube.com/embed/abc?start=30").startSeconds
+      ).toBe(30);
     });
 
     it("ignores non-numeric t / index", () => {
@@ -366,7 +385,12 @@ describe("YouTubeProvider", () => {
   });
 
   describe("buildEmbedSrc", () => {
-    const base = { videoId: null, playlistId: null, videoIds: null, startSeconds: null };
+    const base = {
+      videoId: null,
+      playlistId: null,
+      videoIds: null,
+      startSeconds: null
+    };
 
     it("builds a single video embed", () => {
       const src = yt.buildEmbedSrc(
@@ -387,7 +411,9 @@ describe("YouTubeProvider", () => {
 
     it("omits origin when none is known", () => {
       const noOrigin = new YouTubeProvider({ origin: "" });
-      expect(noOrigin.buildEmbedSrc({ ...base, videoId: "abc" })).not.toContain("origin=");
+      expect(noOrigin.buildEmbedSrc({ ...base, videoId: "abc" })).not.toContain(
+        "origin="
+      );
     });
 
     it("builds a playlist embed with index", () => {
@@ -410,7 +436,11 @@ describe("YouTubeProvider", () => {
     });
 
     it("keeps /embed/ID?list= when a videoId is known and no index is forced", () => {
-      const src = yt.buildEmbedSrc({ ...base, videoId: "abc", playlistId: "PLxyz" });
+      const src = yt.buildEmbedSrc({
+        ...base,
+        videoId: "abc",
+        playlistId: "PLxyz"
+      });
       expect(src).toContain("/embed/abc?");
       expect(src).toContain("list=PLxyz");
     });
@@ -424,7 +454,10 @@ describe("YouTubeProvider", () => {
     });
 
     it("passes index 0 explicitly (0 is not 'no index')", () => {
-      const src = yt.buildEmbedSrc({ ...base, videoIds: ["a", "b"] }, { index: 0 });
+      const src = yt.buildEmbedSrc(
+        { ...base, videoIds: ["a", "b"] },
+        { index: 0 }
+      );
       expect(new URL(src).searchParams.get("index")).toBe("0");
     });
   });
@@ -434,10 +467,12 @@ describe("YouTubeProvider", () => {
       expect(await yt.getThumbnail({ videoId: "abc" })).toBe(
         "https://img.youtube.com/vi/abc/hqdefault.jpg"
       );
-      expect(await yt.getThumbnail({ videoId: null, videoIds: ["x", "y"] })).toBe(
-        "https://img.youtube.com/vi/x/hqdefault.jpg"
-      );
-      expect(await yt.getThumbnail({ videoId: null, videoIds: null })).toBeNull();
+      expect(
+        await yt.getThumbnail({ videoId: null, videoIds: ["x", "y"] })
+      ).toBe("https://img.youtube.com/vi/x/hqdefault.jpg");
+      expect(
+        await yt.getThumbnail({ videoId: null, videoIds: null })
+      ).toBeNull();
     });
   });
 
@@ -445,11 +480,16 @@ describe("YouTubeProvider", () => {
     beforeEach(() => vi.spyOn(console, "warn").mockImplementation(() => {}));
 
     it("returns [] when there is nothing to list", async () => {
-      expect(await yt.getPlaylist({ playlistId: null, videoIds: null })).toEqual([]);
+      expect(
+        await yt.getPlaylist({ playlistId: null, videoIds: null })
+      ).toEqual([]);
     });
 
     it("falls back to generic items for dynamic playlists without api key", async () => {
-      const items = await yt.getPlaylist({ playlistId: null, videoIds: ["a", "b"] });
+      const items = await yt.getPlaylist({
+        playlistId: null,
+        videoIds: ["a", "b"]
+      });
       expect(items).toEqual([
         {
           id: "a",
@@ -469,16 +509,34 @@ describe("YouTubeProvider", () => {
     });
 
     it("returns [] for list= playlists without api key", async () => {
-      expect(await yt.getPlaylist({ playlistId: "PL1", videoIds: null })).toEqual([]);
+      expect(
+        await yt.getPlaylist({ playlistId: "PL1", videoIds: null })
+      ).toEqual([]);
     });
 
     it("loads titles through the Data API and skips private videos", async () => {
       const fetchFn = ytFetch({ ids: ["a", "b", "c"], privateIds: ["b"] });
-      const p = new YouTubeProvider({ apiKey: "K", fetchFn, store: memoryStore() });
+      const p = new YouTubeProvider({
+        apiKey: "K",
+        fetchFn,
+        store: memoryStore()
+      });
       const items = await p.getPlaylist({ playlistId: "PL1", videoIds: null });
       expect(items).toEqual([
-        { id: "a", index: 0, title: "Title a", channelTitle: "Chan", thumbnailUrl: "https://t/a.jpg" },
-        { id: "c", index: 1, title: "Title c", channelTitle: "Chan", thumbnailUrl: "https://t/c.jpg" }
+        {
+          id: "a",
+          index: 0,
+          title: "Title a",
+          channelTitle: "Chan",
+          thumbnailUrl: "https://t/a.jpg"
+        },
+        {
+          id: "c",
+          index: 1,
+          title: "Title c",
+          channelTitle: "Chan",
+          thumbnailUrl: "https://t/c.jpg"
+        }
       ]);
       expect(fetchFn.mock.calls[0][0]).toContain("playlistId=PL1");
       expect(fetchFn.mock.calls[0][0]).toContain("key=K");
@@ -503,7 +561,11 @@ describe("YouTubeProvider", () => {
 
     it("caches the result in the store", async () => {
       const fetchFn = ytFetch();
-      const p = new YouTubeProvider({ apiKey: "K", fetchFn, store: memoryStore() });
+      const p = new YouTubeProvider({
+        apiKey: "K",
+        fetchFn,
+        store: memoryStore()
+      });
       const parsed = { playlistId: "PL1", videoIds: null };
       await p.getPlaylist(parsed);
       const calls = fetchFn.mock.calls.length;
@@ -515,7 +577,10 @@ describe("YouTubeProvider", () => {
     it("falls back to generic items when the API fails on a dynamic playlist", async () => {
       const fetchFn = vi.fn(async () => jsonRes({}, false, 403));
       const p = new YouTubeProvider({ apiKey: "K", fetchFn });
-      const items = await p.getPlaylist({ playlistId: null, videoIds: ["a", "b"] });
+      const items = await p.getPlaylist({
+        playlistId: null,
+        videoIds: ["a", "b"]
+      });
       expect(items.map((i) => i.title)).toEqual(["Video 1", "Video 2"]);
     });
 
@@ -524,7 +589,9 @@ describe("YouTubeProvider", () => {
         throw new Error("network");
       });
       const p = new YouTubeProvider({ apiKey: "K", fetchFn });
-      await expect(p.getPlaylist({ playlistId: "PL1", videoIds: null })).resolves.toEqual([]);
+      await expect(
+        p.getPlaylist({ playlistId: "PL1", videoIds: null })
+      ).resolves.toEqual([]);
     });
   });
 
@@ -552,9 +619,13 @@ describe("YouTubeProvider", () => {
     it("subscribes to player events on iframe load", () => {
       const iframe = fakeIframe();
       const c = yt.createController(iframe, {});
-      const onLoad = iframe.addEventListener.mock.calls.find(([n]) => n === "load")[1];
+      const onLoad = iframe.addEventListener.mock.calls.find(
+        ([n]) => n === "load"
+      )[1];
       onLoad();
-      expect(JSON.parse(iframe.contentWindow.postMessage.mock.calls[0][0])).toEqual({
+      expect(
+        JSON.parse(iframe.contentWindow.postMessage.mock.calls[0][0])
+      ).toEqual({
         event: "listening"
       });
       c.dispose();
@@ -563,7 +634,10 @@ describe("YouTubeProvider", () => {
     it("dispose removes its listeners", () => {
       const iframe = fakeIframe();
       yt.createController(iframe, {}).dispose();
-      expect(iframe.removeEventListener).toHaveBeenCalledWith("load", expect.any(Function));
+      expect(iframe.removeEventListener).toHaveBeenCalledWith(
+        "load",
+        expect.any(Function)
+      );
     });
   });
 });
@@ -578,7 +652,9 @@ describe("DailymotionProvider", () => {
 
   it("canHandle video and playlist urls", () => {
     expect(dm.canHandle("https://www.dailymotion.com/video/x8abc")).toBe(true);
-    expect(dm.canHandle("https://www.dailymotion.com/playlist/x9xyz")).toBe(true);
+    expect(dm.canHandle("https://www.dailymotion.com/playlist/x9xyz")).toBe(
+      true
+    );
     expect(dm.canHandle("https://youtube.com/watch?v=1")).toBe(false);
   });
 
@@ -587,7 +663,9 @@ describe("DailymotionProvider", () => {
       type: "video",
       id: "x8abc"
     });
-    expect(dm.parse("https://www.dailymotion.com/playlist/x9xyz")).toMatchObject({
+    expect(
+      dm.parse("https://www.dailymotion.com/playlist/x9xyz")
+    ).toMatchObject({
       type: "playlist",
       id: "x9xyz",
       playlistId: "x9xyz"
@@ -613,11 +691,15 @@ describe("DailymotionProvider", () => {
   it("buildEmbedSrc falls back to the legacy embed url", () => {
     const video = { type: "video", id: "x1", playlistId: null };
     const playlist = { type: "playlist", id: "x9", playlistId: "x9" };
-    expect(legacy.buildEmbedSrc(video)).toBe("https://www.dailymotion.com/embed/video/x1");
+    expect(legacy.buildEmbedSrc(video)).toBe(
+      "https://www.dailymotion.com/embed/video/x1"
+    );
     expect(legacy.buildEmbedSrc(video, { autoplay: true })).toBe(
       "https://www.dailymotion.com/embed/video/x1?autoplay=1"
     );
-    expect(legacy.buildEmbedSrc(playlist)).toBe("https://www.dailymotion.com/embed/playlist/x9");
+    expect(legacy.buildEmbedSrc(playlist)).toBe(
+      "https://www.dailymotion.com/embed/playlist/x9"
+    );
   });
 
   it("thumbnail only for single videos; playlist is always empty", async () => {
@@ -686,9 +768,13 @@ describe("OkruProvider", () => {
 
   it("buildEmbedSrc picks the right id by index", () => {
     const p = { videoId: "111", itemIds: ["111", "222", "333"], labels: [] };
-    expect(ok.buildEmbedSrc(p, { index: 1 })).toBe("https://okru-embed.vercel.app/?id=222");
+    expect(ok.buildEmbedSrc(p, { index: 1 })).toBe(
+      "https://okru-embed.vercel.app/?id=222"
+    );
     expect(ok.buildEmbedSrc(p)).toBe("https://okru-embed.vercel.app/?id=111");
-    expect(ok.buildEmbedSrc(p, { autoplay: true, index: 0 })).toContain("autoplay=1");
+    expect(ok.buildEmbedSrc(p, { autoplay: true, index: 0 })).toContain(
+      "autoplay=1"
+    );
   });
 
   it("uses ? or & for autoplay depending on the base url", () => {
@@ -704,8 +790,20 @@ describe("OkruProvider", () => {
       labels: ["Title A", "Title B"]
     });
     expect(items).toEqual([
-      { id: "a", index: 0, title: "Title A", channelTitle: "", thumbnailUrl: "" },
-      { id: "b", index: 1, title: "Title B", channelTitle: "", thumbnailUrl: "" }
+      {
+        id: "a",
+        index: 0,
+        title: "Title A",
+        channelTitle: "",
+        thumbnailUrl: ""
+      },
+      {
+        id: "b",
+        index: 1,
+        title: "Title B",
+        channelTitle: "",
+        thumbnailUrl: ""
+      }
     ]);
   });
 
@@ -717,11 +815,15 @@ describe("OkruProvider", () => {
 
   it("getThumbnail reads the oEmbed thumbnail, null on any failure", async () => {
     const good = new OkruProvider({
-      fetchFn: vi.fn(async () => jsonRes({ thumbnail_url: "https://img/x.jpg" }))
+      fetchFn: vi.fn(async () =>
+        jsonRes({ thumbnail_url: "https://img/x.jpg" })
+      )
     });
     expect(await good.getThumbnail({ videoId: "1" })).toBe("https://img/x.jpg");
 
-    const bad = new OkruProvider({ fetchFn: vi.fn(async () => jsonRes({}, false, 404)) });
+    const bad = new OkruProvider({
+      fetchFn: vi.fn(async () => jsonRes({}, false, 404))
+    });
     expect(await bad.getThumbnail({ videoId: "1" })).toBeNull();
 
     const throwing = new OkruProvider({
@@ -754,18 +856,28 @@ describe("ProviderRegistry", () => {
 
   it("resolves the correct provider", () => {
     expect(registry.resolve("https://youtu.be/abc").id).toBe("youtube");
-    expect(registry.resolve("https://www.dailymotion.com/video/x1").id).toBe("dailymotion");
+    expect(registry.resolve("https://www.dailymotion.com/video/x1").id).toBe(
+      "dailymotion"
+    );
     expect(registry.resolve("https://ok.ru/video/1").id).toBe("okru");
   });
 
   it("resolves existing YouTube embeds", () => {
-    expect(registry.resolve("https://www.youtube.com/embed?playlist=a,b").id).toBe("youtube");
-    expect(registry.resolve("https://www.youtube.com/embed/videoseries?list=PL1").id).toBe("youtube");
-    expect(registry.resolve("https://www.youtube-nocookie.com/embed/abc").id).toBe("youtube");
+    expect(
+      registry.resolve("https://www.youtube.com/embed?playlist=a,b").id
+    ).toBe("youtube");
+    expect(
+      registry.resolve("https://www.youtube.com/embed/videoseries?list=PL1").id
+    ).toBe("youtube");
+    expect(
+      registry.resolve("https://www.youtube-nocookie.com/embed/abc").id
+    ).toBe("youtube");
   });
 
   it("throws UnsupportedUrlError for unknown urls", () => {
-    expect(() => registry.resolve("https://vimeo.com/123")).toThrow(UnsupportedUrlError);
+    expect(() => registry.resolve("https://vimeo.com/123")).toThrow(
+      UnsupportedUrlError
+    );
   });
 
   it("register() is chainable and the first matching provider wins", () => {
@@ -864,7 +976,11 @@ describe("NavigationService", () => {
     ...extra
   });
 
-  function setup({ items = mkItems(), panelCfg = { toggle: "top-right", open: true }, ...opts } = {}) {
+  function setup({
+    items = mkItems(),
+    panelCfg = { toggle: "top-right", open: true },
+    ...opts
+  } = {}) {
     const controller = { playAt: vi.fn(), dispose: vi.fn() };
     const provider = {
       id: "fake",
@@ -872,7 +988,8 @@ describe("NavigationService", () => {
       panel: panelCfg,
       parse: vi.fn(() => ({ initialIndex: null })),
       buildEmbedSrc: vi.fn(
-        (_p, { autoplay, index }) => `https://fake/embed?a=${autoplay ? 1 : 0}&i=${index}`
+        (_p, { autoplay, index }) =>
+          `https://fake/embed?a=${autoplay ? 1 : 0}&i=${index}`
       ),
       getPlaylist: vi.fn(async () => items),
       createController: vi.fn(() => controller)
@@ -897,9 +1014,14 @@ describe("NavigationService", () => {
     const { nav, view, onChange } = setup();
     const info = linkInfo("a");
     await nav.navigate(info, { autoplay: true });
-    expect(view.showEmbed).toHaveBeenCalledWith("https://fake/embed?a=1&i=null", "Fake player");
+    expect(view.showEmbed).toHaveBeenCalledWith(
+      "https://fake/embed?a=1&i=null",
+      "Fake player"
+    );
     expect(nav.current).toMatchObject({ key: "a", url: info.url, index: null });
-    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ key: "a" }));
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "a" })
+    );
   });
 
   it("start index precedence: option > data-index > url index", async () => {
@@ -934,9 +1056,16 @@ describe("NavigationService", () => {
   it("rejects with UnsupportedUrlError for unknown urls", async () => {
     const nav = new NavigationService({
       registry: new ProviderRegistry([]),
-      view: { showEmbed: vi.fn(), showPanel: vi.fn(), setActive: vi.fn(), clear: vi.fn() }
+      view: {
+        showEmbed: vi.fn(),
+        showPanel: vi.fn(),
+        setActive: vi.fn(),
+        clear: vi.fn()
+      }
     });
-    await expect(nav.navigate(linkInfo("a"))).rejects.toBeInstanceOf(UnsupportedUrlError);
+    await expect(nav.navigate(linkInfo("a"))).rejects.toBeInstanceOf(
+      UnsupportedUrlError
+    );
   });
 
   describe("panel", () => {
@@ -974,7 +1103,9 @@ describe("NavigationService", () => {
 
     it('is skipped for data-panel="false"', async () => {
       const { nav, view } = setup();
-      await nav.navigate(linkInfo("a", { link: { dataset: { panel: "false" } } }));
+      await nav.navigate(
+        linkInfo("a", { link: { dataset: { panel: "false" } } })
+      );
       expect(view.showPanel).not.toHaveBeenCalled();
     });
 
@@ -1020,7 +1151,9 @@ describe("NavigationService", () => {
       expect(controller.playAt).toHaveBeenCalledWith(2, { autoplay: true });
       expect(view.setActive).toHaveBeenCalledWith(2);
       expect(nav.current.index).toBe(2);
-      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ index: 2 }));
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 2 })
+      );
     });
 
     it("ignores the already-active item", async () => {
@@ -1048,11 +1181,15 @@ describe("NavigationService", () => {
 
       await nav.goBack();
       expect(nav.current.key).toBe("A");
-      expect(view.showEmbed.mock.calls.at(-1)[0]).toBe("https://fake/embed?a=1&i=2");
+      expect(view.showEmbed.mock.calls.at(-1)[0]).toBe(
+        "https://fake/embed?a=1&i=2"
+      );
 
       await nav.goForward();
       expect(nav.current.key).toBe("B");
-      expect(view.showEmbed.mock.calls.at(-1)[0]).toBe("https://fake/embed?a=1&i=1");
+      expect(view.showEmbed.mock.calls.at(-1)[0]).toBe(
+        "https://fake/embed?a=1&i=1"
+      );
       expect(nav.journal.size).toBe(2); // moving does not create history
     });
 
@@ -1143,9 +1280,14 @@ describe("RegionView", () => {
       const view = new RegionView({ container });
       view.adoptIframe(existing);
 
-      const f = view.showEmbed("https://www.youtube.com/embed/abc?enablejsapi=1", "YouTube player");
+      const f = view.showEmbed(
+        "https://www.youtube.com/embed/abc?enablejsapi=1",
+        "YouTube player"
+      );
       expect(f).toBe(existing);
-      expect(f.getAttribute("src")).toBe("https://www.youtube.com/embed/abc?enablejsapi=1");
+      expect(f.getAttribute("src")).toBe(
+        "https://www.youtube.com/embed/abc?enablejsapi=1"
+      );
       expect(f.title).toBe("Mine");
       expect(container.querySelectorAll("iframe")).toHaveLength(1);
     });
@@ -1155,7 +1297,9 @@ describe("RegionView", () => {
       const existing = container.querySelector("iframe");
       const view = new RegionView({ container });
       view.adoptIframe(existing);
-      expect(view.showEmbed("https://x/e?a=1", "YouTube player").title).toBe("YouTube player");
+      expect(view.showEmbed("https://x/e?a=1", "YouTube player").title).toBe(
+        "YouTube player"
+      );
     });
 
     it("is consumed once: the next showEmbed builds a fresh iframe", () => {
@@ -1171,11 +1315,76 @@ describe("RegionView", () => {
   });
 
   describe("showPanel", () => {
+    describe("scrolling", () => {
+      const fakeLayout = () => {
+        const off = (prop, fn) =>
+          vi.spyOn(HTMLElement.prototype, prop, "get").mockImplementation(fn);
+        off("offsetTop", function () {
+          return this.classList.contains("lp-item") ? +this.dataset.i * 50 : 0;
+        });
+        off("offsetHeight", function () {
+          return this.classList.contains("lp-item")
+            ? 50
+            : this.classList.contains("lp-head")
+            ? 30
+            : 0;
+        });
+        off("clientHeight", function () {
+          return this.classList.contains("lp-panel") ? 300 : 0;
+        });
+      };
+      const open = { toggle: "top-right", open: true };
+
+      it("centers the active item on first display", () => {
+        fakeLayout();
+        const view = new RegionView({ container });
+        show(view, { items: items(30), index: 10, cfg: open });
+        // top 500 - head 30 - (300 - 30 - 50) / 2 = 360
+        expect(container.querySelector(".lp-panel").scrollTop).toBe(360);
+      });
+
+      it("does not move the panel when the user clicks an item", () => {
+        fakeLayout();
+        const view = new RegionView({ container });
+        show(view, {
+          items: items(30),
+          index: 0,
+          cfg: open,
+          onSelect: (i) => view.setActive(i) // what NavigationService.select does
+        });
+        const panel = container.querySelector(".lp-panel");
+        panel.scrollTop = 100;
+        container.querySelectorAll(".lp-item")[5].click();
+        expect(panel.scrollTop).toBe(100);
+        expect(container.querySelector(".lp-active").dataset.i).toBe("5");
+      });
+
+      it("does not scroll when a player-driven change stays visible", () => {
+        fakeLayout();
+        const view = new RegionView({ container });
+        show(view, { items: items(30), index: 0, cfg: open });
+        const panel = container.querySelector(".lp-panel");
+        view.setActive(3); // top 150, bottom 200: inside 30..300
+        expect(panel.scrollTop).toBe(0);
+      });
+
+      it("scrolls the minimum when a player-driven change is hidden", () => {
+        fakeLayout();
+        const view = new RegionView({ container });
+        show(view, { items: items(30), index: 0, cfg: open });
+        const panel = container.querySelector(".lp-panel");
+        view.setActive(8); // bottom 450 > 300 → scrollTop = 450 - 300
+        expect(panel.scrollTop).toBe(150);
+      });
+    });
+
     it("renders one entry per item with the count in the header", () => {
       const view = new RegionView({ container });
       show(view);
       expect(container.querySelectorAll(".lp-item")).toHaveLength(3);
-      expect(container.querySelector(".lp-head").textContent).toContain("Playlist · 3");
+      expect(container.querySelector(".lp-head").textContent).toContain(
+        "Playlist · 3"
+      );
     });
 
     it("replaces a previous panel instead of stacking", () => {
@@ -1190,7 +1399,9 @@ describe("RegionView", () => {
     it("starts closed with a visible toggle when cfg.open is false", () => {
       const view = new RegionView({ container });
       show(view, { cfg: { toggle: "bottom-left", open: false } });
-      expect(container.querySelector(".lp-panel").classList.contains("lp-closed")).toBe(true);
+      expect(
+        container.querySelector(".lp-panel").classList.contains("lp-closed")
+      ).toBe(true);
       const toggle = container.querySelector(".lp-toggle");
       expect(toggle.hidden).toBe(false);
       expect(toggle.dataset.pos).toBe("bottom-left");
@@ -1200,7 +1411,9 @@ describe("RegionView", () => {
     it("starts open with the toggle hidden when cfg.open is true", () => {
       const view = new RegionView({ container });
       show(view, { cfg: { toggle: "top-right", open: true } });
-      expect(container.querySelector(".lp-panel").classList.contains("lp-closed")).toBe(false);
+      expect(
+        container.querySelector(".lp-panel").classList.contains("lp-closed")
+      ).toBe(false);
       expect(container.querySelector(".lp-toggle").hidden).toBe(true);
       expect(container.querySelector(".lp-resize").hidden).toBe(false);
     });
@@ -1246,7 +1459,9 @@ describe("RegionView", () => {
 
     it("renders titles as text, never as HTML", () => {
       const view = new RegionView({ container });
-      show(view, { items: [{ ...items(1)[0], title: '<img src=x onerror="alert(1)">' }] });
+      show(view, {
+        items: [{ ...items(1)[0], title: '<img src=x onerror="alert(1)">' }]
+      });
       const title = container.querySelector(".lp-title");
       expect(title.querySelector("img")).toBeNull();
       expect(title.textContent).toBe('<img src=x onerror="alert(1)">');
@@ -1256,7 +1471,9 @@ describe("RegionView", () => {
       const view = new RegionView({ container });
       show(view, { index: 1 });
       const active = () =>
-        [...container.querySelectorAll(".lp-item.lp-active")].map((n) => n.dataset.i);
+        [...container.querySelectorAll(".lp-item.lp-active")].map(
+          (n) => n.dataset.i
+        );
       expect(active()).toEqual(["1"]);
       view.setActive(2);
       expect(active()).toEqual(["2"]);
@@ -1267,13 +1484,15 @@ describe("RegionView", () => {
     });
 
     describe("seasons", () => {
-      const seasonItems = ["S1E1", "S1E2", "S2E1", "S2E2"].map((title, index) => ({
-        id: `i${index}`,
-        index,
-        title,
-        channelTitle: "",
-        thumbnailUrl: ""
-      }));
+      const seasonItems = ["S1E1", "S1E2", "S2E1", "S2E2"].map(
+        (title, index) => ({
+          id: `i${index}`,
+          index,
+          title,
+          channelTitle: "",
+          thumbnailUrl: ""
+        })
+      );
 
       it("groups items and collapses the sections that are not active", () => {
         const view = new RegionView({ container });
@@ -1282,7 +1501,9 @@ describe("RegionView", () => {
         expect(sections).toHaveLength(2);
         expect(sections[0].classList.contains("lp-collapsed")).toBe(false);
         expect(sections[1].classList.contains("lp-collapsed")).toBe(true);
-        expect(sections[0].querySelector(".lp-sh").textContent).toBe("Season 1 (2)");
+        expect(sections[0].querySelector(".lp-sh").textContent).toBe(
+          "Season 1 (2)"
+        );
       });
 
       it("clicking a header toggles the section", () => {
@@ -1298,7 +1519,9 @@ describe("RegionView", () => {
         show(view, { items: seasonItems, index: 0 });
         view.setActive(3);
         expect(
-          container.querySelectorAll(".lp-season")[1].classList.contains("lp-collapsed")
+          container
+            .querySelectorAll(".lp-season")[1]
+            .classList.contains("lp-collapsed")
         ).toBe(false);
       });
     });
@@ -1366,7 +1589,9 @@ describe("LinkPlayer", () => {
       expect(src.searchParams.get("enablejsapi")).toBe("1");
       expect(src.searchParams.get("playlist")).toBe(IDS);
 
-      await vi.waitFor(() => expect(host.querySelector(".lp-panel")).not.toBeNull());
+      await vi.waitFor(() =>
+        expect(host.querySelector(".lp-panel")).not.toBeNull()
+      );
       expect(host.querySelectorAll(".lp-item")).toHaveLength(5);
       expect(host.querySelector(".lp-toggle")).not.toBeNull();
       expect([...player._regions.keys()]).toContain("embed-1");
@@ -1377,7 +1602,9 @@ describe("LinkPlayer", () => {
         `<div class="video-container"><iframe src="https://www.youtube.com/embed?playlist=a,b"></iframe></div>`
       );
       newPlayer(root);
-      expect(root.querySelector(".video-container").getAttribute("style")).toBeNull();
+      expect(
+        root.querySelector(".video-container").getAttribute("style")
+      ).toBeNull();
     });
 
     it("wraps an iframe that has siblings, and keeps the siblings in place", async () => {
@@ -1404,17 +1631,25 @@ describe("LinkPlayer", () => {
 
       const src = new URL(iframe.getAttribute("src"));
       expect(src.pathname).toBe("/embed/videoseries");
-      expect(src.searchParams.get("list")).toBe("PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y");
+      expect(src.searchParams.get("list")).toBe(
+        "PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y"
+      );
       expect(src.searchParams.get("enablejsapi")).toBe("1");
 
-      await vi.waitFor(() => expect(wrapper.querySelectorAll(".lp-item")).toHaveLength(2));
+      await vi.waitFor(() =>
+        expect(wrapper.querySelectorAll(".lp-item")).toHaveLength(2)
+      );
       expect(wrapper.querySelector(".lp-title").textContent).toBe("Title a");
-      expect(fetchFn.mock.calls[0][0]).toContain("playlistId=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y");
+      expect(fetchFn.mock.calls[0][0]).toContain(
+        "playlistId=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y"
+      );
       expect(wrapper.querySelector(".lp-item.lp-active").dataset.i).toBe("0");
     });
 
     it("wraps an iframe placed directly in the scope", () => {
-      const root = mount(`<iframe src="https://www.youtube.com/embed?playlist=a,b"></iframe>`);
+      const root = mount(
+        `<iframe src="https://www.youtube.com/embed?playlist=a,b"></iframe>`
+      );
       const iframe = root.querySelector("iframe");
       newPlayer(root);
       expect(iframe.parentElement).not.toBe(root);
@@ -1433,14 +1668,18 @@ describe("LinkPlayer", () => {
     });
 
     it("single video embed: no panel", async () => {
-      const root = mount(`<div class="vc"><iframe src="https://www.youtube.com/embed/FVhqw12-BVo"></iframe></div>`);
+      const root = mount(
+        `<div class="vc"><iframe src="https://www.youtube.com/embed/FVhqw12-BVo"></iframe></div>`
+      );
       newPlayer(root);
       await new Promise((r) => setTimeout(r, 0));
       expect(root.querySelector(".lp-panel")).toBeNull();
     });
 
     it("ignores iframes it does not know", () => {
-      const root = mount(`<div><iframe src="https://player.vimeo.com/video/76979871"></iframe></div>`);
+      const root = mount(
+        `<div><iframe src="https://player.vimeo.com/video/76979871"></iframe></div>`
+      );
       const before = root.innerHTML;
       const player = newPlayer(root);
       expect(root.innerHTML).toBe(before);
@@ -1461,7 +1700,9 @@ describe("LinkPlayer", () => {
         `<div class="vc"><iframe src="https://www.youtube.com/embed?playlist=a,b,c"></iframe></div>`
       );
       const player = newPlayer(root);
-      await vi.waitFor(() => expect(root.querySelector(".lp-panel")).not.toBeNull());
+      await vi.waitFor(() =>
+        expect(root.querySelector(".lp-panel")).not.toBeNull()
+      );
       player.scan();
       expect([...player._regions.keys()]).toEqual(["embed-1"]);
       expect(root.querySelectorAll(".lp-panel")).toHaveLength(1);
@@ -1514,15 +1755,28 @@ describe("LinkPlayer", () => {
         onError,
         ...opts.player
       });
-      return { root, infos, player, onChange, onError, target: root.querySelector("#t-click") };
+      return {
+        root,
+        infos,
+        player,
+        onChange,
+        onError,
+        target: root.querySelector("#t-click")
+      };
     };
 
     it("click shows the player and marks the link active", () => {
       const { root, target } = setup();
       root.querySelector("#l1").click();
-      expect(target.querySelector("iframe").getAttribute("src")).toContain("/embed/abc");
-      expect(root.querySelector("#l1").classList.contains("is-active")).toBe(true);
-      expect(root.querySelector("#l2").classList.contains("is-active")).toBe(false);
+      expect(target.querySelector("iframe").getAttribute("src")).toContain(
+        "/embed/abc"
+      );
+      expect(root.querySelector("#l1").classList.contains("is-active")).toBe(
+        true
+      );
+      expect(root.querySelector("#l2").classList.contains("is-active")).toBe(
+        false
+      );
     });
 
     it("a second click on the same link closes the player (autoplay none)", () => {
@@ -1530,7 +1784,9 @@ describe("LinkPlayer", () => {
       root.querySelector("#l1").click();
       root.querySelector("#l1").click();
       expect(target.querySelector("iframe")).toBeNull();
-      expect(root.querySelector("#l1").classList.contains("is-active")).toBe(false);
+      expect(root.querySelector("#l1").classList.contains("is-active")).toBe(
+        false
+      );
       expect(onChange).toHaveBeenLastCalledWith("t-click", null);
     });
 
@@ -1545,7 +1801,9 @@ describe("LinkPlayer", () => {
     it("autoplay=click adds autoplay=1 to the embed", () => {
       const { root, target } = setup({ a: { autoplay: "click" } });
       root.querySelector("#l1").click();
-      expect(target.querySelector("iframe").getAttribute("src")).toContain("autoplay=1");
+      expect(target.querySelector("iframe").getAttribute("src")).toContain(
+        "autoplay=1"
+      );
     });
 
     it("another link with the same url but a different key navigates instead of closing", () => {
@@ -1553,27 +1811,42 @@ describe("LinkPlayer", () => {
       root.querySelector("#l1").click();
       root.querySelector("#l2").click();
       expect(target.querySelector("iframe")).not.toBeNull();
-      expect(root.querySelector("#l1").classList.contains("is-active")).toBe(false);
-      expect(root.querySelector("#l2").classList.contains("is-active")).toBe(true);
+      expect(root.querySelector("#l1").classList.contains("is-active")).toBe(
+        false
+      );
+      expect(root.querySelector("#l2").classList.contains("is-active")).toBe(
+        true
+      );
     });
 
     it("reports a link without data-target and keeps going", () => {
-      const root = mount(`<a id="x" href="https://www.youtube.com/watch?v=abc">x</a>`);
+      const root = mount(
+        `<a id="x" href="https://www.youtube.com/watch?v=abc">x</a>`
+      );
       const onError = vi.fn();
       newPlayer(root, {
         scanner: stubScanner([
-          { key: "x", url: "https://www.youtube.com/watch?v=abc", target: "", link: root.querySelector("#x") }
+          {
+            key: "x",
+            url: "https://www.youtube.com/watch?v=abc",
+            target: "",
+            link: root.querySelector("#x")
+          }
         ]),
         onError
       });
       expect(onError).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining("data-target") }),
+        expect.objectContaining({
+          message: expect.stringContaining("data-target")
+        }),
         expect.objectContaining({ key: "x" })
       );
     });
 
     it("reports an unsupported url on click", async () => {
-      const root = mount(`<a id="v" href="https://vimeo.com/76979871">v</a><div id="t-click"></div>`);
+      const root = mount(
+        `<a id="v" href="https://vimeo.com/76979871">v</a><div id="t-click"></div>`
+      );
       const onError = vi.fn();
       newPlayer(root, {
         scanner: stubScanner([
@@ -1611,7 +1884,9 @@ describe("LinkPlayer", () => {
   describe("storage", () => {
     const url = "https://www.youtube.com/watch?v=abc&list=PLx";
     const build = (store, extra = {}) => {
-      const root = mount(`<a id="l" href="${url}">l</a><div id="t-click"></div>`);
+      const root = mount(
+        `<a id="l" href="${url}">l</a><div id="t-click"></div>`
+      );
       const info = {
         key: "a",
         url,
@@ -1623,7 +1898,11 @@ describe("LinkPlayer", () => {
         seasonCounts: null,
         ...extra
       };
-      const player = newPlayer(root, { scanner: stubScanner([info]), store, useStorage: true });
+      const player = newPlayer(root, {
+        scanner: stubScanner([info]),
+        store,
+        useStorage: true
+      });
       return { root, player, target: root.querySelector("#t-click") };
     };
 

@@ -704,7 +704,7 @@ const CSS = `
 .lp-frame{position:absolute;inset:0;width:100%;height:100%;border:0}
 .lp-panel{--b:#141414;--l:#2a2a2a;--h:#1e1e1e;--t:#9a9a9a;--ta:#f0f0f0;--n:#555;--a:#f7931e;
  position:absolute;top:0;right:0;bottom:0;z-index:999;width:var(--lp-w,176px);max-width:70%;display:flex;flex-direction:column;
- overflow:hidden auto;background:var(--b);border-left:1px solid var(--l);font:12px system-ui,sans-serif;scrollbar-width:thin;transition:transform .2s}
+ overflow:hidden auto;background:var(--b);border-left:1px solid var(--l);font:12px system-ui,sans-serif;scrollbar-width:thin;transition:transform .2s;overscroll-behavior:contain;scroll-behavior:auto}
 .lp-panel.lp-wide{--lp-w:280px}
 .lp-host[style*="--lp-w"] .lp-panel{width:var(--lp-w)}
 .lp-panel.lp-closed{transform:translateX(100%);visibility:hidden}
@@ -840,15 +840,31 @@ export class RegionView {
     head.append(el("span", "", `Playlist · ${items.length}`), close);
     root.append(head);
 
-    const scrollToActive = () => {
+    let fromUser = false; // true while a click/keypress inside the panel is being handled
+
+    /** "center": put the active item in the middle. "nearest": scroll only if it is hidden. */
+    const reveal = (mode) => {
       const a = root.querySelector(".lp-active");
-      if (a) root.scrollTop = Math.max(0, a.offsetTop - root.clientHeight / 2); // not scrollIntoView: it scrolls the page
+      if (!a) return;
+      const headH = head.offsetHeight; // sticky header covers the top of the viewport
+      const top = a.offsetTop;
+      const bottom = top + a.offsetHeight;
+      let next = null;
+      if (mode === "center") {
+        next = top - headH - (root.clientHeight - headH - a.offsetHeight) / 2;
+      } else if (top < root.scrollTop + headH) {
+        next = top - headH;
+      } else if (bottom > root.scrollTop + root.clientHeight) {
+        next = bottom - root.clientHeight;
+      }
+      if (next !== null) root.scrollTop = Math.max(0, next); // not scrollIntoView: it scrolls the page
     };
+
     const setOpen = (open) => {
       root.classList.toggle("lp-closed", !open);
       toggle.hidden = open;
       handle.hidden = !open || !this._resizable;
-      if (open) scrollToActive();
+      if (open) reveal("center");
     };
     toggle.onclick = () => setOpen(true);
     close.onclick = () => setOpen(false);
@@ -876,13 +892,23 @@ export class RegionView {
           info
         );
       }
-      d.onclick = () => onSelect(it.index);
+
+      const pick = (i) => {
+        fromUser = true;
+        try {
+          onSelect(i); // setActive() runs synchronously inside
+        } finally {
+          fromUser = false;
+        }
+      };
+      d.onclick = () => pick(it.index);
       d.onkeydown = (e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onSelect(it.index);
+          pick(it.index);
         }
       };
+
       return d;
     };
 
@@ -935,19 +961,19 @@ export class RegionView {
 
     c.append(root, toggle, handle);
     this._panel = {
-      setActive: (i) => {
+      setActive: (i, mode = "nearest") => {
         root
           .querySelectorAll(".lp-item")
           .forEach((n) => n.classList.toggle("lp-active", +n.dataset.i === i));
         root
           .querySelector(".lp-active")
           ?.closest(".lp-season")
-          ?.classList.remove("lp-collapsed");
-        scrollToActive();
+          ?.classList.remove("lp-collapsed"); // expand before measuring
+        if (!fromUser) reveal(mode);
       }
     };
     setOpen(cfg?.open ?? false);
-    this._panel.setActive(index);
+    this._panel.setActive(index, "center"); // initial display: centered
   }
 }
 
@@ -1088,7 +1114,7 @@ export class PlayerRegion {
 }
 
 export class LinkPlayer {
-  static VERSION = "2.0.1";
+  static VERSION = "2.0.2";
 
   /**
    * @param {Object} o
