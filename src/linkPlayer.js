@@ -1186,7 +1186,7 @@ export class PlayerRegion {
 }
 
 export class LinkPlayer {
-  static VERSION = "2.0.3";
+  static VERSION = "2.0.4";
 
   /**
    * @param {Object} o

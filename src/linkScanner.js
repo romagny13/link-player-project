@@ -40,10 +40,29 @@ export function assertValidUrl(value) {
   return text;
 }
 
-/** "https://www.ok.ru/video/1?video_ids=1,2" -> "ok.ru/video/1" */
+const MAX_QUERY = 48; // longer queries are replaced by a short hash
+
+/** 32-bit FNV-1a, base36: short, stable, no dependency. */
+function shortHash(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(36);
+}
+
 export function keyFromUrl(url) {
   const u = new URL(assertValidUrl(url));
-  return `${u.hostname.replace(/^www\./, "")}${u.pathname}`;
+  // Decoded values, sorted by name (stable for repeated names): the key stays
+  // readable and ?b=1&a=2 equals ?a=2&b=1. The #fragment is never part of it.
+  const query = [...u.searchParams]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("&");
+  const base = `${u.hostname.replace(/^www\./, "")}${u.pathname}`;
+  if (!query) return base;
+  return `${base}?${query.length > MAX_QUERY ? `#${shortHash(query)}` : query}`;
 }
 
 /**

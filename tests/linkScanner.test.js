@@ -81,30 +81,124 @@ describe("assertValidUrl", () => {
 });
 
 describe("keyFromUrl", () => {
-  it("keeps host + pathname only", () => {
-    expect(keyFromUrl("https://ok.ru/video/1?video_ids=1,2")).toBe(
-      "ok.ru/video/1"
+  const OK_ID = "6806953659125";
+  const IDS = [OK_ID, "6806954052341", "6812121631477", "6812122483445"].join(",");
+  const longOk = (labels = "Episode%2054,Episode%2055,Episode%2056,Episode%2057") =>
+    `https://ok.ru/video/${OK_ID}?video_ids=${IDS}&labels=${labels}`;
+
+  describe("path and normalization", () => {
+    it("is host + pathname when there is no query", () => {
+      expect(keyFromUrl("https://ok.ru/video/1")).toBe("ok.ru/video/1");
+    });
+
+    it("strips the www prefix", () => {
+      expect(keyFromUrl("https://www.ok.ru/video/1")).toBe("ok.ru/video/1");
+    });
+
+    it("ignores the hash, with or without a query", () => {
+      expect(keyFromUrl("https://ok.ru/video/1#t=5")).toBe("ok.ru/video/1");
+      expect(keyFromUrl("https://ok.ru/video/1?x=1#t=5")).toBe("ok.ru/video/1?x=1");
+    });
+
+    it("trims the url", () => {
+      expect(keyFromUrl("  https://ok.ru/video/1 ")).toBe("ok.ru/video/1");
+    });
+
+    it.each([[""], [null], ["not a url"]])(
+      "throws InvalidUrlError on %j",
+      (v) => {
+        expect(() => keyFromUrl(v)).toThrow(InvalidUrlError);
+      }
     );
   });
 
-  it("strips the www prefix", () => {
-    expect(keyFromUrl("https://www.ok.ru/video/1")).toBe("ok.ru/video/1");
+  describe("short queries", () => {
+    it("are kept, readable and decoded", () => {
+      expect(keyFromUrl("https://ok.ru/video/1?video_ids=1,2")).toBe(
+        "ok.ru/video/1?video_ids=1,2"
+      );
+      expect(keyFromUrl("https://ok.ru/video/1?labels=Episode%2054")).toBe(
+        "ok.ru/video/1?labels=Episode 54"
+      );
+    });
+
+    it("tell YouTube videos apart", () => {
+      const a = keyFromUrl("https://www.youtube.com/watch?v=YCfcg9gzCYc");
+      const b = keyFromUrl("https://www.youtube.com/watch?v=69iUWLA0oVc");
+      expect(a).toBe("youtube.com/watch?v=YCfcg9gzCYc");
+      expect(a).not.toBe(b);
+    });
+
+    it("ignore parameter order", () => {
+      expect(keyFromUrl("https://www.youtube.com/watch?v=A&list=L")).toBe(
+        keyFromUrl("https://youtube.com/watch?list=L&v=A")
+      );
+    });
+
+    it("keep repeated parameters in their original order", () => {
+      expect(keyFromUrl("https://x.io/p?t=2&t=1")).toBe("x.io/p?t=2&t=1");
+    });
   });
 
-  it("ignores the hash", () => {
-    expect(keyFromUrl("https://ok.ru/video/1#t=5")).toBe("ok.ru/video/1");
+  describe("long queries", () => {
+    const HASHED = /^ok\.ru\/video\/\d+\?#[0-9a-z]+$/;
+
+    it("are condensed into a short hash", () => {
+      const key = keyFromUrl(longOk());
+      expect(key).toMatch(HASHED);
+      expect(key.startsWith(`ok.ru/video/${OK_ID}?#`)).toBe(true);
+      expect(key.length).toBeLessThan(40);
+      expect(key).not.toContain("labels");
+    });
+
+    it("are stable: the same url always gives the same key", () => {
+      expect(keyFromUrl(longOk())).toBe(keyFromUrl(longOk()));
+    });
+
+    it("differ when only the labels differ", () => {
+      expect(keyFromUrl(longOk("Episode%2054,B,C,D"))).not.toBe(
+        keyFromUrl(longOk("Episode%2099,B,C,D"))
+      );
+    });
+
+    it("differ when only the id list differs", () => {
+      const other = `https://ok.ru/video/${OK_ID}?video_ids=${IDS},999&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057`;
+      expect(keyFromUrl(other)).not.toBe(keyFromUrl(longOk()));
+    });
+
+    it("ignore parameter order", () => {
+      const swapped = `https://ok.ru/video/${OK_ID}?labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057&video_ids=${IDS}`;
+      expect(keyFromUrl(swapped)).toBe(keyFromUrl(longOk()));
+    });
+
+    it("ignore www, hash and surrounding spaces", () => {
+      const variant = ` ${longOk().replace("https://ok.ru", "https://www.ok.ru")}#t=5 `;
+      expect(keyFromUrl(variant)).toBe(keyFromUrl(longOk()));
+    });
+
+    it("hash the decoded query, so encoding variants match", () => {
+      const encoded = `https://ok.ru/video/${OK_ID}?video_ids=${IDS.replaceAll(",", "%2C")}&labels=Episode%2054%2CEpisode%2055%2CEpisode%2056%2CEpisode%2057`;
+      expect(keyFromUrl(encoded)).toBe(keyFromUrl(longOk()));
+    });
+
+    it("keeps the path, so different videos never collide", () => {
+      const a = keyFromUrl(longOk());
+      const b = keyFromUrl(longOk().replace(`/video/${OK_ID}`, "/video/111"));
+      expect(a).not.toBe(b);
+    });
   });
 
-  it("trims the url", () => {
-    expect(keyFromUrl("  https://ok.ru/video/1 ")).toBe("ok.ru/video/1");
-  });
+  describe("threshold", () => {
+    const withQuery = (n) => `https://x.io/p?a=${"x".repeat(n - 2)}`; // query is exactly n chars
 
-  it.each([[""], [null], ["not a url"]])(
-    "throws InvalidUrlError on %j",
-    (v) => {
-      expect(() => keyFromUrl(v)).toThrow(InvalidUrlError);
-    }
-  );
+    it("keeps a query of 48 characters as is", () => {
+      expect(keyFromUrl(withQuery(48))).toBe(`x.io/p?a=${"x".repeat(46)}`);
+    });
+
+    it("hashes a query of 49 characters", () => {
+      expect(keyFromUrl(withQuery(49))).toMatch(/^x\.io\/p\?#[0-9a-z]+$/);
+    });
+  });
 });
 
 describe("readRawLink", () => {
@@ -210,7 +304,7 @@ describe("parseLink", () => {
       const info = parseLink(
         raw({ href: "https://www.ok.ru/video/9?video_ids=9,10" })
       );
-      expect(info.key).toBe("ok.ru/video/9");
+      expect(info.key).toBe("ok.ru/video/9?video_ids=9,10");
     });
 
     it("prefers the explicit key", () => {
@@ -224,13 +318,21 @@ describe("parseLink", () => {
     it("generates the key when the explicit key is blank", () => {
       expect(parseLink(raw({ key: "   " })).key).toBe("ok.ru/video/1");
     });
-
-    it("is stable when playlist episodes are added", () => {
+    it("changes when playlist episodes are added (the url is the identity)", () => {
       const a = parseLink(raw({ href: "https://ok.ru/video/1?video_ids=1,2" }));
-      const b = parseLink(
-        raw({ href: "https://ok.ru/video/1?video_ids=1,2,3" })
+      const b = parseLink(raw({ href: "https://ok.ru/video/1?video_ids=1,2,3" }));
+      expect(a.key).not.toBe(b.key);
+    });
+    
+    it("keeps an explicit data-key stable when the playlist changes", () => {
+      const a = parseLink(
+        raw({ href: "https://ok.ru/video/1?video_ids=1,2", key: "ep-list" })
       );
-      expect(a.key).toBe(b.key);
+      const b = parseLink(
+        raw({ href: "https://ok.ru/video/1?video_ids=1,2,3", key: "ep-list" })
+      );
+      expect(a.key).toBe("ep-list");
+      expect(b.key).toBe(a.key);
     });
   });
 
