@@ -81,13 +81,42 @@
       }
 
       /* The target needs a size; the panel and its toggle are positioned inside it */
-      .player {
+      .video-container {
         position: relative;
         width: 100%;
-        aspect-ratio: 16 / 9;
-        background: #000;
-        border-radius: 10px;
+        max-width: 1200px;
+        margin: 0 auto;
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08),
+          0 4px 12px rgba(0, 0, 0, 0.04);
+        transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
+          box-shadow 0.4s ease-out;
+      }
+
+      .video-container:empty {
+        display: none;
+      }
+      .video-container::before {
+        content: "";
+        display: block;
+        padding-top: 56.25%; /* 16:9 Aspect Ratio */
+      }
+
+      .video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 12px;
+      }
+
+      .video-container:hover {
+        transform: scale(1.02) translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1),
+          0 5px 15px rgba(0, 0, 0, 0.06);
       }
 
       .toolbar {
@@ -151,30 +180,29 @@
   </head>
   <body data-lp-theme="light">
     <main id="scope">
-      <h1>LinkPlayer — exemples</h1>
+      <h1>LinkPlayer — examples</h1>
       <p>
-        Chaque zone a son propre <code>data-target</code> et mémorise ce qui y
-        est lu. Recharge la page : chaque zone reprend sur le dernier lien et le
-        dernier épisode (en pause, les navigateurs bloquent l'autoplay au
-        chargement). Les clés (<code>data-key</code>) sont explicites partout,
-        car deux URL YouTube <code>/watch</code> donneraient la même clé
-        générée.
+        Each zone has its own <code>data-target</code> and remembers what is
+        played in it. Reload the page: each zone resumes at the last link and
+        the last episode (paused, as browsers block autoplay upon loading). Keys
+        (<code>data-key</code>) are explicit everywhere, because two YouTube
+        <code>/watch</code> URLs would generate the same key.
       </p>
 
       <div class="toolbar">
         <button class="tool" id="reset" type="button">
-          Effacer la sauvegarde et recharger
+          Clear save and reload
         </button>
       </div>
 
       <!-- ───────────── YouTube ───────────── -->
       <h2>YouTube</h2>
       <p>
-        Les playlists <code>list=</code> ont besoin d'une clé YouTube Data API
-        (<code>window.__YTP_API_KEY__</code>) pour afficher le panneau. La
-        playlist dynamique (<code>video_ids</code>) fonctionne sans clé, avec
-        des titres génériques. Le bouton d'ouverture du panneau est en bas à
-        gauche du player, visible au survol.
+        Playlists using <code>list=</code> require a YouTube Data API key
+        (<code>window.__YTP_API_KEY__</code>) to display the panel. Dynamic
+        playlists (<code>video_ids</code>) work without a key, using generic
+        titles. The panel open button is at the bottom left of the player,
+        visible on hover.
       </p>
       <div class="links">
         <a
@@ -183,28 +211,28 @@
           data-target="t-yt"
           data-show-on-init
           href="https://www.youtube.com/watch?v=FVhqw12-BVo"
-          >Vidéo simple</a
+          >Simple video</a
         >
         <a
           data-link
           data-key="yt-start"
           data-target="t-yt"
           href="https://youtu.be/wPw_5Qtf0wc?si=ndSj0Q6XzixxAllF&t=110"
-          >Vidéo avec temps de départ (t=110)</a
+          >Video with start time (t=110)</a
         >
         <a
           data-link
           data-key="yt-playlist"
           data-target="t-yt"
           href="https://www.youtube.com/watch?v=k98esvB9E40&list=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y"
-          >Playlist partagée</a
+          >Shared playlist</a
         >
         <a
           data-link
           data-key="yt-playlist-index"
           data-target="t-yt"
           href="https://www.youtube.com/watch?v=7fgxMSYPILU&list=PLPcL-4_gAMDYTBbLP-yrN9QsxIql2csrf&index=8"
-          >Playlist avec index (URL, index=8)</a
+          >Playlist with index (URL, index=8)</a
         >
         <a
           data-link
@@ -212,22 +240,22 @@
           data-target="t-yt"
           data-index="2"
           href="https://www.youtube.com/watch?v=k98esvB9E40&list=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y"
-          >Playlist avec data-index="2"</a
+          >Playlist with data-index="2"</a
         >
         <a
           data-link
           data-key="yt-dynamic"
           data-target="t-yt"
           href="https://www.youtube.com/watch_videos?video_ids=DPAwTqig4_c,NEOvz3k9DuQ"
-          >Playlist dynamique (video_ids)</a
+          >Dynamic playlist (video_ids)</a
         >
       </div>
-      <div id="t-yt" class="player"></div>
+      <div id="t-yt" class="video-container"></div>
 
       <!-- ───────────── Dailymotion ───────────── -->
       <h2>Dailymotion</h2>
       <p>
-        Pas de panneau : Dailymotion n'expose pas la liste des vidéos sans API.
+        No panel: Dailymotion does not expose the video list without an API.
       </p>
       <div class="links">
         <a
@@ -236,7 +264,7 @@
           data-target="t-dm"
           data-show-on-init
           href="https://www.dailymotion.com/video/x2cvbkk"
-          >Vidéo simple</a
+          >Simple video</a
         >
         <a
           data-link
@@ -250,18 +278,17 @@
           data-key="dm-video-playlist"
           data-target="t-dm"
           href="https://www.dailymotion.com/video/x8p7z61?playlist=x80g3p"
-          >Vidéo dans une playlist (?playlist=)</a
+          >Video in a playlist (?playlist=)</a
         >
       </div>
-      <div id="t-dm" class="player"></div>
+      <div id="t-dm" class="video-container"></div>
 
       <!-- ───────────── Ok.ru ───────────── -->
       <h2>Ok.ru</h2>
       <p>
-        Le panneau est ouvert par défaut. Sa bascule (si tu le fermes) est en
-        haut à droite. Les saisons sont détectées dans les titres
-        (<code>S2</code>, <code>Saison 2</code>) ou imposées par
-        <code>data-seasons</code>.
+        The panel is open by default. Its toggle (if you close it) is at the top
+        right. Seasons are detected in titles (<code>S2</code>,
+        <code>Season 2</code>) or specified via <code>data-seasons</code>.
       </p>
       <div class="links">
         <a
@@ -270,28 +297,28 @@
           data-target="t-ok"
           data-show-on-init
           href="https://ok.ru/video/2406546410212"
-          >Vidéo simple</a
+          >Simple video</a
         >
         <a
           data-link
           data-key="ok-playlist"
           data-target="t-ok"
           href="https://ok.ru/video/6615657941574?video_ids=6615657941574,6615658662470,6615658728006,6615658859078,6615661611590,6615661808198"
-          >Playlist sans titres</a
+          >Playlist without titles</a
         >
         <a
           data-link
           data-key="ok-labels"
           data-target="t-ok"
           href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059"
-          >Playlist avec titres (labels)</a
+          >Playlist with titles (labels)</a
         >
         <a
           data-link
           data-key="ok-url-index"
           data-target="t-ok"
           href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059&index=3"
-          >Playlist avec index (URL, index=3)</a
+          >Playlist with index (URL, index=3)</a
         >
         <a
           data-link
@@ -299,7 +326,7 @@
           data-target="t-ok"
           data-index="5"
           href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059"
-          >Playlist avec data-index="5"</a
+          >Playlist with data-index="5"</a
         >
         <a
           data-link
@@ -307,7 +334,7 @@
           data-target="t-ok"
           data-seasons="3,3"
           href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059"
-          >Playlist en 2 saisons (data-seasons="3,3")</a
+          >Playlist in 2 seasons (data-seasons="3,3")</a
         >
         <a
           data-link
@@ -316,34 +343,29 @@
           data-panel="false"
           href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477&labels=Episode%2054,Episode%2055,Episode%2056"
         >
-          Playlist sans panneau (data-panel="false")
+          Playlist without panel (data-panel="false")
         </a>
       </div>
-      <div id="t-ok" class="player"></div>
+      <div id="t-ok" class="video-container"></div>
 
       <!-- ───────────── Shared target ───────────── -->
-      <h2>Une seule zone, plusieurs services</h2>
+      <h2>Single zone, multiple services</h2>
       <p>
-        La même cible reçoit tour à tour YouTube, Ok.ru et Dailymotion. À chaque
-        changement, le player est remplacé, le panneau suit le service (ou
-        disparaît) et la sauvegarde est mise à jour.
+        The same target alternately receives YouTube, Ok.ru, and Dailymotion. On
+        each change, the player is replaced, the panel follows the service (or
+        disappears), and the save state is updated.
       </p>
       <ul class="check">
+        <li>YouTube dynamic playlist: panel closed, bottom-left button.</li>
+        <li>Ok.ru playlist: panel open, top-right reopen button.</li>
+        <li>Standalone video or Dailymotion: no panel, no button.</li>
         <li>
-          Playlist dynamique YouTube : panneau fermé, bouton en bas à gauche.
+          Quick clicks on multiple links in a row: only the last one should
+          display.
         </li>
         <li>
-          Playlist Ok.ru : panneau ouvert, bouton de réouverture en haut à
-          droite.
-        </li>
-        <li>Vidéo seule ou Dailymotion : aucun panneau, aucun bouton.</li>
-        <li>
-          Un clic rapide sur plusieurs liens d'affilée : seul le dernier doit
-          s'afficher.
-        </li>
-        <li>
-          Précédent / Suivant : revient au lien précédent de cette zone, à
-          l'épisode où tu étais.
+          Previous / Next: returns to the previous link of this zone, at the
+          episode where you were.
         </li>
       </ul>
       <div class="links">
@@ -353,7 +375,7 @@
           data-target="t-mix"
           data-show-on-init
           href="https://www.youtube.com/watch_videos?video_ids=DPAwTqig4_c,NEOvz3k9DuQ"
-          >YouTube — playlist dynamique</a
+          >YouTube — dynamic playlist</a
         >
         <a
           data-link
@@ -367,21 +389,21 @@
           data-key="mix-dm-video"
           data-target="t-mix"
           href="https://www.dailymotion.com/video/x2cvbkk"
-          >Dailymotion — vidéo</a
+          >Dailymotion — video</a
         >
         <a
           data-link
           data-key="mix-ok-video"
           data-target="t-mix"
           href="https://ok.ru/video/2406546410212"
-          >Ok.ru — vidéo seule</a
+          >Ok.ru — standalone video</a
         >
         <a
           data-link
           data-key="mix-yt-video"
           data-target="t-mix"
           href="https://www.youtube.com/watch?v=FVhqw12-BVo"
-          >YouTube — vidéo seule</a
+          >YouTube — standalone video</a
         >
         <!-- Not an <a>: the url comes from data-url -->
         <button
@@ -391,28 +413,26 @@
           type="button"
           data-url="https://www.dailymotion.com/playlist/x8j3fi"
         >
-          Bouton — Dailymotion playlist
+          Button — Dailymotion playlist
         </button>
       </div>
       <div class="toolbar">
         <button class="tool" id="back" type="button" disabled>
-          ← Précédent
+          ← Previous
         </button>
-        <button class="tool" id="forward" type="button" disabled>
-          Suivant →
-        </button>
+        <button class="tool" id="forward" type="button" disabled>Next →</button>
       </div>
-      <div id="t-mix" class="player"></div>
+      <div id="t-mix" class="video-container"></div>
 
       <!-- ───────────── Autoplay ───────────── -->
       <h2>Autoplay</h2>
       <p>
-        <code>data-autoplay</code> décide <em>quand</em> la lecture démarre
-        seule : <code>none</code> (défaut) jamais, <code>click</code> seulement
-        après un clic, <code>always</code> (ou attribut vide) aussi à
-        l'affichage initial. Même en <code>always</code>, une restauration après
-        rechargement reste en pause. Les navigateurs peuvent aussi refuser
-        l'autoplay avec son sans interaction préalable.
+        <code>data-autoplay</code> determines <em>when</em> playback starts
+        automatically: <code>none</code> (default) never,
+        <code>click</code> only after a click, <code>always</code> (or empty
+        attribute) also on initial display. Even when set to
+        <code>always</code>, restoration after a reload remains paused. Browsers
+        may also refuse autoplay with sound without prior user interaction.
       </p>
       <div class="links">
         <a
@@ -421,7 +441,7 @@
           data-target="t-ap"
           data-show-on-init
           href="https://www.youtube.com/watch?v=YCfcg9gzCYc"
-          >none — jamais</a
+          >none — never</a
         >
         <a
           data-link
@@ -429,7 +449,7 @@
           data-target="t-ap"
           data-autoplay="click"
           href="https://www.youtube.com/watch?v=GLhUitFjgso"
-          >click — au clic</a
+          >click — on click</a
         >
         <a
           data-link
@@ -437,7 +457,7 @@
           data-target="t-ap"
           data-autoplay="always"
           href="https://www.youtube.com/watch?v=5drmgVauSMg"
-          >always — toujours</a
+          >always — always</a
         >
         <a
           data-link
@@ -448,14 +468,68 @@
           >click — Ok.ru</a
         >
       </div>
-      <div id="t-ap" class="player"></div>
+      <div id="t-ap" class="video-container"></div>
+
+      <!-- ───────────── Existing YouTube Embeds ───────────── -->
+      <h2>Existing YouTube Embed</h2>
+      <p>
+        <code>&lt;iframe&gt;</code> elements already present on the page,
+        without <code>data-link</code> or <code>data-target</code>. The plugin
+        must adopt them, add the ☰ button (bottom left, visible on hover) and
+        the playlist panel.
+      </p>
+      <ul class="check">
+        <li>
+          A: <code>list=</code> playlist (requires the API key for titles).
+        </li>
+        <li>
+          B: dynamic <code>playlist=a,b</code> playlist (works without a key).
+        </li>
+        <li>C: standalone video, no panel expected (not a playlist).</li>
+        <li>
+          D: iframe injected afterwards, followed by <code>player.scan()</code>.
+        </li>
+      </ul>
+
+      <h3>A — playlist list=</h3>
+      <iframe
+        src="https://www.youtube.com/embed/videoseries?list=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y"
+        title="YouTube playlist"
+        frameborder="0"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowfullscreen
+      ></iframe>
+
+      <h3>B — dynamic playlist</h3>
+      <iframe
+        src="https://www.youtube.com/embed/videoseries?playlist=DPAwTqig4_c,NEOvz3k9DuQ"
+        title="YouTube dynamic playlist"
+        frameborder="0"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowfullscreen
+      ></iframe>
+
+      <h4>Example 2</h4>
+
+      <div class="video-container">
+        <iframe
+          width="560"
+          height="315"
+          src="https://www.youtube.com/embed?playlist=at9-Gm1-MWQ,AwaVAlMURak,GgNTzHi4xtQ,Enevxnnn114,i47QRX20un8"
+          title="YouTube video player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+        >
+        </iframe>
+      </div>
 
       <!-- ───────────── Errors ───────────── -->
-      <h2>Cas d'erreur</h2>
+      <h2>Error cases</h2>
       <p>
-        Une URL qu'aucun service ne gère et un lien sans
-        <code>data-target</code> sont signalés dans le journal d'erreurs, sans
-        bloquer le reste de la page.
+        An unsupported URL and a link without a
+        <code>data-target</code> are reported in the error log without blocking
+        the rest of the page.
       </p>
       <div class="links">
         <a
@@ -463,21 +537,21 @@
           data-key="err-unsupported"
           data-target="t-err"
           href="https://vimeo.com/76979871"
-          >Vimeo (non supporté)</a
+          >Vimeo (unsupported)</a
         >
-        <!-- <a data-link data-key="err-no-target" href="https://www.dailymotion.com/video/x2cvbkk">Sans data-target</a> -->
+        <!-- <a data-link data-key="err-no-target" href="https://www.dailymotion.com/video/x2cvbkk">Without data-target</a> -->
       </div>
-      <div id="t-err" class="player"></div>
+      <div id="t-err" class="video-container"></div>
 
       <!-- ───────────── Debug ───────────── -->
-      <h2>État interne</h2>
+      <h2>Internal state</h2>
       <div class="debug">
         <div>
-          <h3>Journal sauvegardé (par zone)</h3>
+          <h3>Saved log (per zone)</h3>
           <pre id="journal">—</pre>
         </div>
         <div>
-          <h3>Erreurs</h3>
+          <h3>Errors</h3>
           <pre id="errors">—</pre>
         </div>
       </div>
@@ -485,7 +559,7 @@
 
     <script type="module">
       // Serve this folder over http (ES modules do not load from file://), e.g.:  npx serve .
-      import { LinkPlayer } from "../src/index.js";
+      import { LinkPlayer } from "../src/linkPlayer.js";
 
       const journalEl = document.querySelector("#journal");
       const errorsEl = document.querySelector("#errors");
@@ -530,7 +604,7 @@
           console.warn("[LinkPlayer]", error, link);
         }
       });
-      window.__player = player; 
+      window.__player = player;
       renderState();
 
       const navigationService = () =>
@@ -551,7 +625,6 @@
         }
         location.reload();
       });
-
     </script>
   </body>
 </html>

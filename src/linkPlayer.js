@@ -173,6 +173,11 @@ export class YouTubeProvider {
     try {
       const u = new URL(url);
       const h = hostOf(u);
+      if (
+        (h === "youtube.com" || h === "youtube-nocookie.com") &&
+        /^\/embed(\/|$)/.test(u.pathname)
+      )
+        return true;
       if (h === "youtube.com") {
         return (
           (u.pathname === "/watch" && u.searchParams.has("v")) ||
@@ -187,22 +192,30 @@ export class YouTubeProvider {
 
   parse(url) {
     const u = new URL(url);
-    const ids = u.searchParams.get("video_ids");
-    const urlIndex = intParam(u, "index"); // 1-based in YouTube urls
+    const emb = /^\/embed(?:\/([^/]+))?\/?$/.exec(u.pathname);
+    const pathId = emb?.[1] && emb[1] !== "videoseries" ? emb[1] : null;
+    const ids = u.searchParams.get(emb ? "playlist" : "video_ids");
+    const videoIds = ids
+      ? ids
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : null;
+    if (pathId && videoIds && !videoIds.includes(pathId))
+      videoIds.unshift(pathId);
+    const urlIndex = intParam(u, "index");
     return {
-      videoId:
-        hostOf(u) === "youtu.be"
-          ? u.pathname.slice(1)
-          : u.searchParams.get("v"),
+      videoId: emb
+        ? pathId
+        : hostOf(u) === "youtu.be"
+        ? u.pathname.slice(1)
+        : u.searchParams.get("v"),
       playlistId: u.searchParams.get("list"),
-      videoIds: ids
-        ? ids
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : null,
-      startSeconds: intParam(u, "t"),
-      initialIndex: urlIndex !== null ? Math.max(urlIndex - 1, 0) : null
+      videoIds,
+      startSeconds: intParam(u, "start") ?? intParam(u, "t"),
+      // embed: index is 0-based, watch: 1-based
+      initialIndex:
+        urlIndex === null ? null : emb ? urlIndex : Math.max(urlIndex - 1, 0)
     };
   }
 
@@ -218,8 +231,8 @@ export class YouTubeProvider {
       return `https://www.youtube.com/embed/videoseries?${q}`;
     }
     if (p.playlistId) q.set("list", p.playlistId);
-    if (p.playlistId && index !== null) {
-      q.set("index", index);
+    if (p.playlistId && (index !== null || !p.videoId)) {
+      if (index !== null) q.set("index", index);
       return `https://www.youtube.com/embed/videoseries?${q}`;
     }
     return `https://www.youtube.com/embed/${p.videoId}?${q}`;
@@ -765,14 +778,29 @@ export class RegionView {
     this._panel = null;
   }
 
+  /** Marks an iframe already in the page: showEmbed() will reuse it instead of creating one. */
+  adoptIframe(iframe) {
+    this._adopted = iframe;
+  }
+
   showEmbed(src, title) {
+    if (this._adopted) {
+      const f = this._adopted;
+      this._adopted = null;
+      this._c
+        .querySelectorAll(".lp-panel,.lp-toggle,.lp-resize")
+        .forEach((e) => e.remove());
+      f.title ||= title;
+      if (f.src !== src) f.src = src; // adds enablejsapi=1 (one reload)
+      return f;
+    }
     const f = el("iframe", "lp-frame");
     f.src = src;
     f.title = title;
     f.allow = "autoplay; fullscreen; picture-in-picture; web-share";
     f.allowFullscreen = true;
     f.referrerPolicy = "strict-origin-when-cross-origin";
-    this._c.replaceChildren(f); // also removes the previous panel
+    this._c.replaceChildren(f);
     this._panel = null;
     return f;
   }
@@ -1048,13 +1076,19 @@ export class Tooltip {
 export class PlayerRegion {
   constructor({ target, registry, view, panel, onChange }) {
     this.target = target;
+    this.view = view;
     this.links = [];
-    this.service = new NavigationService({ registry, view, panel, onChange });
+    this.navigationService = new NavigationService({
+      registry,
+      view,
+      panel,
+      onChange
+    });
   }
 }
 
 export class LinkPlayer {
-  static VERSION = "2.0.0";
+  static VERSION = "2.0.1";
 
   /**
    * @param {Object} o
@@ -1102,12 +1136,12 @@ export class LinkPlayer {
     this._regions = new Map();
     this._bound = new WeakSet();
     this._thumbs = new Map();
+    this._embedCount = 0;
     this.scan();
   }
 
-  getRegion(target) {
+  getRegion(target, container = document.getElementById(target)) {
     if (!this._regions.has(target)) {
-      const container = document.getElementById(target);
       if (!container) throw new Error(`Target not found: "${target}"`);
       const widths = this._resizable
         ? {
@@ -1132,6 +1166,63 @@ export class LinkPlayer {
       );
     }
     return this._regions.get(target);
+  }
+
+  /** Host of an existing iframe: its own parent when it holds only the iframe (.video-container...), otherwise a wrapper. */
+  _hostFor(iframe) {
+    const p = iframe.parentElement;
+    if (
+      p &&
+      p !== this._scope &&
+      p !== document.body &&
+      p.children.length === 1 &&
+      !p.textContent.trim()
+    )
+      return p; // existing styles stay untouched
+
+    const w = +iframe.getAttribute("width") || 0;
+    const h = +iframe.getAttribute("height") || 0;
+    const wrap = document.createElement("div");
+    wrap.style.cssText = `width:100%;${
+      w ? `max-width:${w}px;` : ""
+    }aspect-ratio:${w && h ? `${w}/${h}` : "16/9"}`;
+    iframe.replaceWith(wrap);
+    wrap.append(iframe);
+    iframe.classList.add("lp-frame"); // fills the wrapper
+    return wrap;
+  }
+
+  _adoptEmbeds() {
+    this._scope.querySelectorAll("iframe").forEach((iframe) => {
+      if (this._bound.has(iframe) || iframe.closest(".lp-host")) return;
+      if (iframe.dataset.panel === "false") return;
+
+      let url, provider;
+      try {
+        url = new URL(iframe.getAttribute("src") ?? "", location.href).href;
+        provider = this._registry.resolve(url);
+      } catch {
+        return; // not an embed we know
+      }
+      if (!provider.panel) return; // nothing to show (Dailymotion...)
+
+      this._bound.add(iframe);
+      const target = `embed-${++this._embedCount}`;
+      const region = this.getRegion(target, this._hostFor(iframe));
+      region.view.adoptIframe(iframe);
+
+      const info = {
+        key: target,
+        url,
+        link: iframe,
+        autoplay: "none",
+        startIndex: null,
+        seasonCounts: null
+      };
+      this._run(info, () =>
+        region.navigationService.navigate(info, { autoplay: false })
+      );
+    });
   }
 
   scan() {
@@ -1173,20 +1264,27 @@ export class LinkPlayer {
         { id: provider?.id, name: provider?.name }
       );
     }
+
+    try {
+      this._adoptEmbeds();
+    } catch (error) {
+      this._onError(error);
+    }
     this._regions.forEach((region) => this._init(region));
   }
 
   _click(region, info) {
-    const autoplay = shouldAutoplay(info.autoplay, "click");
-    // Same link again: nothing if it autoplays on click, otherwise it closes the player
-    if (region.service.current?.url === info.url)
-      return autoplay ? undefined : region.service.close();
-    this._run(info, () => region.service.navigate(info, { autoplay }));
+    const ns = region.navigationService;
+    // Same link again → toggle off, whatever its autoplay setting
+    if (ns.current?.key === info.key) return ns.close();
+    this._run(info, () =>
+      ns.navigate(info, { autoplay: shouldAutoplay(info.autoplay, "click") })
+    );
   }
 
   /** Restore the saved url/index, otherwise data-show-on-init. */
   _init(region) {
-    if (region.service.current) return; // already started (second scan)
+    if (region.navigationService.current) return; // already started (second scan)
     const saved = this._useStorage
       ? this._store.get(`state:${region.target}`)
       : null;
@@ -1200,13 +1298,16 @@ export class LinkPlayer {
       };
       // Browsers block autoplay on page load: restore paused
       return this._run(info, () =>
-        region.service.navigate(info, { index: saved.index, autoplay: false })
+        region.navigationService.navigate(info, {
+          index: saved.index,
+          autoplay: false
+        })
       );
     }
     const first = region.links.find((l) => l.showOnInit);
     if (first)
       this._run(first, () =>
-        region.service.navigate(first, {
+        region.navigationService.navigate(first, {
           autoplay: shouldAutoplay(first.autoplay, "init")
         })
       );
