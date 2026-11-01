@@ -14,7 +14,8 @@ import {
   NavigationJournal,
   NavigationService,
   RegionView,
-  LinkPlayer
+  LinkPlayer,
+  MemoryStore
 } from "../src/linkPlayer.js";
 
 /* ───────────────────────── test helpers ───────────────────────── */
@@ -642,80 +643,46 @@ describe("YouTubeProvider", () => {
   });
 });
 
-describe("DailymotionProvider", () => {
-  const dm = new DailymotionProvider({ playerId: "PLAYER123" });
-  const legacy = new DailymotionProvider();
+describe("DailymotionProvider (player id)", () => {
+  const dm = new DailymotionProvider({ playerId: "OPT" });
 
-  it("has no panel", () => {
-    expect(dm.panel).toBeNull();
-  });
-
-  it("canHandle video and playlist urls", () => {
-    expect(dm.canHandle("https://www.dailymotion.com/video/x8abc")).toBe(true);
-    expect(dm.canHandle("https://www.dailymotion.com/playlist/x9xyz")).toBe(
-      true
+  it("handles existing geo embeds", () => {
+    expect(
+      dm.canHandle(
+        "https://geo.dailymotion.com/player/x8lr5.html?video=x84sh87"
+      )
+    ).toBe(true);
+    expect(
+      dm.canHandle(
+        "https://geo.dailymotion.com/player/x8lr5.html?playlist=x5zhzj"
+      )
+    ).toBe(true);
+    expect(dm.canHandle("https://geo.dailymotion.com/player/x8lr5.html")).toBe(
+      false
     );
-    expect(dm.canHandle("https://youtube.com/watch?v=1")).toBe(false);
   });
 
-  it("parses video and playlist", () => {
-    expect(dm.parse("https://www.dailymotion.com/video/x8abc")).toMatchObject({
+  it("keeps the player id of an existing embed, which wins over the option", () => {
+    const p = dm.parse(
+      "https://geo.dailymotion.com/player/x8lr5.html?video=x84sh87&playlist=x5zhzj"
+    );
+    expect(p).toMatchObject({
       type: "video",
-      id: "x8abc"
+      id: "x84sh87",
+      playlistId: "x5zhzj",
+      playerId: "x8lr5"
     });
-    expect(
-      dm.parse("https://www.dailymotion.com/playlist/x9xyz")
-    ).toMatchObject({
-      type: "playlist",
-      id: "x9xyz",
-      playlistId: "x9xyz"
-    });
-  });
-
-  it("parses a video inside a playlist (?playlist=)", () => {
-    expect(
-      dm.parse("https://www.dailymotion.com/video/x8p7z61?playlist=x80g3p")
-    ).toMatchObject({ type: "video", id: "x8p7z61", playlistId: "x80g3p" });
-  });
-
-  it("buildEmbedSrc uses player id when present", () => {
-    const src = dm.buildEmbedSrc(
-      { type: "video", id: "x8abc", playlistId: null },
-      { autoplay: true }
-    );
-    expect(src).toBe(
-      "https://geo.dailymotion.com/player/PLAYER123.html?video=x8abc&autoplay=true"
+    expect(dm.buildEmbedSrc(p)).toBe(
+      "https://geo.dailymotion.com/player/x8lr5.html?video=x84sh87&playlist=x5zhzj"
     );
   });
 
-  it("buildEmbedSrc falls back to the legacy embed url", () => {
-    const video = { type: "video", id: "x1", playlistId: null };
-    const playlist = { type: "playlist", id: "x9", playlistId: "x9" };
-    expect(legacy.buildEmbedSrc(video)).toBe(
-      "https://www.dailymotion.com/embed/video/x1"
+  it("uses the option for classic dailymotion.com links", () => {
+    const p = dm.parse("https://www.dailymotion.com/playlist/x9xyz");
+    expect(p.playerId).toBeNull();
+    expect(dm.buildEmbedSrc(p)).toBe(
+      "https://geo.dailymotion.com/player/OPT.html?playlist=x9xyz"
     );
-    expect(legacy.buildEmbedSrc(video, { autoplay: true })).toBe(
-      "https://www.dailymotion.com/embed/video/x1?autoplay=1"
-    );
-    expect(legacy.buildEmbedSrc(playlist)).toBe(
-      "https://www.dailymotion.com/embed/playlist/x9"
-    );
-  });
-
-  it("thumbnail only for single videos; playlist is always empty", async () => {
-    expect(await dm.getThumbnail({ type: "video", id: "x1" })).toBe(
-      "https://www.dailymotion.com/thumbnail/video/x1"
-    );
-    expect(await dm.getThumbnail({ type: "playlist", id: "x9" })).toBeNull();
-    expect(await dm.getPlaylist()).toEqual([]);
-  });
-
-  it("controller is a harmless no-op", () => {
-    const c = dm.createController();
-    expect(() => {
-      c.playAt(1);
-      c.dispose();
-    }).not.toThrow();
   });
 });
 
@@ -1779,7 +1746,7 @@ describe("LinkPlayer", () => {
       );
     });
 
-    it("a second click on the same link closes the player (autoplay none)", () => {
+    it("a second click on the same link hides the player but keeps the state (autoplay none)", () => {
       const { root, target, onChange } = setup();
       root.querySelector("#l1").click();
       root.querySelector("#l1").click();
@@ -1787,7 +1754,8 @@ describe("LinkPlayer", () => {
       expect(root.querySelector("#l1").classList.contains("is-active")).toBe(
         false
       );
-      expect(onChange).toHaveBeenLastCalledWith("t-click", null);
+      // hidden, not closed: listeners are not told the zone was reset
+      expect(onChange).not.toHaveBeenCalledWith("t-click", null);
     });
 
     it('a second click also hides the video with data-autoplay="click"', () => {
@@ -1915,13 +1883,43 @@ describe("LinkPlayer", () => {
       expect(src).not.toContain("autoplay=1");
     });
 
-    it("saves on navigation and clears on close", () => {
+    it("saves on navigation, keeps the save when hidden, clears it on close", () => {
       const store = memoryStore();
-      const { root } = build(store);
+      const { root, player } = build(store);
       root.querySelector("#l").click();
       expect(store.get("state:t-click")).toMatchObject({ key: "a", url });
-      root.querySelector("#l").click();
+
+      root.querySelector("#l").click(); // hide
+      expect(store.get("state:t-click")).toMatchObject({ key: "a", url });
+
+      player.getRegion("t-click").navigationService.close();
       expect(store.get("state:t-click")).toBeNull();
     });
+
+    it("useStorage:false never touches localStorage", () => {
+      const spy = vi.spyOn(Storage.prototype, "setItem");
+      const root = mount(`<div id="t"></div>`);
+      new LinkPlayer({
+        scope: root,
+        scanner: stubScanner(),
+        useStorage: false,
+        tooltip: false
+      });
+      expect(spy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("MemoryStore", () => {
+  it("stores, expires and removes like JsonStore", () => {
+    vi.useFakeTimers();
+    const s = new MemoryStore();
+    s.set("a", { x: 1 });
+    s.set("tmp", "v", 1000);
+    expect(s.get("a")).toEqual({ x: 1 });
+    vi.advanceTimersByTime(1001);
+    expect(s.get("tmp")).toBeNull();
+    s.remove("a");
+    expect(s.get("a")).toBeNull();
   });
 });

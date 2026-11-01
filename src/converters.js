@@ -30,23 +30,15 @@ export function toStringOrNull(value) {
 }
 
 export const AUTOPLAY_MODES = Object.freeze({
-  NONE: "none",
-  CLICK: "click",
-  ALWAYS: "always"
+  NONE: "none", // false
+  INIT: "init", // true
+  CLICK: "click" // click
 });
 
-/** undefined -> none ; "" / "true" / "always" -> always ; "click" -> click ; other -> none */
 export function toAutoplayMode(value) {
   if (value === undefined || value === null) return AUTOPLAY_MODES.NONE;
   const v = String(value).trim().toLowerCase();
-  if (v === "" || v === "true" || v === "always") return AUTOPLAY_MODES.ALWAYS;
+  if (v === "" || v === "true") return AUTOPLAY_MODES.INIT;
   if (v === "click") return AUTOPLAY_MODES.CLICK;
-  return AUTOPLAY_MODES.NONE; // "none", "false", "0", unknown values
-}
-
-/** Pure decision: should this navigation autoplay? */
-export function shouldAutoplay(mode, trigger) {
-  // trigger: 'click' | 'init'
-  if (mode === AUTOPLAY_MODES.ALWAYS) return true;
-  return mode === AUTOPLAY_MODES.CLICK && trigger === "click";
+  return AUTOPLAY_MODES.NONE; 
 }

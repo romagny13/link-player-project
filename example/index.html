@@ -13,7 +13,27 @@
         --muted: #9a958a;
         --accent: #f7931e;
         --danger: #e5634d;
+
+       /* --lp-bg: #0b1020;
+        --lp-border: #1d2744;
+        --lp-hover: #141c35;
+        --lp-text: #8fa0c8;
+        --lp-text-active: #fff;
+        --lp-muted: #4b5a85;
+        --lp-accent: #36c5f0; */
       }
+
+      /* or by region 
+      #t-yt {
+        --lp-accent: #e5384f;
+      }
+      #t-ok {
+        --lp-bg: #fff8ee;
+        --lp-text: #5a4630;
+        --lp-text-active: #000;
+      }
+*/
+
       *,
       *::before,
       *::after {
@@ -437,17 +457,10 @@
       <div class="links">
         <a
           data-link
-          data-key="ap-none"
-          data-target="t-ap"
-          data-show-on-init
-          href="https://www.youtube.com/watch?v=YCfcg9gzCYc"
-          >none — never</a
-        >
-        <a
-          data-link
           data-key="ap-click"
           data-target="t-ap"
           data-autoplay="click"
+          data-show-on-init
           href="https://www.youtube.com/watch?v=GLhUitFjgso"
           >click — on click</a
         >
@@ -455,17 +468,16 @@
           data-link
           data-key="ap-always"
           data-target="t-ap"
-          data-autoplay="always"
+          data-autoplay="true"
           href="https://www.youtube.com/watch?v=5drmgVauSMg"
-          >always — always</a
+          >init — init</a
         >
         <a
           data-link
-          data-key="ap-click-ok"
+          data-key="ap-none"
           data-target="t-ap"
-          data-autoplay="click"
-          href="https://ok.ru/video/2406546410212"
-          >click — Ok.ru</a
+          href="https://www.youtube.com/watch?v=YCfcg9gzCYc"
+          >none — never</a
         >
       </div>
       <div id="t-ap" class="video-container"></div>

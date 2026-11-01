@@ -4,16 +4,17 @@ import {
   toIntList,
   toStringOrNull,
   toAutoplayMode,
-  shouldAutoplay,
   AUTOPLAY_MODES
 } from "../src/converters.js";
+
+const { NONE, INIT, CLICK } = AUTOPLAY_MODES;
 
 describe("AUTOPLAY_MODES", () => {
   it("exposes the three modes", () => {
     expect(AUTOPLAY_MODES).toEqual({
       NONE: "none",
       CLICK: "click",
-      ALWAYS: "always"
+      INIT: "init"
     });
   });
 
@@ -25,47 +26,34 @@ describe("AUTOPLAY_MODES", () => {
 describe("toAutoplayMode", () => {
   it.each([
     // attribute absent
-    [undefined, "none"],
-    [null, "none"],
-    // attribute present without value, or truthy aliases
-    ["", "always"],
-    ["true", "always"],
-    ["always", "always"],
-    [" ALWAYS ", "always"],
-    ["TRUE", "always"],
+    [undefined, NONE],
+    [null, NONE],
+    // attribute present without value, or truthy alias
+    ["", INIT],
+    ["  ", INIT],
+    ["true", INIT],
+    ["TRUE", INIT],
+    [" true ", INIT],
     // click
-    ["click", "click"],
-    ["CLICK", "click"],
-    [" click ", "click"],
+    ["click", CLICK],
+    ["CLICK", CLICK],
+    [" click ", CLICK],
     // explicit none, falsy aliases, unknown values
-    ["none", "none"],
-    ["false", "none"],
-    ["0", "none"],
-    ["clik", "none"],
-    ["nonsense", "none"]
+    ["none", NONE],
+    ["false", NONE],
+    ["0", NONE],
+    ["clik", NONE],
+    ["nonsense", NONE],
+    // legacy value, no longer an alias (see note)
+    ["always", NONE],
+    ["init", NONE]
   ])("%j -> %j", (input, expected) =>
     expect(toAutoplayMode(input)).toBe(expected)
   );
-});
 
-describe("shouldAutoplay", () => {
-  it.each([
-    ["none", "init", false],
-    ["none", "click", false],
-    ["click", "init", false],
-    ["click", "click", true],
-    ["always", "init", true],
-    ["always", "click", true]
-  ])("mode %s on %s -> %s", (mode, trigger, expected) => {
-    expect(shouldAutoplay(mode, trigger)).toBe(expected);
-  });
-
-  it("does not autoplay for an unknown mode", () => {
-    expect(shouldAutoplay("nonsense", "click")).toBe(false);
-  });
-
-  it("does not autoplay for an unknown trigger in click mode", () => {
-    expect(shouldAutoplay("click", "restore")).toBe(false);
+  it("exposes frozen, stable mode values", () => {
+    expect(AUTOPLAY_MODES).toEqual({ NONE: "none", INIT: "init", CLICK: "click" });
+    expect(Object.isFrozen(AUTOPLAY_MODES)).toBe(true);
   });
 });
 

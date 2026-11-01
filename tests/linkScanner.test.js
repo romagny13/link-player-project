@@ -1,3 +1,4 @@
+import { AUTOPLAY_MODES } from "../src/converters.js";
 import {
   DATA_ATTRIBUTES,
   LINK_SELECTOR,
@@ -8,6 +9,8 @@ import {
   parseLink,
   LinkScanner
 } from "../src/linkScanner.js";
+
+const { NONE, INIT, CLICK } = AUTOPLAY_MODES;
 
 // Minimal valid raw source, overridden per test
 const raw = (overrides = {}) => ({
@@ -256,24 +259,32 @@ describe("parseLink", () => {
 
   describe("autoplay (mode)", () => {
     it('is "none" when absent', () =>
-      expect(parseLink(raw()).autoplay).toBe("none"));
-    it('is "always" when the attribute is present (empty string)', () =>
-      expect(parseLink(raw({ autoplay: "" })).autoplay).toBe("always"));
-    it('is "always" for "true" and "always"', () => {
-      expect(parseLink(raw({ autoplay: "true" })).autoplay).toBe("always");
-      expect(parseLink(raw({ autoplay: "always" })).autoplay).toBe("always");
-    });
+      expect(parseLink(raw()).autoplay).toBe(NONE));
+
+    it('is "init" when the attribute is present (empty string)', () =>
+      expect(parseLink(raw({ autoplay: "" })).autoplay).toBe(INIT));
+
+    it('is "init" for "true"', () =>
+      expect(parseLink(raw({ autoplay: "true" })).autoplay).toBe(INIT));
+
     it('is "click" for "click"', () =>
-      expect(parseLink(raw({ autoplay: "click" })).autoplay).toBe("click"));
+      expect(parseLink(raw({ autoplay: "click" })).autoplay).toBe(CLICK));
+
     it('is "none" for "none", "false" and "0"', () => {
-      expect(parseLink(raw({ autoplay: "none" })).autoplay).toBe("none");
-      expect(parseLink(raw({ autoplay: "false" })).autoplay).toBe("none");
-      expect(parseLink(raw({ autoplay: "0" })).autoplay).toBe("none");
+      expect(parseLink(raw({ autoplay: "none" })).autoplay).toBe(NONE);
+      expect(parseLink(raw({ autoplay: "false" })).autoplay).toBe(NONE);
+      expect(parseLink(raw({ autoplay: "0" })).autoplay).toBe(NONE);
     });
-    it('falls back to "none" for an unknown value', () =>
-      expect(parseLink(raw({ autoplay: "clik" })).autoplay).toBe("none"));
-    it("is case and space insensitive", () =>
-      expect(parseLink(raw({ autoplay: " CLICK " })).autoplay).toBe("click"));
+
+    it('falls back to "none" for an unknown value', () => {
+      expect(parseLink(raw({ autoplay: "clik" })).autoplay).toBe(NONE);
+      expect(parseLink(raw({ autoplay: "always" })).autoplay).toBe(NONE); // legacy value
+    });
+
+    it("is case and space insensitive", () => {
+      expect(parseLink(raw({ autoplay: " CLICK " })).autoplay).toBe(CLICK);
+      expect(parseLink(raw({ autoplay: " TRUE " })).autoplay).toBe(INIT);
+    });
   });
 
   describe("startIndex (data-index)", () => {

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { AUTOPLAY_MODES } from "../src/converters.js";
 import {
   LinkScanner,
   readRawLink,
@@ -54,16 +55,24 @@ describe("LinkScanner on real HTML", () => {
   });
 
   it.each([
-    ["", "always"],
-    ['="always"', "always"],
-    ['="click"', "click"],
-    ['="none"', "none"],
-    ['="false"', "none"]
+    ["", AUTOPLAY_MODES.INIT],
+    ['="true"', AUTOPLAY_MODES.INIT],
+    ['="TRUE"', AUTOPLAY_MODES.INIT],
+    ['="click"', AUTOPLAY_MODES.CLICK],
+    ['=" Click "', AUTOPLAY_MODES.CLICK],
+    ['="none"', AUTOPLAY_MODES.NONE],
+    ['="false"', AUTOPLAY_MODES.NONE],
+    ['="nimportequoi"', AUTOPLAY_MODES.NONE]
   ])("reads data-autoplay%s as %s from real HTML", (suffix, expected) => {
     const root = html(
       `<a data-link data-autoplay${suffix} href="https://ok.ru/video/1">Ep</a>`
     );
     expect(new LinkScanner().scan(root)[0].autoplay).toBe(expected);
+  });
+  
+  it("defaults to none when data-autoplay is absent", () => {
+    const root = html(`<a data-link href="https://ok.ru/video/1">Ep</a>`);
+    expect(new LinkScanner().scan(root)[0].autoplay).toBe(AUTOPLAY_MODES.NONE);
   });
 
   it('defaults to "none" when data-autoplay is absent', () => {
