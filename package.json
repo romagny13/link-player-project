@@ -1,0 +1,18 @@
+{
+  "type": "module",
+  "main": "dist/link-player.min.js",
+  "module": "dist/link-player.es.js",
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "vitest": "^5.0.5"
+  }
+}
