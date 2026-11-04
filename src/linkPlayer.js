@@ -367,12 +367,6 @@ export class YouTubeProvider {
     };
     const controller = {
       playAt: (i) => post({ event: "command", func: "playVideoAt", args: [i] }),
-      next: () => (
-        post({ event: "command", func: "nextVideo", args: [] }), true
-      ),
-      previous: () => (
-        post({ event: "command", func: "previousVideo", args: [] }), true
-      ),
       dispose() {
         globalThis.removeEventListener("message", onMessage);
         iframe.removeEventListener("load", onLoad);
@@ -646,7 +640,6 @@ export class NavigationService {
   #token = 0; // invalidates a navigation superseded by a newer one
   #controller = null;
   #index = null;
-  #count = 0;
   #visible = false;
 
   /** view: { showEmbed(src, title) → iframe, showPanel(opts), setActive(i), clear() } */
@@ -656,8 +649,7 @@ export class NavigationService {
     journal = new NavigationJournal(),
     panel = true,
     onChange = () => {},
-    onHide = () => {},
-    onItemsLoaded = () => {}
+    onHide = () => {}
   }) {
     this._registry = registry;
     this._view = view;
@@ -665,7 +657,6 @@ export class NavigationService {
     this._onChange = onChange;
     this.journal = journal;
     this._onHide = onHide;
-    this._onItemsLoaded = onItemsLoaded;
   }
 
   get current() {
@@ -676,51 +667,13 @@ export class NavigationService {
     return this.#visible;
   }
 
-  get hasNextItem() {
-    return (
-      this.#visible && this.#count > 0 && (this.#index ?? 0) < this.#count - 1
-    );
-  }
-  get hasPreviousItem() {
-    return this.#visible && this.#count > 0 && (this.#index ?? 0) > 0;
-  }
-
-  get itemIndex() {
-    return this.#index;
-  }
-  get itemCount() {
-    return this.#count;
-  }
-
-  /** @returns {boolean} false when there is nothing to go to (end of list, no playlist...). */
-  nextItem() {
-    return this.#step(1);
-  }
-  previousItem() {
-    return this.#step(-1);
-  }
-
-  #step(delta) {
-    if (!this.#visible) return false;
-    if (this.#count) {
-      const i = (this.#index ?? 0) + delta;
-      if (i < 0 || i >= this.#count) return false;
-      this.select(i);
-      return true;
-    }
-    // size unknown (YouTube list= without api key): let the player decide
-    return this.#controller?.[delta > 0 ? "next" : "previous"]?.() === true;
-  }
-
   /** @throws UnsupportedUrlError. index (0-based) wins over data-index, which wins over the url's index. */
   async navigate(info, { autoplay = false, index = null, push = true } = {}) {
     const provider = this._registry.resolve(info.url);
     const parsed = provider.parse(info.url);
     const token = ++this.#token;
-    const itemsPromise = provider.getPlaylist(parsed);
+    const itemsPromise = provider.getPlaylist(parsed); // started now, awaited only for the panel
     const start = index ?? info.startIndex ?? parsed.initialIndex ?? null;
-
-    this.#count = 0; // never keep the previous link's count (see point 3)
 
     this.#controller?.dispose();
     const iframe = this._view.showEmbed(
@@ -739,19 +692,15 @@ export class NavigationService {
     push ? this.journal.push(entry) : this.journal.replaceCurrent(entry);
     this._onChange(this.journal.current);
 
-    // no early return before this line: the count is needed even without a panel
-    const items = await itemsPromise;
-    if (token !== this.#token) return;
-    this.#count = items.length;
-    this._onItemsLoaded(this.#count);
-
+    // data-panel="false" on the link disables the panel for this link only
     if (
       !this._panel ||
       !provider.panel ||
-      info.link?.dataset?.panel === "false" ||
-      items.length === 0
+      info.link?.dataset?.panel === "false"
     )
       return;
+    const items = await itemsPromise;
+    if (token !== this.#token || items.length === 0) return;
     this._view.showPanel({
       items,
       index: this.#index ?? 0,
@@ -797,7 +746,6 @@ export class NavigationService {
     this.#controller?.dispose();
     this.#controller = null;
     this.#index = null;
-    this.#count = 0;
     this.#visible = false;
     this._view.clear();
     this.journal.clear();
@@ -1223,15 +1171,7 @@ export class Tooltip {
 
 /** A zone (data-target): its links and its navigation service (which owns the journal). */
 export class PlayerRegion {
-  constructor({
-    target,
-    registry,
-    view,
-    panel,
-    onChange,
-    onHide,
-    onItemsLoaded
-  }) {
+  constructor({ target, registry, view, panel, onChange, onHide }) {
     this.target = target;
     this.view = view;
     this.links = [];
@@ -1240,8 +1180,7 @@ export class PlayerRegion {
       view,
       panel,
       onChange,
-      onHide,
-      onItemsLoaded
+      onHide
     });
   }
 }
@@ -1259,7 +1198,7 @@ export function neighbourLink(links, currentKey, delta, wrap = false) {
 }
 
 export class LinkPlayer {
-  static VERSION = "2.0.7";
+  static VERSION = "2.0.8";
 
   /**
    * @param {Object} o
@@ -1302,7 +1241,7 @@ export class LinkPlayer {
     this._registry =
       registry ??
       new ProviderRegistry([
-        new YouTubeProvider({ apiKey: youtubeApiKey, store : this._store }),
+        new YouTubeProvider({ apiKey: youtubeApiKey, store: this._store }),
         new DailymotionProvider({ playerId: dailymotionPlayerId }),
         new OkruProvider({ embedBaseUrl: okruEmbedBaseUrl })
       ]);
@@ -1336,8 +1275,7 @@ export class LinkPlayer {
             resizable: this._resizable
           }),
           onChange: (entry) => this._changed(target, entry),
-          onHide: () => this._hidden(target),
-          onItemsLoaded: () => this._emitNav(target)
+          onHide: () => this._hidden(target)
         })
       );
     }
@@ -1401,14 +1339,6 @@ export class LinkPlayer {
     });
   }
 
-  /* ── episodes (inside the current playlist) ── */
-  nextItem(target) {
-    return this._regions.get(target)?.navigationService.nextItem() ?? false;
-  }
-  previousItem(target) {
-    return this._regions.get(target)?.navigationService.previousItem() ?? false;
-  }
-
   /* ── links (between the links of the zone) ── */
   nextLink(target, opts) {
     return this._stepLink(target, 1, opts);
@@ -1431,18 +1361,18 @@ export class LinkPlayer {
   }
 
   /** Everything a custom navigation bar needs to enable/disable its buttons. */
+  /** Everything a custom navigation bar needs (links of the zone, in DOM order). */
   getNavigationState(target) {
     const region = this._regions.get(target);
     if (!region) return null;
     const ns = region.navigationService;
     const key = ns.current?.key;
+    const at = region.links.findIndex((l) => l.key === key);
     return {
       target,
       isOpen: ns.isOpen,
-      index: ns.itemIndex,
-      count: ns.itemCount,
-      hasNextItem: ns.hasNextItem,
-      hasPreviousItem: ns.hasPreviousItem,
+      linkIndex: at === -1 ? null : at,
+      linkCount: region.links.length,
       hasNextLink: !!neighbourLink(region.links, key, 1),
       hasPreviousLink: !!neighbourLink(region.links, key, -1)
     };

@@ -21,7 +21,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
   }
 });
 
-  var _m, _entries, _cursor, _token, _controller, _index, _count, _visible, _NavigationService_instances, step_fn, go_fn, setIndex_fn;
+  var _m, _entries, _cursor, _token, _controller, _index, _visible, _NavigationService_instances, go_fn, setIndex_fn;
   function toBool(value) {
     if (value === void 0 || value === null) return false;
     const v = String(value).trim().toLowerCase();
@@ -457,8 +457,6 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       };
       const controller = {
         playAt: (i) => post({ event: "command", func: "playVideoAt", args: [i] }),
-        next: () => (post({ event: "command", func: "nextVideo", args: [] }), true),
-        previous: () => (post({ event: "command", func: "previousVideo", args: [] }), true),
         dispose() {
           globalThis.removeEventListener("message", onMessage);
           iframe.removeEventListener("load", onLoad);
@@ -678,8 +676,6 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       onChange = () => {
       },
       onHide = () => {
-      },
-      onItemsLoaded = () => {
       }
     }) {
       __privateAdd(this, _NavigationService_instances);
@@ -687,7 +683,6 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       // invalidates a navigation superseded by a newer one
       __privateAdd(this, _controller, null);
       __privateAdd(this, _index, null);
-      __privateAdd(this, _count, 0);
       __privateAdd(this, _visible, false);
       this._registry = registry;
       this._view = view;
@@ -695,32 +690,12 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       this._onChange = onChange;
       this.journal = journal;
       this._onHide = onHide;
-      this._onItemsLoaded = onItemsLoaded;
     }
     get current() {
       return this.journal.current;
     }
     get isOpen() {
       return __privateGet(this, _visible);
-    }
-    get hasNextItem() {
-      return __privateGet(this, _visible) && __privateGet(this, _count) > 0 && (__privateGet(this, _index) ?? 0) < __privateGet(this, _count) - 1;
-    }
-    get hasPreviousItem() {
-      return __privateGet(this, _visible) && __privateGet(this, _count) > 0 && (__privateGet(this, _index) ?? 0) > 0;
-    }
-    get itemIndex() {
-      return __privateGet(this, _index);
-    }
-    get itemCount() {
-      return __privateGet(this, _count);
-    }
-    /** @returns {boolean} false when there is nothing to go to (end of list, no playlist...). */
-    nextItem() {
-      return __privateMethod(this, _NavigationService_instances, step_fn).call(this, 1);
-    }
-    previousItem() {
-      return __privateMethod(this, _NavigationService_instances, step_fn).call(this, -1);
     }
     /** @throws UnsupportedUrlError. index (0-based) wins over data-index, which wins over the url's index. */
     async navigate(info, { autoplay = false, index = null, push = true } = {}) {
@@ -730,7 +705,6 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       const token = ++__privateWrapper(this, _token)._;
       const itemsPromise = provider.getPlaylist(parsed);
       const start = index ?? info.startIndex ?? parsed.initialIndex ?? null;
-      __privateSet(this, _count, 0);
       (_a = __privateGet(this, _controller)) == null ? void 0 : _a.dispose();
       const iframe = this._view.showEmbed(
         provider.buildEmbedSrc(parsed, { autoplay, index: start }),
@@ -746,12 +720,10 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       const entry = { key: info.key, url: info.url, index: start, info };
       push ? this.journal.push(entry) : this.journal.replaceCurrent(entry);
       this._onChange(this.journal.current);
-      const items = await itemsPromise;
-      if (token !== __privateGet(this, _token)) return;
-      __privateSet(this, _count, items.length);
-      this._onItemsLoaded(__privateGet(this, _count));
-      if (!this._panel || !provider.panel || ((_c = (_b = info.link) == null ? void 0 : _b.dataset) == null ? void 0 : _c.panel) === "false" || items.length === 0)
+      if (!this._panel || !provider.panel || ((_c = (_b = info.link) == null ? void 0 : _b.dataset) == null ? void 0 : _c.panel) === "false")
         return;
+      const items = await itemsPromise;
+      if (token !== __privateGet(this, _token) || items.length === 0) return;
       this._view.showPanel({
         items,
         index: __privateGet(this, _index) ?? 0,
@@ -793,7 +765,6 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       (_a = __privateGet(this, _controller)) == null ? void 0 : _a.dispose();
       __privateSet(this, _controller, null);
       __privateSet(this, _index, null);
-      __privateSet(this, _count, 0);
       __privateSet(this, _visible, false);
       this._view.clear();
       this.journal.clear();
@@ -803,20 +774,8 @@ var __privateWrapper = (obj, member, setter, getter) => ({
   _token = new WeakMap();
   _controller = new WeakMap();
   _index = new WeakMap();
-  _count = new WeakMap();
   _visible = new WeakMap();
   _NavigationService_instances = new WeakSet();
-  step_fn = function(delta) {
-    var _a, _b;
-    if (!__privateGet(this, _visible)) return false;
-    if (__privateGet(this, _count)) {
-      const i = (__privateGet(this, _index) ?? 0) + delta;
-      if (i < 0 || i >= __privateGet(this, _count)) return false;
-      this.select(i);
-      return true;
-    }
-    return ((_b = (_a = __privateGet(this, _controller)) == null ? void 0 : _a[delta > 0 ? "next" : "previous"]) == null ? void 0 : _b.call(_a)) === true;
-  };
   go_fn = function(entry) {
     return entry ? this.navigate(entry.info, {
       index: entry.index,
@@ -1186,15 +1145,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
     }
   }
   class PlayerRegion {
-    constructor({
-      target,
-      registry,
-      view,
-      panel,
-      onChange,
-      onHide,
-      onItemsLoaded
-    }) {
+    constructor({ target, registry, view, panel, onChange, onHide }) {
       this.target = target;
       this.view = view;
       this.links = [];
@@ -1203,8 +1154,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
         view,
         panel,
         onChange,
-        onHide,
-        onItemsLoaded
+        onHide
       });
     }
   }
@@ -1291,8 +1241,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
               resizable: this._resizable
             }),
             onChange: (entry) => this._changed(target, entry),
-            onHide: () => this._hidden(target),
-            onItemsLoaded: () => this._emitNav(target)
+            onHide: () => this._hidden(target)
           })
         );
       }
@@ -1342,15 +1291,6 @@ var __privateWrapper = (obj, member, setter, getter) => ({
         );
       });
     }
-    /* ── episodes (inside the current playlist) ── */
-    nextItem(target) {
-      var _a;
-      return ((_a = this._regions.get(target)) == null ? void 0 : _a.navigationService.nextItem()) ?? false;
-    }
-    previousItem(target) {
-      var _a;
-      return ((_a = this._regions.get(target)) == null ? void 0 : _a.navigationService.previousItem()) ?? false;
-    }
     /* ── links (between the links of the zone) ── */
     nextLink(target, opts) {
       return this._stepLink(target, 1, opts);
@@ -1373,19 +1313,19 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       return true;
     }
     /** Everything a custom navigation bar needs to enable/disable its buttons. */
+    /** Everything a custom navigation bar needs (links of the zone, in DOM order). */
     getNavigationState(target) {
       var _a;
       const region = this._regions.get(target);
       if (!region) return null;
       const ns = region.navigationService;
       const key = (_a = ns.current) == null ? void 0 : _a.key;
+      const at = region.links.findIndex((l) => l.key === key);
       return {
         target,
         isOpen: ns.isOpen,
-        index: ns.itemIndex,
-        count: ns.itemCount,
-        hasNextItem: ns.hasNextItem,
-        hasPreviousItem: ns.hasPreviousItem,
+        linkIndex: at === -1 ? null : at,
+        linkCount: region.links.length,
         hasNextLink: !!neighbourLink(region.links, key, 1),
         hasPreviousLink: !!neighbourLink(region.links, key, -1)
       };
@@ -1527,7 +1467,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       }
     }
   }
-  __publicField(LinkPlayer, "VERSION", "2.0.7");
+  __publicField(LinkPlayer, "VERSION", "2.0.8");
   return LinkPlayer;
 }));
 //# sourceMappingURL=link-player.js.map

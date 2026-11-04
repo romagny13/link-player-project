@@ -14,7 +14,7 @@
         --accent: #f7931e;
         --danger: #e5634d;
 
-       /* --lp-bg: #0b1020;
+        /* --lp-bg: #0b1020;
         --lp-border: #1d2744;
         --lp-hover: #141c35;
         --lp-text: #8fa0c8;
@@ -195,6 +195,33 @@
       .check {
         margin: 0.5rem 0 0;
         padding-left: 1.2rem;
+      }
+
+      .nav {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 0.75rem 0;
+      }
+      .nav-count {
+        margin-left: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      button.tool:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      pre.nav-state {
+        min-height: 0;
+        margin-top: 0.5rem;
+        max-height: 9rem;
+      }
+      label.opt {
+        font-size: 0.85rem;
+        color: var(--muted);
+        cursor: pointer;
       }
     </style>
   </head>
@@ -536,6 +563,126 @@
         </iframe>
       </div>
 
+      <!-- ───────────── Next / Previous ───────────── -->
+      <h2>Next / Previous</h2>
+      <p>
+        <code>Item</code> navigue dans la playlist en cours (épisode suivant ou
+        précédent). <code>Link</code> navigue entre les liens de la zone, dans
+        l'ordre du DOM. Chaque bouton est désactivé quand l'action est
+        impossible (sauf <code>Link</code> avec « wrap »). Le journal en bas
+        indique la valeur renvoyée par chaque appel.
+      </p>
+      <div class="toolbar">
+        <label class="opt">
+          <input type="checkbox" id="nav-wrap" /> wrap (links)
+        </label>
+        <button class="tool" id="nav-log-clear" type="button">Clear log</button>
+      </div>
+
+      <!-- 1. YouTube -->
+      <h3>1 — YouTube</h3>
+      <div class="links">
+        <a
+          data-link
+          data-key="n-yt-dyn"
+          data-target="t-nav-yt"
+          data-show-on-init
+          href="https://www.youtube.com/watch_videos?video_ids=at9-Gm1-MWQ,AwaVAlMURak,GgNTzHi4xtQ,Enevxnnn114,i47QRX20un8"
+          >Dynamic playlist (5)</a
+        >
+        <a
+          data-link
+          data-key="n-yt-list"
+          data-target="t-nav-yt"
+          href="https://www.youtube.com/watch?v=k98esvB9E40&list=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y"
+          >list= playlist</a
+        >
+        <a
+          data-link
+          data-key="n-yt-single"
+          data-target="t-nav-yt"
+          href="https://www.youtube.com/watch?v=FVhqw12-BVo"
+          >Standalone video</a
+        >
+      </div>
+      <div class="nav" data-nav-for="t-nav-yt"></div>
+      <div id="t-nav-yt" class="video-container"></div>
+      <pre class="nav-state" data-state-for="t-nav-yt">—</pre>
+
+      <!-- 2. Ok.ru -->
+      <h3>2 — Ok.ru</h3>
+      <div class="links">
+        <a
+          data-link
+          data-key="n-ok-labels"
+          data-target="t-nav-ok"
+          data-show-on-init
+          href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059"
+          >Playlist with titles (6)</a
+        >
+        <a
+          data-link
+          data-key="n-ok-plain"
+          data-target="t-nav-ok"
+          href="https://ok.ru/video/6615657941574?video_ids=6615657941574,6615658662470,6615658728006,6615658859078,6615661611590,6615661808198"
+          >Playlist without titles (6)</a
+        >
+      </div>
+      <div class="nav" data-nav-for="t-nav-ok"></div>
+      <div id="t-nav-ok" class="video-container"></div>
+      <pre class="nav-state" data-state-for="t-nav-ok">—</pre>
+
+      <!-- 3. Buttons only, no playlist -->
+      <h3>3 — Buttons (standalone videos, autoplay on click)</h3>
+      <div class="links">
+        <button
+          data-link
+          data-key="n-b1"
+          data-target="t-nav-btn"
+          data-autoplay="click"
+          type="button"
+          data-url="https://www.youtube.com/watch?v=YCfcg9gzCYc"
+        >
+          Bahamas
+        </button>
+        <button
+          data-link
+          data-key="n-b2"
+          data-target="t-nav-btn"
+          data-autoplay="click"
+          type="button"
+          data-url="https://www.youtube.com/watch?v=69iUWLA0oVc"
+        >
+          Maldives
+        </button>
+        <button
+          data-link
+          data-key="n-b3"
+          data-target="t-nav-btn"
+          data-autoplay="click"
+          type="button"
+          data-url="https://www.youtube.com/watch?v=5drmgVauSMg"
+        >
+          Tahiti
+        </button>
+        <button
+          data-link
+          data-key="n-b4"
+          data-target="t-nav-btn"
+          data-autoplay="click"
+          type="button"
+          data-url="https://www.youtube.com/watch?v=k8m0SaGQ_1c"
+        >
+          Vietnam
+        </button>
+      </div>
+      <div class="nav" data-nav-for="t-nav-btn"></div>
+      <div id="t-nav-btn" class="video-container"></div>
+      <pre class="nav-state" data-state-for="t-nav-btn">—</pre>
+
+      <h3>Call log</h3>
+      <pre id="nav-log">—</pre>
+
       <!-- ───────────── Errors ───────────── -->
       <h2>Error cases</h2>
       <p>
@@ -606,6 +753,7 @@
           entry ? states.set(target, entry) : states.delete(target);
           renderState();
         },
+        onNavigationState: (target, state) => renderNav(target, state),
         onError: (error, link) => {
           errorLines.push(
             `${error.name ?? "Error"}: ${error.message}${
@@ -636,6 +784,79 @@
           /* storage unavailable */
         }
         location.reload();
+      });
+
+      /* ───────── Next / Previous test bars ───────── */
+      const NAV_TARGETS = ["t-nav-yt", "t-nav-ok", "t-nav-btn"];
+      const NAV_BUTTONS = [
+        ["prevLink", "◀ Link"],
+        ["nextLink", "Link ▶"]
+      ];
+
+      const navLogEl = document.querySelector("#nav-log");
+      const navWrapEl = document.querySelector("#nav-wrap");
+      const navLines = [];
+      const navStates = new Map(); // target -> last navigation state
+
+      // build the bars
+      document.querySelectorAll("[data-nav-for]").forEach((bar) => {
+        const buttons = NAV_BUTTONS.map(([act, label]) => {
+          const b = document.createElement("button");
+          b.className = "tool";
+          b.type = "button";
+          b.dataset.act = act;
+          b.textContent = label;
+          return b;
+        });
+        const count = document.createElement("span");
+        count.className = "nav-count";
+        bar.replaceChildren(...buttons, count);
+      });
+
+      function renderNav(target, state) {
+        if (!state) return;
+        navStates.set(target, state);
+        const bar = document.querySelector(`[data-nav-for="${target}"]`);
+        if (!bar) return;
+        const wrap = navWrapEl.checked;
+        bar.querySelector('[data-act="prevLink"]').disabled = !(
+          state.hasPreviousLink || wrap
+        );
+        bar.querySelector('[data-act="nextLink"]').disabled = !(
+          state.hasNextLink || wrap
+        );
+        bar.querySelector(".nav-count").textContent = state.isOpen
+          ? `link ${(state.linkIndex ?? 0) + 1} / ${state.linkCount}`
+          : "closed";
+        const pre = document.querySelector(`[data-state-for="${target}"]`);
+        if (pre) pre.textContent = JSON.stringify(state, null, 1);
+      }
+
+      document.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-nav-for] [data-act]");
+        if (!btn) return;
+        const target = btn.closest("[data-nav-for]").dataset.navFor;
+        const act = btn.dataset.act;
+        const opts = { wrap: navWrapEl.checked };
+        const calls = {
+          prevItem: () => player.previousItem(target),
+          nextItem: () => player.nextItem(target),
+          prevLink: () => player.previousLink(target, opts),
+          nextLink: () => player.nextLink(target, opts)
+        };
+        const result = calls[act]();
+        navLines.push(
+          `${new Date().toLocaleTimeString()}  ${target}  ${act} → ${result}`
+        );
+        navLogEl.textContent = navLines.slice(-30).join("\n");
+      });
+
+      navWrapEl.addEventListener("change", () =>
+        navStates.forEach((state, target) => renderNav(target, state))
+      );
+      document.querySelector("#nav-log-clear").addEventListener("click", () => {
+        navLines.length = 0;
+        navLogEl.textContent = "—";
       });
     </script>
   </body>
