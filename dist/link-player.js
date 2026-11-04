@@ -1343,6 +1343,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
         return this._onError(error);
       }
       for (const info of infos) {
+        if (info.link.dataset.lpBound != null) continue;
         if (this._bound.has(info.link)) continue;
         let region;
         try {
@@ -1353,6 +1354,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
           this._onError(error, info);
           continue;
         }
+        info.link.dataset.lpBound = "1";
         this._bound.add(info.link);
         region.links.push(info);
         info.link.addEventListener("click", (e) => {
@@ -1467,7 +1469,7 @@ var __privateWrapper = (obj, member, setter, getter) => ({
       }
     }
   }
-  __publicField(LinkPlayer, "VERSION", "2.0.8");
+  __publicField(LinkPlayer, "VERSION", "2.0.9");
   return LinkPlayer;
 }));
 //# sourceMappingURL=link-player.js.map

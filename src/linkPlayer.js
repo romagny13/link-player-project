@@ -1198,7 +1198,7 @@ export function neighbourLink(links, currentKey, delta, wrap = false) {
 }
 
 export class LinkPlayer {
-  static VERSION = "2.0.8";
+  static VERSION = "2.0.9";
 
   /**
    * @param {Object} o
@@ -1392,6 +1392,7 @@ export class LinkPlayer {
     }
 
     for (const info of infos) {
+      if (info.link.dataset.lpBound != null) continue;
       if (this._bound.has(info.link)) continue; // already handled by a previous scan
       let region;
       try {
@@ -1402,6 +1403,8 @@ export class LinkPlayer {
         this._onError(error, info);
         continue;
       }
+
+      info.link.dataset.lpBound = "1";
       this._bound.add(info.link);
       region.links.push(info);
 
