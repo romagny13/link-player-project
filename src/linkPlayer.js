@@ -367,6 +367,12 @@ export class YouTubeProvider {
     };
     const controller = {
       playAt: (i) => post({ event: "command", func: "playVideoAt", args: [i] }),
+      next: () => (
+        post({ event: "command", func: "nextVideo", args: [] }), true
+      ),
+      previous: () => (
+        post({ event: "command", func: "previousVideo", args: [] }), true
+      ),
       dispose() {
         globalThis.removeEventListener("message", onMessage);
         iframe.removeEventListener("load", onLoad);
@@ -640,6 +646,7 @@ export class NavigationService {
   #token = 0; // invalidates a navigation superseded by a newer one
   #controller = null;
   #index = null;
+  #count = 0;
   #visible = false;
 
   /** view: { showEmbed(src, title) → iframe, showPanel(opts), setActive(i), clear() } */
@@ -649,7 +656,8 @@ export class NavigationService {
     journal = new NavigationJournal(),
     panel = true,
     onChange = () => {},
-    onHide = () => {}
+    onHide = () => {},
+    onItemsLoaded = () => {}
   }) {
     this._registry = registry;
     this._view = view;
@@ -657,6 +665,7 @@ export class NavigationService {
     this._onChange = onChange;
     this.journal = journal;
     this._onHide = onHide;
+    this._onItemsLoaded = onItemsLoaded;
   }
 
   get current() {
@@ -667,13 +676,51 @@ export class NavigationService {
     return this.#visible;
   }
 
+  get hasNextItem() {
+    return (
+      this.#visible && this.#count > 0 && (this.#index ?? 0) < this.#count - 1
+    );
+  }
+  get hasPreviousItem() {
+    return this.#visible && this.#count > 0 && (this.#index ?? 0) > 0;
+  }
+
+  get itemIndex() {
+    return this.#index;
+  }
+  get itemCount() {
+    return this.#count;
+  }
+
+  /** @returns {boolean} false when there is nothing to go to (end of list, no playlist...). */
+  nextItem() {
+    return this.#step(1);
+  }
+  previousItem() {
+    return this.#step(-1);
+  }
+
+  #step(delta) {
+    if (!this.#visible) return false;
+    if (this.#count) {
+      const i = (this.#index ?? 0) + delta;
+      if (i < 0 || i >= this.#count) return false;
+      this.select(i);
+      return true;
+    }
+    // size unknown (YouTube list= without api key): let the player decide
+    return this.#controller?.[delta > 0 ? "next" : "previous"]?.() === true;
+  }
+
   /** @throws UnsupportedUrlError. index (0-based) wins over data-index, which wins over the url's index. */
   async navigate(info, { autoplay = false, index = null, push = true } = {}) {
     const provider = this._registry.resolve(info.url);
     const parsed = provider.parse(info.url);
     const token = ++this.#token;
-    const itemsPromise = provider.getPlaylist(parsed); // started now, awaited only for the panel
+    const itemsPromise = provider.getPlaylist(parsed);
     const start = index ?? info.startIndex ?? parsed.initialIndex ?? null;
+
+    this.#count = 0; // never keep the previous link's count (see point 3)
 
     this.#controller?.dispose();
     const iframe = this._view.showEmbed(
@@ -686,21 +733,25 @@ export class NavigationService {
       onItemChange: (i) => this.#setIndex(i)
     });
     this.#index = start;
-
     this.#visible = true;
+
     const entry = { key: info.key, url: info.url, index: start, info };
     push ? this.journal.push(entry) : this.journal.replaceCurrent(entry);
     this._onChange(this.journal.current);
 
-    // data-panel="false" on the link disables the panel for this link only
+    // no early return before this line: the count is needed even without a panel
+    const items = await itemsPromise;
+    if (token !== this.#token) return;
+    this.#count = items.length;
+    this._onItemsLoaded(this.#count);
+
     if (
       !this._panel ||
       !provider.panel ||
-      info.link?.dataset?.panel === "false"
+      info.link?.dataset?.panel === "false" ||
+      items.length === 0
     )
       return;
-    const items = await itemsPromise;
-    if (token !== this.#token || items.length === 0) return;
     this._view.showPanel({
       items,
       index: this.#index ?? 0,
@@ -746,6 +797,7 @@ export class NavigationService {
     this.#controller?.dispose();
     this.#controller = null;
     this.#index = null;
+    this.#count = 0;
     this.#visible = false;
     this._view.clear();
     this.journal.clear();
@@ -1171,7 +1223,15 @@ export class Tooltip {
 
 /** A zone (data-target): its links and its navigation service (which owns the journal). */
 export class PlayerRegion {
-  constructor({ target, registry, view, panel, onChange, onHide }) {
+  constructor({
+    target,
+    registry,
+    view,
+    panel,
+    onChange,
+    onHide,
+    onItemsLoaded
+  }) {
     this.target = target;
     this.view = view;
     this.links = [];
@@ -1180,13 +1240,26 @@ export class PlayerRegion {
       view,
       panel,
       onChange,
-      onHide
+      onHide,
+      onItemsLoaded
     });
   }
 }
 
+/** The link before/after the current one in a zone, or null at the edges. */
+export function neighbourLink(links, currentKey, delta, wrap = false) {
+  const n = links.length;
+  if (!n) return null;
+  const at = links.findIndex((l) => l.key === currentKey);
+  if (at === -1) return delta > 0 ? links[0] : links[n - 1]; // nothing shown yet
+  if (n === 1) return null;
+  const i = at + delta;
+  if (i >= 0 && i < n) return links[i];
+  return wrap ? links[(i + n) % n] : null;
+}
+
 export class LinkPlayer {
-  static VERSION = "2.0.6";
+  static VERSION = "2.0.7";
 
   /**
    * @param {Object} o
@@ -1195,6 +1268,7 @@ export class LinkPlayer {
    * @param o.resizable    panel resize handle + saved width
    * @param o.tooltip      thumbnail on hover
    * @param o.registry     custom ProviderRegistry (otherwise built from the options below)
+   * @param o.onNavigationState (target, state) => void
    * @param o.onChange     (target, entry|null) => void
    * @param o.onError      (error, linkInfo?) => void
    */
@@ -1212,6 +1286,7 @@ export class LinkPlayer {
     okruEmbedBaseUrl,
     dailymotionPlayerId = null,
     onChange = () => {},
+    onNavigationState = () => {},
     onError = (e) => console.warn("[LinkPlayer]", e)
   } = {}) {
     this._scope = resolveScope(scope);
@@ -1221,12 +1296,13 @@ export class LinkPlayer {
     this._panel = panel;
     this._resizable = resizable;
     this._activeClass = activeClass;
+    this._onNavState = onNavigationState;
     this._onChange = onChange;
     this._onError = onError;
     this._registry =
       registry ??
       new ProviderRegistry([
-        new YouTubeProvider({ apiKey: youtubeApiKey, store }),
+        new YouTubeProvider({ apiKey: youtubeApiKey, store : this._store }),
         new DailymotionProvider({ playerId: dailymotionPlayerId }),
         new OkruProvider({ embedBaseUrl: okruEmbedBaseUrl })
       ]);
@@ -1260,7 +1336,8 @@ export class LinkPlayer {
             resizable: this._resizable
           }),
           onChange: (entry) => this._changed(target, entry),
-          onHide: () => this._hidden(target)
+          onHide: () => this._hidden(target),
+          onItemsLoaded: () => this._emitNav(target)
         })
       );
     }
@@ -1322,6 +1399,58 @@ export class LinkPlayer {
         region.navigationService.navigate(info, { autoplay: false })
       );
     });
+  }
+
+  /* ── episodes (inside the current playlist) ── */
+  nextItem(target) {
+    return this._regions.get(target)?.navigationService.nextItem() ?? false;
+  }
+  previousItem(target) {
+    return this._regions.get(target)?.navigationService.previousItem() ?? false;
+  }
+
+  /* ── links (between the links of the zone) ── */
+  nextLink(target, opts) {
+    return this._stepLink(target, 1, opts);
+  }
+  previousLink(target, opts) {
+    return this._stepLink(target, -1, opts);
+  }
+
+  /** @returns {boolean} false at the edges (unless wrap) or for an unknown zone. */
+  _stepLink(target, delta, { wrap = false, autoplay } = {}) {
+    const region = this._regions.get(target);
+    if (!region) return false;
+    const ns = region.navigationService;
+    const link = neighbourLink(region.links, ns.current?.key, delta, wrap);
+    if (!link) return false;
+    this._run(link, () =>
+      ns.navigate(link, { autoplay: autoplay ?? this._clickAutoplay(link) })
+    );
+    return true;
+  }
+
+  /** Everything a custom navigation bar needs to enable/disable its buttons. */
+  getNavigationState(target) {
+    const region = this._regions.get(target);
+    if (!region) return null;
+    const ns = region.navigationService;
+    const key = ns.current?.key;
+    return {
+      target,
+      isOpen: ns.isOpen,
+      index: ns.itemIndex,
+      count: ns.itemCount,
+      hasNextItem: ns.hasNextItem,
+      hasPreviousItem: ns.hasPreviousItem,
+      hasNextLink: !!neighbourLink(region.links, key, 1),
+      hasPreviousLink: !!neighbourLink(region.links, key, -1)
+    };
+  }
+
+  _emitNav(target) {
+    const state = this.getNavigationState(target);
+    if (state) this._onNavState(target, state);
   }
 
   scan() {
@@ -1389,7 +1518,7 @@ export class LinkPlayer {
         startIndex: null,
         seasonCounts: null
       };
-      // Browsers block autoplay on page load: restore paused
+
       return this._run(info, () =>
         region.navigationService.navigate(info, {
           index: saved.index,
@@ -1408,17 +1537,21 @@ export class LinkPlayer {
       );
   }
 
+  _clickAutoplay(info) {
+    return (
+      info.autoplay === AUTOPLAY_MODES.INIT ||
+      info.autoplay === AUTOPLAY_MODES.CLICK
+    );
+  }
+
+  // _click: only the autoplay line changes
   _click(region, info) {
     const ns = region.navigationService;
-    const autoplay =
-      info.autoplay === AUTOPLAY_MODES.INIT ||
-      info.autoplay === AUTOPLAY_MODES.CLICK;
-
-    if (ns.current?.key === info.key)
+    const autoplay = this._clickAutoplay(info);
+    if (ns.current?.key === info.key && ns.current?.url === info.url)
       return ns.isOpen
         ? ns.hide()
         : this._run(info, () => ns.show({ autoplay }));
-
     this._run(info, () => ns.navigate(info, { autoplay }));
   }
 
@@ -1437,12 +1570,14 @@ export class LinkPlayer {
         : this._store.remove(`state:${target}`);
     }
     this._onChange(target, entry);
+    this._emitNav(target);
   }
 
   _hidden(target) {
     (this._regions.get(target)?.links ?? []).forEach((l) =>
       l.link.classList.remove(this._activeClass)
     );
+    this._emitNav(target);
   }
 
   async _thumbnail(info) {

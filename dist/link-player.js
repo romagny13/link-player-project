@@ -1,4 +1,837 @@
-(function(u,d){typeof exports=="object"&&typeof module<"u"?module.exports=d():typeof define=="function"&&define.amd?define(d):(u=typeof globalThis<"u"?globalThis:u||self,u.LinkPlayer=d())})(this,(function(){"use strict";var jt=Object.defineProperty;var rt=u=>{throw TypeError(u)};var Rt=(u,d,g)=>d in u?jt(u,d,{enumerable:!0,configurable:!0,writable:!0,value:g}):u[d]=g;var x=(u,d,g)=>Rt(u,typeof d!="symbol"?d+"":d,g),J=(u,d,g)=>d.has(u)||rt("Cannot "+g);var m=(u,d,g)=>(J(u,d,"read from private field"),g?g.call(u):d.get(u)),O=(u,d,g)=>d.has(u)?rt("Cannot add the same private member more than once"):d instanceof WeakSet?d.add(u):d.set(u,g),k=(u,d,g,$)=>(J(u,d,"write to private field"),$?$.call(u,g):d.set(u,g),g),Y=(u,d,g)=>(J(u,d,"access private method"),g);var B=(u,d,g,$)=>({set _(L){k(u,d,L,g)},get _(){return m(u,d,$)}});var N,I,S,D,T,P,H,j,G,V;function u(r){if(r==null)return!1;const t=String(r).trim().toLowerCase();return t!=="false"&&t!=="0"}function d(r){if(r==null)return null;const t=String(r).trim();return/^\d+$/.test(t)?parseInt(t,10):null}function g(r){if(r==null)return null;const t=String(r).split(",").map(d).filter(e=>e!==null&&e>0);return t.length>0?t:null}function $(r){if(r==null)return null;const t=String(r).trim();return t===""?null:t}const L=Object.freeze({NONE:"none",INIT:"init",CLICK:"click"});function ot(r){if(r==null)return L.NONE;const t=String(r).trim().toLowerCase();return t===""||t==="true"?L.INIT:t==="click"?L.CLICK:L.NONE}const U=Object.freeze({key:"key",url:"url",target:"target",autoplay:"autoplay",showOnInit:"showOnInit",index:"index",seasons:"seasons",thumbnail:"thumbnail"}),lt="[data-link]";class Q extends Error{constructor(t){super(t),this.name="InvalidUrlError"}}function Z(r){const t=r==null?"":String(r).trim();if(t==="")throw new Q("URL is missing or empty");try{new URL(t)}catch{throw new Q(`URL is malformed: "${t}"`)}return t}const at=48;function ct(r){let t=2166136261;for(let e=0;e<r.length;e++)t^=r.charCodeAt(e),t=Math.imul(t,16777619);return(t>>>0).toString(36)}function ht(r){const t=new URL(Z(r)),e=[...t.searchParams].sort(([i],[s])=>i<s?-1:i>s?1:0).map(([i,s])=>`${i}=${s}`).join("&"),n=`${t.hostname.replace(/^www\./,"")}${t.pathname}`;return e?`${n}?${e.length>at?`#${ct(e)}`:e}`:n}function pt(r){var e;const t=r.dataset??{};return{key:t[U.key],dataUrl:t[U.url],href:((e=r.getAttribute)==null?void 0:e.call(r,"href"))??void 0,target:t[U.target],autoplay:t[U.autoplay],showOnInit:t[U.showOnInit],index:t[U.index],seasons:t[U.seasons],thumbnail:t[U.thumbnail]}}function ut(r){const t=Z($(r.dataUrl)??$(r.href));return Object.freeze({url:t,key:$(r.key)??ht(t),target:$(r.target),autoplay:ot(r.autoplay),showOnInit:u(r.showOnInit),startIndex:d(r.index),seasonCounts:g(r.seasons),thumbnail:$(r.thumbnail)})}class dt{findLinks(t){return t.querySelectorAll(lt)}scan(t=document){return Array.from(this.findLinks(t)).map(e=>Object.freeze({...ut(pt(e)),link:e}))}}const y=(r,t,e)=>{const n=document.createElement(r);return t&&(n.className=t),e!==void 0&&(n.textContent=e),n},mt=()=>{var r;return!!((r=globalThis.matchMedia)!=null&&r.call(globalThis,"(hover: none) and (pointer: coarse)").matches)},W=r=>r.hostname.replace(/^www\./,""),K=(r,t)=>{const e=r.searchParams.get(t);return e!==null&&/^\d+$/.test(e)?+e:null},ft=r=>{try{return decodeURIComponent(r)}catch{return r}},gt=1440*60*1e3;function yt(r){return r instanceof HTMLElement?r:typeof r=="string"&&document.querySelector(r)||document.documentElement}const bt=(r,t)=>Math.min(Math.max(Math.round(r),140),Math.max(140,Math.floor(t*.7)));class vt{constructor(){O(this,N,new Map)}get(t){const e=m(this,N).get(t);return e?e.expiresAt&&Date.now()>e.expiresAt?(m(this,N).delete(t),null):e.data??null:null}set(t,e,n){m(this,N).set(t,{data:e,expiresAt:n?Date.now()+n:null})}remove(t){m(this,N).delete(t)}}N=new WeakMap;class _t{constructor({storage:t=globalThis.localStorage,prefix:e="lp:"}={}){this._s=t,this._p=e}get(t){try{const e=this._s.getItem(this._p+t);if(!e)return null;const{data:n,expiresAt:i}=JSON.parse(e);return i&&Date.now()>i?(this._s.removeItem(this._p+t),null):n??null}catch{return null}}set(t,e,n){try{this._s.setItem(this._p+t,JSON.stringify({data:e,expiresAt:n?Date.now()+n:null}))}catch{}}remove(t){try{this._s.removeItem(this._p+t)}catch{}}}const wt=/\b(?:saison|season)\s*0*(\d{1,3})\b|\bs0*(\d{1,2})(?:\b|(?=e\d))/i;function xt(r,t=null){const e=r.length;if(t!=null&&t.length){const h=[];let c=0;return t.forEach((p,a)=>{c<e&&(h.push({label:`Season ${a+1}`,start:c,end:Math.min(c+p,e)}),c+=p)}),c<e&&h.push({label:"Other",start:c,end:e}),h.length>1?h:null}const n=r.map(h=>{const c=wt.exec(h.title);return c?+(c[1]||c[2]):null}),i=n.find(h=>h!==null);if(i===void 0)return null;let s=i>1?1:null;const o=[];return n.forEach((h,c)=>{h!==null&&(s=h);const p=o[o.length-1];p&&p.key===s?p.end=c+1:o.push({key:s,label:s===null?"Other":`Season ${s}`,start:c,end:c+1})}),o.length>1?o:null}const kt={playAt(){},dispose(){}},F=(r,t,e="",n="",i="")=>({id:String(r),index:t,title:e||`Video ${t+1}`,channelTitle:n,thumbnailUrl:i}),It=["https://www.youtube.com","https://www.youtube-nocookie.com"];class St{constructor({apiKey:t=null,store:e=null,fetchFn:n=(...o)=>fetch(...o),origin:i=(s=>(s=globalThis.location)==null?void 0:s.origin)()??""}={}){x(this,"id","youtube");x(this,"name","YouTube");x(this,"label","YouTube player");x(this,"panel",{toggle:"bottom-left",open:!1});this._apiKey=t,this._store=e,this._fetch=n,this._origin=i}canHandle(t){try{const e=new URL(t),n=W(e);return(n==="youtube.com"||n==="youtube-nocookie.com")&&/^\/embed(\/|$)/.test(e.pathname)?!0:n==="youtube.com"?e.pathname==="/watch"&&e.searchParams.has("v")||e.pathname==="/watch_videos"&&e.searchParams.has("video_ids"):n==="youtu.be"&&e.pathname.length>1}catch{return!1}}parse(t){const e=new URL(t),n=/^\/embed(?:\/([^/]+))?\/?$/.exec(e.pathname),i=n!=null&&n[1]&&n[1]!=="videoseries"?n[1]:null,s=e.searchParams.get(n?"playlist":"video_ids"),o=s?s.split(",").map(c=>c.trim()).filter(Boolean):null;i&&o&&!o.includes(i)&&o.unshift(i);const h=K(e,"index");return{videoId:n?i:W(e)==="youtu.be"?e.pathname.slice(1):e.searchParams.get("v"),playlistId:e.searchParams.get("list"),videoIds:o,startSeconds:K(e,"start")??K(e,"t"),initialIndex:h===null?null:n?h:Math.max(h-1,0)}}buildEmbedSrc(t,{autoplay:e=!1,index:n=null}={}){var s;const i=new URLSearchParams({enablejsapi:"1"});return this._origin&&i.set("origin",this._origin),e&&i.set("autoplay","1"),t.startSeconds!==null&&i.set("start",t.startSeconds),(s=t.videoIds)!=null&&s.length?(i.set("playlist",t.videoIds.join(",")),n!==null&&i.set("index",n),`https://www.youtube.com/embed/videoseries?${i}`):(t.playlistId&&i.set("list",t.playlistId),t.playlistId&&(n!==null||!t.videoId)?(n!==null&&i.set("index",n),`https://www.youtube.com/embed/videoseries?${i}`):`https://www.youtube.com/embed/${t.videoId}?${i}`)}async getThumbnail(t){var n;const e=t.videoId??((n=t.videoIds)==null?void 0:n[0]);return e?`https://img.youtube.com/vi/${e}/hqdefault.jpg`:null}async getPlaylist(t){var s,o,h;const e=t.playlistId??((s=t.videoIds)==null?void 0:s.join(","));if(!e)return[];const n=(o=this._store)==null?void 0:o.get(`yt:${e}`);if(n)return n;let i=t.videoIds??[];try{if(!this._apiKey)throw new Error("no apiKey (needed for list= playlists and titles)");t.playlistId&&(i=await this._playlistIds(t.playlistId));const c=(await this._videos(i)).map((p,a)=>F(p.id,a,p.title,p.channelTitle,p.thumbnailUrl));return c.length&&((h=this._store)==null||h.set(`yt:${e}`,c,gt)),c}catch(c){return console.warn("[YouTubeProvider]",c.message),i.map((p,a)=>F(p,a,"","",`https://img.youtube.com/vi/${p}/mqdefault.jpg`))}}async _json(t,e){const n=new URLSearchParams({...e,key:this._apiKey}),i=await this._fetch(`https://www.googleapis.com/youtube/v3/${t}?${n}`);if(!i.ok)throw new Error(`YouTube API ${i.status}`);return i.json()}async _playlistIds(t){var i;const e=[];let n="";do{const s=await this._json("playlistItems",{part:"contentDetails",maxResults:"50",playlistId:t,...n&&{pageToken:n}});(i=s.items)==null||i.forEach(o=>{var h;return((h=o.contentDetails)==null?void 0:h.videoId)&&e.push(o.contentDetails.videoId)}),n=s.nextPageToken??""}while(n);return e}async _videos(t){var n,i,s,o,h;const e=[];for(let c=0;c<t.length;c+=50){const p=await this._json("videos",{part:"snippet,status",id:t.slice(c,c+50).join(",")});for(const a of p.items??[])((n=a.status)==null?void 0:n.privacyStatus)!=="private"&&e.push({id:a.id,title:a.snippet.title,channelTitle:a.snippet.channelTitle||"",thumbnailUrl:((s=(i=a.snippet.thumbnails)==null?void 0:i.medium)==null?void 0:s.url)||((h=(o=a.snippet.thumbnails)==null?void 0:o.default)==null?void 0:h.url)||""})}return e}createController(t,{index:e=null,onItemChange:n=()=>{}}={}){const i=p=>{var a;return(a=t.contentWindow)==null?void 0:a.postMessage(JSON.stringify(p),"*")};let s=e===null;const o=()=>i({event:"listening"}),h=p=>{var b;if(!It.includes(p.origin)||p.source!==t.contentWindow)return;let a;try{a=JSON.parse(p.data)}catch{return}if(!(a.event!=="infoDelivery"||((b=a.info)==null?void 0:b.playerState)!==1||!Number.isInteger(a.info.playlistIndex))){if(!s&&(s=!0,a.info.playlistIndex!==e))return c.playAt(e);n(a.info.playlistIndex)}},c={playAt:p=>i({event:"command",func:"playVideoAt",args:[p]}),dispose(){globalThis.removeEventListener("message",h),t.removeEventListener("load",o)}};return globalThis.addEventListener("message",h),t.addEventListener("load",o),c}}class Et{constructor({playerId:t=null}={}){x(this,"id","dailymotion");x(this,"name","Dailymotion");x(this,"label","Dailymotion player");x(this,"panel",null);this._playerId=t}canHandle(t){try{const e=new URL(t),n=W(e);return n==="geo.dailymotion.com"?/^\/player\/[^/]+\.(?:html|js)$/.test(e.pathname)&&(e.searchParams.has("video")||e.searchParams.has("playlist")):n==="dailymotion.com"&&(e.pathname.startsWith("/video/")||e.pathname.startsWith("/playlist/"))}catch{return!1}}parse(t){const e=new URL(t),n=/^\/player\/([^/]+)\.(?:html|js)$/.exec(e.pathname);if(W(e)==="geo.dailymotion.com"&&n){const o=e.searchParams.get("video"),h=e.searchParams.get("playlist");return{type:o?"video":"playlist",id:o??h,playlistId:h,playerId:n[1],initialIndex:null}}const i=e.pathname.match(/^\/video\/([^/]+)/),s=e.pathname.match(/^\/playlist\/([^/]+)/);return{type:i?"video":"playlist",id:(i??s)[1],playlistId:(s==null?void 0:s[1])??e.searchParams.get("playlist"),playerId:null,initialIndex:null}}buildEmbedSrc(t,{autoplay:e=!1}={}){const n=t.playerId??this._playerId;if(n){const s=new URLSearchParams;return t.type==="video"&&s.set("video",t.id),t.playlistId&&s.set("playlist",t.playlistId),e&&s.set("autoplay","true"),`https://geo.dailymotion.com/player/${n}.html?${s}`}return`https://www.dailymotion.com/embed/${t.type==="playlist"?"playlist":"video"}/${t.id}${e?"?autoplay=1":""}`}async getThumbnail(t){return t.type==="video"?`https://www.dailymotion.com/thumbnail/video/${t.id}`:null}async getPlaylist(){return[]}createController(){return kt}}class Lt{constructor({embedBaseUrl:t="https://ok.ru/videoembed/",fetchFn:e=(...n)=>fetch(...n)}={}){x(this,"id","okru");x(this,"name","Ok.ru");x(this,"label","Ok.ru player");x(this,"panel",{toggle:"top-right",open:!0});this._base=t,this._fetch=e}canHandle(t){try{const e=new URL(t);return W(e)==="ok.ru"&&e.pathname.startsWith("/video/")}catch{return!1}}parse(t){var a;const e=new URL(t),n=e.pathname.match(/^\/video\/([^/]+)/)[1],i=(e.searchParams.get("video_ids")??"").split(",").map(b=>b.trim()).filter(Boolean),s=i.length?i.includes(n)?i:[n,...i]:[n],o=(a=e.search.match(/[?&]labels=([^&]*)/))==null?void 0:a[1],h=o?o.split(",").map(b=>ft(b.trim())).filter(Boolean):[],c=s.length-i.length,p=c>0&&i.length?[...Array(c).fill(""),...h]:h;return{videoId:n,itemIds:s,labels:p,initialIndex:K(e,"index")??Math.max(s.indexOf(n),0)}}buildEmbedSrc(t,{autoplay:e=!1,index:n=null}={}){const i=n===null?t.videoId:t.itemIds[n]??t.videoId;return`${this._base}${i}${e?(this._base.includes("?")?"&":"?")+"autoplay=1":""}`}async getThumbnail(t){try{const e=await this._fetch(`https://ok.ru/oembed?url=${encodeURIComponent(`https://ok.ru/video/${t.videoId}`)}&format=json`);return e.ok?(await e.json()).thumbnail_url??null:null}catch{return null}}async getPlaylist(t){return t.itemIds.length<2?[]:t.itemIds.map((e,n)=>F(e,n,t.labels[n]))}createController(t,{parsed:e}){return{playAt:(n,{autoplay:i=!0}={})=>{t.src=this.buildEmbedSrc(e,{autoplay:i,index:n})},dispose(){}}}}class $t extends Error{constructor(t){super(`No provider can handle this URL: ${t}`),this.name="UnsupportedUrlError"}}class Tt{constructor(t=[]){this._providers=[...t]}register(t){return this._providers.push(t),this}resolve(t){const e=this._providers.find(n=>n.canHandle(t));if(!e)throw new $t(t);return e}}class Ct{constructor(){O(this,I,[]);O(this,S,-1)}get current(){return m(this,I)[m(this,S)]??null}get canGoBack(){return m(this,S)>0}get canGoForward(){return m(this,S)<m(this,I).length-1}get size(){return m(this,I).length}push(t){m(this,I).splice(m(this,S)+1),m(this,I).push(t),k(this,S,m(this,I).length-1)}replaceCurrent(t){if(!this.current)return this.push(t);m(this,I)[m(this,S)]={...this.current,...t}}back(){return this.canGoBack?m(this,I)[--B(this,S)._]:null}forward(){return this.canGoForward?m(this,I)[++B(this,S)._]:null}clear(){k(this,I,[]),k(this,S,-1)}}I=new WeakMap,S=new WeakMap;class At{constructor({registry:t,view:e,journal:n=new Ct,panel:i=!0,onChange:s=()=>{},onHide:o=()=>{}}){O(this,j);O(this,D,0);O(this,T,null);O(this,P,null);O(this,H,!1);this._registry=t,this._view=e,this._panel=i,this._onChange=s,this.journal=n,this._onHide=o}get current(){return this.journal.current}get isOpen(){return m(this,H)}async navigate(t,{autoplay:e=!1,index:n=null,push:i=!0}={}){var v,C,R;const s=this._registry.resolve(t.url),o=s.parse(t.url),h=++B(this,D)._,c=s.getPlaylist(o),p=n??t.startIndex??o.initialIndex??null;(v=m(this,T))==null||v.dispose();const a=this._view.showEmbed(s.buildEmbedSrc(o,{autoplay:e,index:p}),s.label);k(this,T,s.createController(a,{parsed:o,index:p,onItemChange:M=>Y(this,j,V).call(this,M)})),k(this,P,p),k(this,H,!0);const b={key:t.key,url:t.url,index:p,info:t};if(i?this.journal.push(b):this.journal.replaceCurrent(b),this._onChange(this.journal.current),!this._panel||!s.panel||((R=(C=t.link)==null?void 0:C.dataset)==null?void 0:R.panel)==="false")return;const E=await c;h!==m(this,D)||E.length===0||this._view.showPanel({items:E,index:m(this,P)??0,cfg:s.panel,seasonCounts:t.seasonCounts,onSelect:M=>this.select(M)})}select(t){var e;t!==m(this,P)&&((e=m(this,T))==null||e.playAt(t,{autoplay:!0}),Y(this,j,V).call(this,t))}goBack(){return Y(this,j,G).call(this,this.journal.back())}goForward(){return Y(this,j,G).call(this,this.journal.forward())}hide(){var t;B(this,D)._++,(t=m(this,T))==null||t.dispose(),k(this,T,null),k(this,H,!1),this._view.clear(),this._onHide(this.journal.current)}show({autoplay:t=!1}={}){const e=this.journal.current;return e?this.navigate(e.info,{index:e.index,autoplay:t,push:!1}):null}close(){var t;B(this,D)._++,(t=m(this,T))==null||t.dispose(),k(this,T,null),k(this,P,null),k(this,H,!1),this._view.clear(),this.journal.clear(),this._onChange(null)}}D=new WeakMap,T=new WeakMap,P=new WeakMap,H=new WeakMap,j=new WeakSet,G=function(t){return t?this.navigate(t.info,{index:t.index,autoplay:!0,push:!1}):null},V=function(t){t!==m(this,P)&&(k(this,P,t),this._view.setActive(t),this.journal.replaceCurrent({index:t}),this._onChange(this.journal.current))};const zt=`
+(function(global, factory) {
+  typeof exports === "object" && typeof module !== "undefined" ? module.exports = factory() : typeof define === "function" && define.amd ? define(factory) : (global = typeof globalThis !== "undefined" ? globalThis : global || self, global.LinkPlayer = factory());
+})(this, (function() {
+  "use strict";var __defProp = Object.defineProperty;
+var __typeError = (msg) => {
+  throw TypeError(msg);
+};
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
+var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
+var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
+var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
+var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
+var __privateWrapper = (obj, member, setter, getter) => ({
+  set _(value) {
+    __privateSet(obj, member, value, setter);
+  },
+  get _() {
+    return __privateGet(obj, member, getter);
+  }
+});
+
+  var _m, _entries, _cursor, _token, _controller, _index, _count, _visible, _NavigationService_instances, step_fn, go_fn, setIndex_fn;
+  function toBool(value) {
+    if (value === void 0 || value === null) return false;
+    const v = String(value).trim().toLowerCase();
+    return v !== "false" && v !== "0";
+  }
+  function toIntOrNull(value) {
+    if (value === void 0 || value === null) return null;
+    const v = String(value).trim();
+    return /^\d+$/.test(v) ? parseInt(v, 10) : null;
+  }
+  function toIntList(value) {
+    if (value === void 0 || value === null) return null;
+    const list = String(value).split(",").map(toIntOrNull).filter((n) => n !== null && n > 0);
+    return list.length > 0 ? list : null;
+  }
+  function toStringOrNull(value) {
+    if (value === void 0 || value === null) return null;
+    const v = String(value).trim();
+    return v === "" ? null : v;
+  }
+  const AUTOPLAY_MODES = Object.freeze({
+    NONE: "none",
+    // false
+    INIT: "init",
+    // true
+    CLICK: "click"
+    // click
+  });
+  function toAutoplayMode(value) {
+    if (value === void 0 || value === null) return AUTOPLAY_MODES.NONE;
+    const v = String(value).trim().toLowerCase();
+    if (v === "" || v === "true") return AUTOPLAY_MODES.INIT;
+    if (v === "click") return AUTOPLAY_MODES.CLICK;
+    return AUTOPLAY_MODES.NONE;
+  }
+  const DATA_ATTRIBUTES = Object.freeze({
+    key: "key",
+    url: "url",
+    // required
+    target: "target",
+    autoplay: "autoplay",
+    showOnInit: "showOnInit",
+    index: "index",
+    seasons: "seasons",
+    thumbnail: "thumbnail"
+  });
+  const LINK_SELECTOR = "[data-link]";
+  class InvalidUrlError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = "InvalidUrlError";
+    }
+  }
+  function assertValidUrl(value) {
+    const text = value == null ? "" : String(value).trim();
+    if (text === "") throw new InvalidUrlError("URL is missing or empty");
+    try {
+      new URL(text);
+    } catch {
+      throw new InvalidUrlError(`URL is malformed: "${text}"`);
+    }
+    return text;
+  }
+  const MAX_QUERY = 48;
+  function shortHash(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0).toString(36);
+  }
+  function keyFromUrl(url) {
+    const u = new URL(assertValidUrl(url));
+    const query = [...u.searchParams].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([k, v]) => `${k}=${v}`).join("&");
+    const base = `${u.hostname.replace(/^www\./, "")}${u.pathname}`;
+    if (!query) return base;
+    return `${base}?${query.length > MAX_QUERY ? `#${shortHash(query)}` : query}`;
+  }
+  function readRawLink(link) {
+    var _a;
+    const d = link.dataset ?? {};
+    return {
+      key: d[DATA_ATTRIBUTES.key],
+      dataUrl: d[DATA_ATTRIBUTES.url],
+      href: ((_a = link.getAttribute) == null ? void 0 : _a.call(link, "href")) ?? void 0,
+      target: d[DATA_ATTRIBUTES.target],
+      autoplay: d[DATA_ATTRIBUTES.autoplay],
+      showOnInit: d[DATA_ATTRIBUTES.showOnInit],
+      index: d[DATA_ATTRIBUTES.index],
+      seasons: d[DATA_ATTRIBUTES.seasons],
+      thumbnail: d[DATA_ATTRIBUTES.thumbnail]
+    };
+  }
+  function parseLink(raw) {
+    const url = assertValidUrl(
+      toStringOrNull(raw.dataUrl) ?? toStringOrNull(raw.href)
+    );
+    return Object.freeze({
+      url,
+      key: toStringOrNull(raw.key) ?? keyFromUrl(url),
+      target: toStringOrNull(raw.target),
+      autoplay: toAutoplayMode(raw.autoplay),
+      showOnInit: toBool(raw.showOnInit),
+      startIndex: toIntOrNull(raw.index),
+      seasonCounts: toIntList(raw.seasons),
+      thumbnail: toStringOrNull(raw.thumbnail)
+    });
+  }
+  class LinkScanner {
+    findLinks(scope) {
+      return scope.querySelectorAll(LINK_SELECTOR);
+    }
+    scan(scope = document) {
+      return Array.from(this.findLinks(scope)).map(
+        (link) => Object.freeze({ ...parseLink(readRawLink(link)), link })
+      );
+    }
+  }
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== void 0) e.textContent = text;
+    return e;
+  };
+  const isTouch = () => {
+    var _a;
+    return !!((_a = globalThis.matchMedia) == null ? void 0 : _a.call(globalThis, "(hover: none) and (pointer: coarse)").matches);
+  };
+  const hostOf = (u) => u.hostname.replace(/^www\./, "");
+  const intParam = (u, name) => {
+    const v = u.searchParams.get(name);
+    return v !== null && /^\d+$/.test(v) ? +v : null;
+  };
+  const safeDecode = (s) => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  const DAY = 24 * 60 * 60 * 1e3;
+  function resolveScope(scope) {
+    if (scope instanceof HTMLElement) return scope;
+    if (typeof scope === "string")
+      return document.querySelector(scope) || document.documentElement;
+    return document.documentElement;
+  }
+  const clampWidth = (px, hostWidth) => Math.min(
+    Math.max(Math.round(px), 140),
+    Math.max(140, Math.floor(hostWidth * 0.7))
+  );
+  class MemoryStore {
+    constructor() {
+      __privateAdd(this, _m, /* @__PURE__ */ new Map());
+    }
+    get(key) {
+      const e = __privateGet(this, _m).get(key);
+      if (!e) return null;
+      if (e.expiresAt && Date.now() > e.expiresAt) {
+        __privateGet(this, _m).delete(key);
+        return null;
+      }
+      return e.data ?? null;
+    }
+    set(key, data, ttlMs) {
+      __privateGet(this, _m).set(key, { data, expiresAt: ttlMs ? Date.now() + ttlMs : null });
+    }
+    remove(key) {
+      __privateGet(this, _m).delete(key);
+    }
+  }
+  _m = new WeakMap();
+  class JsonStore {
+    constructor({ storage = globalThis.localStorage, prefix = "lp:" } = {}) {
+      this._s = storage;
+      this._p = prefix;
+    }
+    get(key) {
+      try {
+        const raw = this._s.getItem(this._p + key);
+        if (!raw) return null;
+        const { data, expiresAt } = JSON.parse(raw);
+        if (expiresAt && Date.now() > expiresAt) {
+          this._s.removeItem(this._p + key);
+          return null;
+        }
+        return data ?? null;
+      } catch {
+        return null;
+      }
+    }
+    set(key, data, ttlMs) {
+      try {
+        this._s.setItem(
+          this._p + key,
+          JSON.stringify({ data, expiresAt: ttlMs ? Date.now() + ttlMs : null })
+        );
+      } catch {
+      }
+    }
+    remove(key) {
+      try {
+        this._s.removeItem(this._p + key);
+      } catch {
+      }
+    }
+  }
+  const SEASON_RE = /\b(?:saison|season)\s*0*(\d{1,3})\b|\bs0*(\d{1,2})(?:\b|(?=e\d))/i;
+  function groupBySeason(items, counts = null) {
+    const n = items.length;
+    if (counts == null ? void 0 : counts.length) {
+      const groups2 = [];
+      let start = 0;
+      counts.forEach((c, i) => {
+        if (start < n) {
+          groups2.push({
+            label: `Season ${i + 1}`,
+            start,
+            end: Math.min(start + c, n)
+          });
+          start += c;
+        }
+      });
+      if (start < n) groups2.push({ label: "Other", start, end: n });
+      return groups2.length > 1 ? groups2 : null;
+    }
+    const seasons = items.map((it) => {
+      const m = SEASON_RE.exec(it.title);
+      return m ? +(m[1] || m[2]) : null;
+    });
+    const first = seasons.find((s) => s !== null);
+    if (first === void 0) return null;
+    let cur = first > 1 ? 1 : null;
+    const groups = [];
+    seasons.forEach((s, i) => {
+      if (s !== null) cur = s;
+      const last = groups[groups.length - 1];
+      if (last && last.key === cur) last.end = i + 1;
+      else
+        groups.push({
+          key: cur,
+          label: cur === null ? "Other" : `Season ${cur}`,
+          start: i,
+          end: i + 1
+        });
+    });
+    return groups.length > 1 ? groups : null;
+  }
+  const noopController = { playAt() {
+  }, dispose() {
+  } };
+  const item = (id, index, title = "", channelTitle = "", thumbnailUrl = "") => ({
+    id: String(id),
+    index,
+    title: title || `Video ${index + 1}`,
+    channelTitle,
+    thumbnailUrl
+  });
+  const YT_ORIGINS = [
+    "https://www.youtube.com",
+    "https://www.youtube-nocookie.com"
+  ];
+  class YouTubeProvider {
+    constructor({
+      apiKey = null,
+      store = null,
+      fetchFn = (...a) => fetch(...a),
+      origin = ((_a) => (_a = globalThis.location) == null ? void 0 : _a.origin)() ?? ""
+    } = {}) {
+      __publicField(this, "id", "youtube");
+      __publicField(this, "name", "YouTube");
+      __publicField(this, "label", "YouTube player");
+      __publicField(this, "panel", { toggle: "bottom-left", open: false });
+      this._apiKey = apiKey;
+      this._store = store;
+      this._fetch = fetchFn;
+      this._origin = origin;
+    }
+    canHandle(url) {
+      try {
+        const u = new URL(url);
+        const h = hostOf(u);
+        if ((h === "youtube.com" || h === "youtube-nocookie.com") && /^\/embed(\/|$)/.test(u.pathname))
+          return true;
+        if (h === "youtube.com") {
+          return u.pathname === "/watch" && u.searchParams.has("v") || u.pathname === "/watch_videos" && u.searchParams.has("video_ids");
+        }
+        return h === "youtu.be" && u.pathname.length > 1;
+      } catch {
+        return false;
+      }
+    }
+    parse(url) {
+      const u = new URL(url);
+      const emb = /^\/embed(?:\/([^/]+))?\/?$/.exec(u.pathname);
+      const pathId = (emb == null ? void 0 : emb[1]) && emb[1] !== "videoseries" ? emb[1] : null;
+      const ids = u.searchParams.get(emb ? "playlist" : "video_ids");
+      const videoIds = ids ? ids.split(",").map((s) => s.trim()).filter(Boolean) : null;
+      if (pathId && videoIds && !videoIds.includes(pathId))
+        videoIds.unshift(pathId);
+      const urlIndex = intParam(u, "index");
+      return {
+        videoId: emb ? pathId : hostOf(u) === "youtu.be" ? u.pathname.slice(1) : u.searchParams.get("v"),
+        playlistId: u.searchParams.get("list"),
+        videoIds,
+        startSeconds: intParam(u, "start") ?? intParam(u, "t"),
+        // embed: index is 0-based, watch: 1-based
+        initialIndex: urlIndex === null ? null : emb ? urlIndex : Math.max(urlIndex - 1, 0)
+      };
+    }
+    buildEmbedSrc(p, { autoplay = false, index = null } = {}) {
+      var _a;
+      const q = new URLSearchParams({ enablejsapi: "1" });
+      if (this._origin) q.set("origin", this._origin);
+      if (autoplay) q.set("autoplay", "1");
+      if (p.startSeconds !== null) q.set("start", p.startSeconds);
+      if ((_a = p.videoIds) == null ? void 0 : _a.length) {
+        q.set("playlist", p.videoIds.join(","));
+        if (index !== null) q.set("index", index);
+        return `https://www.youtube.com/embed/videoseries?${q}`;
+      }
+      if (p.playlistId) q.set("list", p.playlistId);
+      if (p.playlistId && (index !== null || !p.videoId)) {
+        if (index !== null) q.set("index", index);
+        return `https://www.youtube.com/embed/videoseries?${q}`;
+      }
+      return `https://www.youtube.com/embed/${p.videoId}?${q}`;
+    }
+    async getThumbnail(p) {
+      var _a;
+      const id = p.videoId ?? ((_a = p.videoIds) == null ? void 0 : _a[0]);
+      return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
+    }
+    async getPlaylist(p) {
+      var _a, _b, _c;
+      const key = p.playlistId ?? ((_a = p.videoIds) == null ? void 0 : _a.join(","));
+      if (!key) return [];
+      const cached = (_b = this._store) == null ? void 0 : _b.get(`yt:${key}`);
+      if (cached) return cached;
+      let ids = p.videoIds ?? [];
+      try {
+        if (!this._apiKey)
+          throw new Error("no apiKey (needed for list= playlists and titles)");
+        if (p.playlistId) ids = await this._playlistIds(p.playlistId);
+        const items = (await this._videos(ids)).map(
+          (v, i) => item(v.id, i, v.title, v.channelTitle, v.thumbnailUrl)
+        );
+        if (items.length) (_c = this._store) == null ? void 0 : _c.set(`yt:${key}`, items, DAY);
+        return items;
+      } catch (error) {
+        console.warn("[YouTubeProvider]", error.message);
+        return ids.map(
+          (id, i) => item(id, i, "", "", `https://img.youtube.com/vi/${id}/mqdefault.jpg`)
+        );
+      }
+    }
+    async _json(path, params) {
+      const q = new URLSearchParams({ ...params, key: this._apiKey });
+      const res = await this._fetch(
+        `https://www.googleapis.com/youtube/v3/${path}?${q}`
+      );
+      if (!res.ok) throw new Error(`YouTube API ${res.status}`);
+      return res.json();
+    }
+    async _playlistIds(playlistId) {
+      var _a;
+      const ids = [];
+      let pageToken = "";
+      do {
+        const d = await this._json("playlistItems", {
+          part: "contentDetails",
+          maxResults: "50",
+          playlistId,
+          ...pageToken && { pageToken }
+        });
+        (_a = d.items) == null ? void 0 : _a.forEach(
+          (i) => {
+            var _a2;
+            return ((_a2 = i.contentDetails) == null ? void 0 : _a2.videoId) && ids.push(i.contentDetails.videoId);
+          }
+        );
+        pageToken = d.nextPageToken ?? "";
+      } while (pageToken);
+      return ids;
+    }
+    async _videos(ids) {
+      var _a, _b, _c, _d, _e;
+      const out = [];
+      for (let i = 0; i < ids.length; i += 50) {
+        const d = await this._json("videos", {
+          part: "snippet,status",
+          id: ids.slice(i, i + 50).join(",")
+        });
+        for (const v of d.items ?? []) {
+          if (((_a = v.status) == null ? void 0 : _a.privacyStatus) === "private") continue;
+          out.push({
+            id: v.id,
+            title: v.snippet.title,
+            channelTitle: v.snippet.channelTitle || "",
+            thumbnailUrl: ((_c = (_b = v.snippet.thumbnails) == null ? void 0 : _b.medium) == null ? void 0 : _c.url) || ((_e = (_d = v.snippet.thumbnails) == null ? void 0 : _d.default) == null ? void 0 : _e.url) || ""
+          });
+        }
+      }
+      return out;
+    }
+    /** postMessage API. onItemChange fires for changes made by the player itself (next video...). */
+    createController(iframe, { index = null, onItemChange = () => {
+    } } = {}) {
+      const post = (m) => {
+        var _a;
+        return (_a = iframe.contentWindow) == null ? void 0 : _a.postMessage(JSON.stringify(m), "*");
+      };
+      let synced = index === null;
+      const onLoad = () => post({ event: "listening" });
+      const onMessage = (e) => {
+        var _a;
+        if (!YT_ORIGINS.includes(e.origin) || e.source !== iframe.contentWindow)
+          return;
+        let d;
+        try {
+          d = JSON.parse(e.data);
+        } catch {
+          return;
+        }
+        if (d.event !== "infoDelivery" || ((_a = d.info) == null ? void 0 : _a.playerState) !== 1 || !Number.isInteger(d.info.playlistIndex))
+          return;
+        if (!synced) {
+          synced = true;
+          if (d.info.playlistIndex !== index) return controller.playAt(index);
+        }
+        onItemChange(d.info.playlistIndex);
+      };
+      const controller = {
+        playAt: (i) => post({ event: "command", func: "playVideoAt", args: [i] }),
+        next: () => (post({ event: "command", func: "nextVideo", args: [] }), true),
+        previous: () => (post({ event: "command", func: "previousVideo", args: [] }), true),
+        dispose() {
+          globalThis.removeEventListener("message", onMessage);
+          iframe.removeEventListener("load", onLoad);
+        }
+      };
+      globalThis.addEventListener("message", onMessage);
+      iframe.addEventListener("load", onLoad);
+      return controller;
+    }
+  }
+  class DailymotionProvider {
+    // no item list without the Dailymotion API
+    /**
+     * playerId: Player ID from Dailymotion Studio (required by current embeds).
+     * A Player ID found in the url itself (geo.dailymotion.com/player/ID.html) wins.
+     * Without any, the legacy /embed/ url is used (no longer guaranteed to work).
+     */
+    constructor({ playerId = null } = {}) {
+      __publicField(this, "id", "dailymotion");
+      __publicField(this, "name", "Dailymotion");
+      __publicField(this, "label", "Dailymotion player");
+      __publicField(this, "panel", null);
+      this._playerId = playerId;
+    }
+    canHandle(url) {
+      try {
+        const u = new URL(url);
+        const h = hostOf(u);
+        if (h === "geo.dailymotion.com")
+          return /^\/player\/[^/]+\.(?:html|js)$/.test(u.pathname) && (u.searchParams.has("video") || u.searchParams.has("playlist"));
+        return h === "dailymotion.com" && (u.pathname.startsWith("/video/") || u.pathname.startsWith("/playlist/"));
+      } catch {
+        return false;
+      }
+    }
+    parse(url) {
+      const u = new URL(url);
+      const geo = /^\/player\/([^/]+)\.(?:html|js)$/.exec(u.pathname);
+      if (hostOf(u) === "geo.dailymotion.com" && geo) {
+        const video2 = u.searchParams.get("video");
+        const playlistId = u.searchParams.get("playlist");
+        return {
+          type: video2 ? "video" : "playlist",
+          id: video2 ?? playlistId,
+          playlistId,
+          playerId: geo[1],
+          initialIndex: null
+        };
+      }
+      const video = u.pathname.match(/^\/video\/([^/]+)/);
+      const playlist = u.pathname.match(/^\/playlist\/([^/]+)/);
+      return {
+        type: video ? "video" : "playlist",
+        id: (video ?? playlist)[1],
+        playlistId: (playlist == null ? void 0 : playlist[1]) ?? u.searchParams.get("playlist"),
+        playerId: null,
+        initialIndex: null
+      };
+    }
+    buildEmbedSrc(p, { autoplay = false } = {}) {
+      const playerId = p.playerId ?? this._playerId;
+      if (playerId) {
+        const q = new URLSearchParams();
+        if (p.type === "video") q.set("video", p.id);
+        if (p.playlistId) q.set("playlist", p.playlistId);
+        if (autoplay) q.set("autoplay", "true");
+        return `https://geo.dailymotion.com/player/${playerId}.html?${q}`;
+      }
+      const kind = p.type === "playlist" ? "playlist" : "video";
+      return `https://www.dailymotion.com/embed/${kind}/${p.id}${autoplay ? "?autoplay=1" : ""}`;
+    }
+    async getThumbnail(p) {
+      return p.type === "video" ? `https://www.dailymotion.com/thumbnail/video/${p.id}` : null;
+    }
+    async getPlaylist() {
+      return [];
+    }
+    createController() {
+      return noopController;
+    }
+  }
+  class OkruProvider {
+    constructor({
+      embedBaseUrl = "https://ok.ru/videoembed/",
+      fetchFn = (...a) => fetch(...a)
+    } = {}) {
+      __publicField(this, "id", "okru");
+      __publicField(this, "name", "Ok.ru");
+      __publicField(this, "label", "Ok.ru player");
+      __publicField(this, "panel", { toggle: "top-right", open: true });
+      this._base = embedBaseUrl;
+      this._fetch = fetchFn;
+    }
+    canHandle(url) {
+      try {
+        const u = new URL(url);
+        return hostOf(u) === "ok.ru" && u.pathname.startsWith("/video/");
+      } catch {
+        return false;
+      }
+    }
+    /** itemIds: ordered ids (the url's id is prepended when absent); labels: aligned with itemIds. */
+    parse(url) {
+      var _a;
+      const u = new URL(url);
+      const videoId = u.pathname.match(/^\/video\/([^/]+)/)[1];
+      const listed = (u.searchParams.get("video_ids") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+      const itemIds = !listed.length ? [videoId] : listed.includes(videoId) ? listed : [videoId, ...listed];
+      const raw = (_a = u.search.match(/[?&]labels=([^&]*)/)) == null ? void 0 : _a[1];
+      const names = raw ? raw.split(",").map((s) => safeDecode(s.trim())).filter(Boolean) : [];
+      const offset = itemIds.length - listed.length;
+      const labels = offset > 0 && listed.length ? [...Array(offset).fill(""), ...names] : names;
+      return {
+        videoId,
+        itemIds,
+        labels,
+        initialIndex: intParam(u, "index") ?? Math.max(itemIds.indexOf(videoId), 0)
+      };
+    }
+    buildEmbedSrc(p, { autoplay = false, index = null } = {}) {
+      const id = index === null ? p.videoId : p.itemIds[index] ?? p.videoId;
+      return `${this._base}${id}${autoplay ? (this._base.includes("?") ? "&" : "?") + "autoplay=1" : ""}`;
+    }
+    async getThumbnail(p) {
+      try {
+        const res = await this._fetch(
+          `https://ok.ru/oembed?url=${encodeURIComponent(
+            `https://ok.ru/video/${p.videoId}`
+          )}&format=json`
+        );
+        return res.ok ? (await res.json()).thumbnail_url ?? null : null;
+      } catch {
+        return null;
+      }
+    }
+    async getPlaylist(p) {
+      return p.itemIds.length < 2 ? [] : p.itemIds.map((id, i) => item(id, i, p.labels[i]));
+    }
+    /** No player API on Ok.ru: changing video means reloading the iframe. */
+    createController(iframe, { parsed }) {
+      return {
+        playAt: (i, { autoplay = true } = {}) => {
+          iframe.src = this.buildEmbedSrc(parsed, { autoplay, index: i });
+        },
+        dispose() {
+        }
+      };
+    }
+  }
+  class UnsupportedUrlError extends Error {
+    constructor(url) {
+      super(`No provider can handle this URL: ${url}`);
+      this.name = "UnsupportedUrlError";
+    }
+  }
+  class ProviderRegistry {
+    constructor(providers = []) {
+      this._providers = [...providers];
+    }
+    register(provider) {
+      this._providers.push(provider);
+      return this;
+    }
+    resolve(url) {
+      const provider = this._providers.find((p) => p.canHandle(url));
+      if (!provider) throw new UnsupportedUrlError(url);
+      return provider;
+    }
+  }
+  class NavigationJournal {
+    constructor() {
+      __privateAdd(this, _entries, []);
+      __privateAdd(this, _cursor, -1);
+    }
+    get current() {
+      return __privateGet(this, _entries)[__privateGet(this, _cursor)] ?? null;
+    }
+    get canGoBack() {
+      return __privateGet(this, _cursor) > 0;
+    }
+    get canGoForward() {
+      return __privateGet(this, _cursor) < __privateGet(this, _entries).length - 1;
+    }
+    get size() {
+      return __privateGet(this, _entries).length;
+    }
+    push(entry) {
+      __privateGet(this, _entries).splice(__privateGet(this, _cursor) + 1);
+      __privateGet(this, _entries).push(entry);
+      __privateSet(this, _cursor, __privateGet(this, _entries).length - 1);
+    }
+    /** Updates the current entry (e.g. the episode changed) without creating history. */
+    replaceCurrent(patch) {
+      if (!this.current) return this.push(patch);
+      __privateGet(this, _entries)[__privateGet(this, _cursor)] = { ...this.current, ...patch };
+    }
+    back() {
+      return this.canGoBack ? __privateGet(this, _entries)[--__privateWrapper(this, _cursor)._] : null;
+    }
+    forward() {
+      return this.canGoForward ? __privateGet(this, _entries)[++__privateWrapper(this, _cursor)._] : null;
+    }
+    clear() {
+      __privateSet(this, _entries, []);
+      __privateSet(this, _cursor, -1);
+    }
+  }
+  _entries = new WeakMap();
+  _cursor = new WeakMap();
+  class NavigationService {
+    /** view: { showEmbed(src, title) → iframe, showPanel(opts), setActive(i), clear() } */
+    constructor({
+      registry,
+      view,
+      journal = new NavigationJournal(),
+      panel = true,
+      onChange = () => {
+      },
+      onHide = () => {
+      },
+      onItemsLoaded = () => {
+      }
+    }) {
+      __privateAdd(this, _NavigationService_instances);
+      __privateAdd(this, _token, 0);
+      // invalidates a navigation superseded by a newer one
+      __privateAdd(this, _controller, null);
+      __privateAdd(this, _index, null);
+      __privateAdd(this, _count, 0);
+      __privateAdd(this, _visible, false);
+      this._registry = registry;
+      this._view = view;
+      this._panel = panel;
+      this._onChange = onChange;
+      this.journal = journal;
+      this._onHide = onHide;
+      this._onItemsLoaded = onItemsLoaded;
+    }
+    get current() {
+      return this.journal.current;
+    }
+    get isOpen() {
+      return __privateGet(this, _visible);
+    }
+    get hasNextItem() {
+      return __privateGet(this, _visible) && __privateGet(this, _count) > 0 && (__privateGet(this, _index) ?? 0) < __privateGet(this, _count) - 1;
+    }
+    get hasPreviousItem() {
+      return __privateGet(this, _visible) && __privateGet(this, _count) > 0 && (__privateGet(this, _index) ?? 0) > 0;
+    }
+    get itemIndex() {
+      return __privateGet(this, _index);
+    }
+    get itemCount() {
+      return __privateGet(this, _count);
+    }
+    /** @returns {boolean} false when there is nothing to go to (end of list, no playlist...). */
+    nextItem() {
+      return __privateMethod(this, _NavigationService_instances, step_fn).call(this, 1);
+    }
+    previousItem() {
+      return __privateMethod(this, _NavigationService_instances, step_fn).call(this, -1);
+    }
+    /** @throws UnsupportedUrlError. index (0-based) wins over data-index, which wins over the url's index. */
+    async navigate(info, { autoplay = false, index = null, push = true } = {}) {
+      var _a, _b, _c;
+      const provider = this._registry.resolve(info.url);
+      const parsed = provider.parse(info.url);
+      const token = ++__privateWrapper(this, _token)._;
+      const itemsPromise = provider.getPlaylist(parsed);
+      const start = index ?? info.startIndex ?? parsed.initialIndex ?? null;
+      __privateSet(this, _count, 0);
+      (_a = __privateGet(this, _controller)) == null ? void 0 : _a.dispose();
+      const iframe = this._view.showEmbed(
+        provider.buildEmbedSrc(parsed, { autoplay, index: start }),
+        provider.label
+      );
+      __privateSet(this, _controller, provider.createController(iframe, {
+        parsed,
+        index: start,
+        onItemChange: (i) => __privateMethod(this, _NavigationService_instances, setIndex_fn).call(this, i)
+      }));
+      __privateSet(this, _index, start);
+      __privateSet(this, _visible, true);
+      const entry = { key: info.key, url: info.url, index: start, info };
+      push ? this.journal.push(entry) : this.journal.replaceCurrent(entry);
+      this._onChange(this.journal.current);
+      const items = await itemsPromise;
+      if (token !== __privateGet(this, _token)) return;
+      __privateSet(this, _count, items.length);
+      this._onItemsLoaded(__privateGet(this, _count));
+      if (!this._panel || !provider.panel || ((_c = (_b = info.link) == null ? void 0 : _b.dataset) == null ? void 0 : _c.panel) === "false" || items.length === 0)
+        return;
+      this._view.showPanel({
+        items,
+        index: __privateGet(this, _index) ?? 0,
+        cfg: provider.panel,
+        seasonCounts: info.seasonCounts,
+        onSelect: (i) => this.select(i)
+      });
+    }
+    /** User picked an item in the panel. */
+    select(index) {
+      var _a;
+      if (index === __privateGet(this, _index)) return;
+      (_a = __privateGet(this, _controller)) == null ? void 0 : _a.playAt(index, { autoplay: true });
+      __privateMethod(this, _NavigationService_instances, setIndex_fn).call(this, index);
+    }
+    goBack() {
+      return __privateMethod(this, _NavigationService_instances, go_fn).call(this, this.journal.back());
+    }
+    goForward() {
+      return __privateMethod(this, _NavigationService_instances, go_fn).call(this, this.journal.forward());
+    }
+    /** Hides the player and panel but keeps the journal and the current episode. */
+    hide() {
+      var _a;
+      __privateWrapper(this, _token)._++;
+      (_a = __privateGet(this, _controller)) == null ? void 0 : _a.dispose();
+      __privateSet(this, _controller, null);
+      __privateSet(this, _visible, false);
+      this._view.clear();
+      this._onHide(this.journal.current);
+    }
+    show({ autoplay = false } = {}) {
+      const e = this.journal.current;
+      return e ? this.navigate(e.info, { index: e.index, autoplay, push: false }) : null;
+    }
+    close() {
+      var _a;
+      __privateWrapper(this, _token)._++;
+      (_a = __privateGet(this, _controller)) == null ? void 0 : _a.dispose();
+      __privateSet(this, _controller, null);
+      __privateSet(this, _index, null);
+      __privateSet(this, _count, 0);
+      __privateSet(this, _visible, false);
+      this._view.clear();
+      this.journal.clear();
+      this._onChange(null);
+    }
+  }
+  _token = new WeakMap();
+  _controller = new WeakMap();
+  _index = new WeakMap();
+  _count = new WeakMap();
+  _visible = new WeakMap();
+  _NavigationService_instances = new WeakSet();
+  step_fn = function(delta) {
+    var _a, _b;
+    if (!__privateGet(this, _visible)) return false;
+    if (__privateGet(this, _count)) {
+      const i = (__privateGet(this, _index) ?? 0) + delta;
+      if (i < 0 || i >= __privateGet(this, _count)) return false;
+      this.select(i);
+      return true;
+    }
+    return ((_b = (_a = __privateGet(this, _controller)) == null ? void 0 : _a[delta > 0 ? "next" : "previous"]) == null ? void 0 : _b.call(_a)) === true;
+  };
+  go_fn = function(entry) {
+    return entry ? this.navigate(entry.info, {
+      index: entry.index,
+      autoplay: true,
+      push: false
+    }) : null;
+  };
+  setIndex_fn = function(i) {
+    if (i === __privateGet(this, _index)) return;
+    __privateSet(this, _index, i);
+    this._view.setActive(i);
+    this.journal.replaceCurrent({ index: i });
+    this._onChange(this.journal.current);
+  };
+  const CSS = `
 .lp-host{position:relative}
 .lp-frame{position:absolute;inset:0;width:100%;height:100%;border:0}
 .lp-panel{--b:var(--lp-bg,#141414);--l:var(--lp-border,#2a2a2a);--h:var(--lp-hover,#1e1e1e);--t:var(--lp-text,#9a9a9a);--ta:var(--lp-text-active,#f0f0f0);--n:var(--lp-muted,#555);--a:var(--lp-accent,#f7931e);position:absolute;inset:0 0 0 auto;z-index:999;width:var(--lp-w,176px);max-width:70%;display:flex;flex-direction:column;overflow:hidden auto;overscroll-behavior:contain;scroll-behavior:auto;scrollbar-width:thin;background:var(--b);border-left:1px solid var(--l);font:12px var(--lp-font,system-ui,sans-serif);transition:transform .2s}
@@ -52,5 +885,649 @@
 .lp-tip.lp-nothumb::after{display:none}
 .lp-tip.lp-nothumb .lp-tip-play{top:42%}
 .lp-tip.lp-nothumb .lp-tip-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.3}
-`;function tt(){if(document.getElementById("lp-styles"))return;const r=y("style");r.id="lp-styles",r.textContent=zt,document.head.appendChild(r)}class Pt{constructor({container:t,widths:e=null,resizable:n=!0}){tt(),this._c=t,this._c.classList.add("lp-host"),this._widths=e,this._resizable=n,this._panel=null}adoptIframe(t){this._adopted=t}showEmbed(t,e){if(this._adopted){const i=this._adopted;return this._adopted=null,this._c.querySelectorAll(".lp-panel,.lp-toggle,.lp-resize").forEach(s=>s.remove()),i.title||(i.title=e),i.src!==t&&(i.src=t),i}const n=y("iframe","lp-frame");return n.src=t,n.title=e,n.allow="autoplay; fullscreen; picture-in-picture; web-share",n.allowFullscreen=!0,n.referrerPolicy="strict-origin-when-cross-origin",this._c.replaceChildren(n),this._panel=null,n}clear(){this._c.replaceChildren(),this._panel=null}setActive(t){var e;(e=this._panel)==null||e.setActive(t)}showPanel({items:t,index:e,cfg:n,seasonCounts:i,onSelect:s}){var st;this._c.querySelectorAll(".lp-panel,.lp-toggle,.lp-resize").forEach(l=>l.remove());const o=this._c,h=t.some(l=>l.thumbnailUrl)?280:176,c=l=>{const f=bt(l,o.clientWidth||1/0);return o.style.setProperty("--lp-w",`${f}px`),f};let p=c(((st=this._widths)==null?void 0:st.get())??h);const a=y("div","lp-panel"),b=y("div","lp-head"),E=y("button","lp-toggle","☰"),v=y("div","lp-resize");E.type="button",E.dataset.pos=(n==null?void 0:n.toggle)??"top-right",E.title=E.ariaLabel="Show playlist";const C=y("button","lp-close","»");C.type="button",C.title=C.ariaLabel="Hide playlist",b.append(y("span","",`Playlist · ${t.length}`),C),a.append(b);let R=!1;const M=l=>{const f=a.querySelector(".lp-active");if(!f)return;const _=b.offsetHeight,A=f.offsetTop,w=A+f.offsetHeight;let z=null;l==="center"?z=A-_-(a.clientHeight-_-f.offsetHeight)/2:A<a.scrollTop+_?z=A-_:w>a.scrollTop+a.clientHeight&&(z=w-a.clientHeight),z!==null&&(a.scrollTop=Math.max(0,z))},X=l=>{a.classList.toggle("lp-closed",!l),E.hidden=l,v.hidden=!l||!this._resizable,l&&M("center")};E.onclick=()=>X(!0),C.onclick=()=>X(!1);const nt=l=>{const f=y("div","lp-item");f.dataset.i=l.index,f.title=l.title,f.tabIndex=0,f.setAttribute("role","button");const _=y("div","lp-info");if(_.append(y("div","lp-title",l.title)),l.channelTitle&&_.append(y("div","lp-chan",l.channelTitle)),l.thumbnailUrl){const w=y("div","lp-thumb"),z=new Image;z.src=l.thumbnailUrl,z.alt="",z.loading="lazy",w.append(z,y("span","lp-tn",String(l.index+1))),f.append(w,_)}else f.append(y("span","lp-num",String(l.index+1).padStart(2,"0")),_);const A=w=>{R=!0;try{s(w)}finally{R=!1}};return f.onclick=()=>A(l.index),f.onkeydown=w=>{(w.key==="Enter"||w.key===" ")&&(w.preventDefault(),A(l.index))},f},it=xt(t,i);it?it.forEach(l=>{const f=y("div","lp-season"),_=y("div","lp-sh",`${l.label} (${l.end-l.start})`);_.onclick=()=>f.classList.toggle("lp-collapsed"),f.append(_,...t.slice(l.start,l.end).map(nt)),e>=l.start&&e<l.end||f.classList.add("lp-collapsed"),a.append(f)}):t.forEach(l=>a.append(nt(l)));let q=null;v.tabIndex=0,v.title="Drag to resize (double-click to reset)",v.setAttribute("role","separator"),v.onpointerdown=l=>{l.button||(q={x:l.clientX,w:a.getBoundingClientRect().width},v.setPointerCapture(l.pointerId),o.classList.add("lp-resizing"),l.preventDefault())},v.onpointermove=l=>{q&&(p=c(q.w+q.x-l.clientX))},v.onpointerup=v.onpointercancel=()=>{var l;q&&(q=null,o.classList.remove("lp-resizing"),(l=this._widths)==null||l.set(p))},v.ondblclick=()=>{var l;p=c(h),(l=this._widths)==null||l.clear()},v.onkeydown=l=>{var f;l.key!=="ArrowLeft"&&l.key!=="ArrowRight"||(l.preventDefault(),p=c(a.getBoundingClientRect().width+(l.key==="ArrowLeft"?16:-16)),(f=this._widths)==null||f.set(p))},o.append(a,E,v),this._panel={setActive:(l,f="nearest")=>{var _,A;a.querySelectorAll(".lp-item").forEach(w=>w.classList.toggle("lp-active",+w.dataset.i===l)),(A=(_=a.querySelector(".lp-active"))==null?void 0:_.closest(".lp-season"))==null||A.classList.remove("lp-collapsed"),R||M(f)}},X((n==null?void 0:n.open)??!1),this._panel.setActive(e,"center")}}class Ot{constructor(){this._token=0,this._el=null,this._timer=null,this._hideTimer=null,this._last=null,document.addEventListener("pointerdown",()=>{clearTimeout(this._timer),this._hide()},!0)}attach(t,e,n,i={}){t.addEventListener("mouseenter",s=>{this._last=s,this._timer=setTimeout(()=>this._show(e,n,i),120)}),t.addEventListener("mousemove",s=>this._move(s)),t.addEventListener("mouseleave",()=>{clearTimeout(this._timer),this._hide()})}_build(){const t=y("div","lp-tip"),e=new Image;return e.alt="",t.append(y("div","lp-tip-loader"),e,y("div","lp-tip-play"),y("span","lp-tip-title")),document.body.append(t),this._el=t}async _show(t,e,n){tt(),clearTimeout(this._hideTimer);const i=++this._token,s=this._el??this._build(),[o,h]=s.children;s.dataset.provider=n.id??"",s.dataset.name=n.name??"",s.classList.remove("lp-nothumb"),s.lastChild.textContent=e,o.hidden=!1,h.hidden=!0,h.removeAttribute("src"),s.style.display="block",this._move(this._last),requestAnimationFrame(()=>{i===this._token&&s.classList.add("lp-show")});const c=()=>{o.hidden=!0,s.classList.add("lp-nothumb")},p=await Promise.race([t(),new Promise(b=>setTimeout(()=>b(null),3e3))]);if(i!==this._token)return;if(!p)return c();const a=new Image;a.onload=()=>{if(i===this._token){if(n.id==="youtube"&&a.naturalWidth<=120)return c();o.hidden=!0,h.src=p,h.hidden=!1}},a.onerror=()=>{i===this._token&&c()},a.src=p}_move(t){if(!this._el||!t)return;const e=14,{offsetWidth:n,offsetHeight:i}=this._el;this._el.style.left=`${t.clientX+e+n>innerWidth?t.clientX-n-e:t.clientX+e}px`,this._el.style.top=`${t.clientY+e+i>innerHeight?t.clientY-i-e:t.clientY+e}px`}_hide(){this._token++,this._el&&(this._el.classList.remove("lp-show"),clearTimeout(this._hideTimer),this._hideTimer=setTimeout(()=>{this._el.style.display="none"},150))}}class Ut{constructor({target:t,registry:e,view:n,panel:i,onChange:s,onHide:o}){this.target=t,this.view=n,this.links=[],this.navigationService=new At({registry:e,view:n,panel:i,onChange:s,onHide:o})}}class et{constructor({scope:t=document,scanner:e=new dt,store:n=null,registry:i=null,useStorage:s=!0,panel:o=!0,resizable:h=!0,tooltip:c=!0,activeClass:p="is-active",youtubeApiKey:a=null,okruEmbedBaseUrl:b,dailymotionPlayerId:E=null,onChange:v=()=>{},onError:C=R=>console.warn("[LinkPlayer]",R)}={}){this._scope=yt(t),this._scanner=e,this._store=n??(s?new _t:new vt),this._useStorage=s,this._panel=o,this._resizable=h,this._activeClass=p,this._onChange=v,this._onError=C,this._registry=i??new Tt([new St({apiKey:a,store:n}),new Et({playerId:E}),new Lt({embedBaseUrl:b})]),this._tooltip=c&&!mt()?new Ot:null,this._regions=new Map,this._bound=new WeakSet,this._thumbs=new Map,this._embedCount=0,this.scan()}getRegion(t,e=document.getElementById(t)){if(!this._regions.has(t)){if(!e)throw new Error(`Target not found: "${t}"`);const n=this._resizable?{get:()=>this._store.get("panel-width"),set:i=>this._store.set("panel-width",i),clear:()=>this._store.remove("panel-width")}:null;this._regions.set(t,new Ut({target:t,registry:this._registry,panel:this._panel,view:new Pt({container:e,widths:n,resizable:this._resizable}),onChange:i=>this._changed(t,i),onHide:()=>this._hidden(t)}))}return this._regions.get(t)}_hostFor(t){const e=t.parentElement;if(e&&e!==this._scope&&e!==document.body&&e.children.length===1&&!e.textContent.trim())return e;const n=+t.getAttribute("width")||0,i=+t.getAttribute("height")||0,s=document.createElement("div");return s.style.cssText=`width:100%;${n?`max-width:${n}px;`:""}aspect-ratio:${n&&i?`${n}/${i}`:"16/9"}`,t.replaceWith(s),s.append(t),t.classList.add("lp-frame"),s}_adoptEmbeds(){this._scope.querySelectorAll("iframe").forEach(t=>{if(this._bound.has(t)||t.closest(".lp-host")||t.dataset.panel==="false")return;let e,n;try{e=new URL(t.getAttribute("src")??"",location.href).href,n=this._registry.resolve(e)}catch{return}if(!n.panel)return;this._bound.add(t);const i=`embed-${++this._embedCount}`,s=this.getRegion(i,this._hostFor(t));s.view.adoptIframe(t);const o={key:i,url:e,link:t,autoplay:"none",startIndex:null,seasonCounts:null};this._run(o,()=>s.navigationService.navigate(o,{autoplay:!1}))})}scan(){var e;let t=[];try{t=this._scanner.scan(this._scope)}catch(n){return this._onError(n)}for(const n of t){if(this._bound.has(n.link))continue;let i;try{if(!n.target)throw new Error(`data-target is required (${n.url})`);i=this.getRegion(n.target)}catch(o){this._onError(o,n);continue}this._bound.add(n.link),i.links.push(n),n.link.addEventListener("click",o=>{o.preventDefault(),this._click(i,n)});let s=null;try{s=this._registry.resolve(n.url)}catch{}(e=this._tooltip)==null||e.attach(n.link,()=>this._thumbnail(n),n.link.textContent.trim(),{id:s==null?void 0:s.id,name:s==null?void 0:s.name})}try{this._adoptEmbeds()}catch(n){this._onError(n)}this._regions.forEach(n=>this._init(n))}_init(t){if(t.navigationService.current)return;const e=this._useStorage?this._store.get(`state:${t.target}`):null;if(e!=null&&e.url){const i=t.links.find(s=>s.url===e.url)??{url:e.url,key:e.key,autoplay:L.NONE,startIndex:null,seasonCounts:null};return this._run(i,()=>t.navigationService.navigate(i,{index:e.index,autoplay:i.autoplay===L.INIT}))}const n=t.links.find(i=>i.showOnInit);n&&this._run(n,()=>t.navigationService.navigate(n,{autoplay:n.autoplay===L.INIT}))}_click(t,e){var s;const n=t.navigationService,i=e.autoplay===L.INIT||e.autoplay===L.CLICK;if(((s=n.current)==null?void 0:s.key)===e.key)return n.isOpen?n.hide():this._run(e,()=>n.show({autoplay:i}));this._run(e,()=>n.navigate(e,{autoplay:i}))}_changed(t,e){var i;(((i=this._regions.get(t))==null?void 0:i.links)??[]).forEach(s=>s.link.classList.toggle(this._activeClass,!!e&&s.key===e.key)),this._useStorage&&(e?this._store.set(`state:${t}`,{key:e.key,url:e.url,index:e.index}):this._store.remove(`state:${t}`)),this._onChange(t,e)}_hidden(t){var e;(((e=this._regions.get(t))==null?void 0:e.links)??[]).forEach(n=>n.link.classList.remove(this._activeClass))}async _thumbnail(t){return t.thumbnail?t.thumbnail:(this._thumbs.has(t.url)||this._thumbs.set(t.url,(async()=>{try{const e=this._registry.resolve(t.url);return await e.getThumbnail(e.parse(t.url))}catch{return null}})()),this._thumbs.get(t.url))}async _run(t,e){try{await e()}catch(n){this._onError(n,t)}}}return x(et,"VERSION","2.0.6"),et}));
+`;
+  function injectStyles() {
+    if (document.getElementById("lp-styles")) return;
+    const s = el("style");
+    s.id = "lp-styles";
+    s.textContent = CSS;
+    document.head.appendChild(s);
+  }
+  class RegionView {
+    /** widths: { get, set, clear } for the saved panel width (or null) */
+    constructor({ container, widths = null, resizable = true }) {
+      injectStyles();
+      this._c = container;
+      this._c.classList.add("lp-host");
+      this._widths = widths;
+      this._resizable = resizable;
+      this._panel = null;
+    }
+    /** Marks an iframe already in the page: showEmbed() will reuse it instead of creating one. */
+    adoptIframe(iframe) {
+      this._adopted = iframe;
+    }
+    showEmbed(src, title) {
+      if (this._adopted) {
+        const f2 = this._adopted;
+        this._adopted = null;
+        this._c.querySelectorAll(".lp-panel,.lp-toggle,.lp-resize").forEach((e) => e.remove());
+        f2.title || (f2.title = title);
+        if (f2.src !== src) f2.src = src;
+        return f2;
+      }
+      const f = el("iframe", "lp-frame");
+      f.src = src;
+      f.title = title;
+      f.allow = "autoplay; fullscreen; picture-in-picture; web-share";
+      f.allowFullscreen = true;
+      f.referrerPolicy = "strict-origin-when-cross-origin";
+      this._c.replaceChildren(f);
+      this._panel = null;
+      return f;
+    }
+    clear() {
+      this._c.replaceChildren();
+      this._panel = null;
+    }
+    setActive(i) {
+      var _a;
+      (_a = this._panel) == null ? void 0 : _a.setActive(i);
+    }
+    showPanel({ items, index, cfg, seasonCounts, onSelect }) {
+      var _a;
+      this._c.querySelectorAll(".lp-panel,.lp-toggle,.lp-resize").forEach((e) => e.remove());
+      const c = this._c;
+      const defaultWidth = items.some((i) => i.thumbnailUrl) ? 280 : 176;
+      const setWidth = (w) => {
+        const v = clampWidth(w, c.clientWidth || Infinity);
+        c.style.setProperty("--lp-w", `${v}px`);
+        return v;
+      };
+      let width = setWidth(((_a = this._widths) == null ? void 0 : _a.get()) ?? defaultWidth);
+      const root = el("div", "lp-panel");
+      const head = el("div", "lp-head");
+      const toggle = el("button", "lp-toggle", "☰");
+      const handle = el("div", "lp-resize");
+      toggle.type = "button";
+      toggle.dataset.pos = (cfg == null ? void 0 : cfg.toggle) ?? "top-right";
+      toggle.title = toggle.ariaLabel = "Show playlist";
+      const close = el("button", "lp-close", "»");
+      close.type = "button";
+      close.title = close.ariaLabel = "Hide playlist";
+      head.append(el("span", "", `Playlist · ${items.length}`), close);
+      root.append(head);
+      let fromUser = false;
+      const reveal = (mode) => {
+        const a = root.querySelector(".lp-active");
+        if (!a) return;
+        const headH = head.offsetHeight;
+        const top = a.offsetTop;
+        const bottom = top + a.offsetHeight;
+        let next = null;
+        if (mode === "center") {
+          next = top - headH - (root.clientHeight - headH - a.offsetHeight) / 2;
+        } else if (top < root.scrollTop + headH) {
+          next = top - headH;
+        } else if (bottom > root.scrollTop + root.clientHeight) {
+          next = bottom - root.clientHeight;
+        }
+        if (next !== null) root.scrollTop = Math.max(0, next);
+      };
+      const setOpen = (open) => {
+        root.classList.toggle("lp-closed", !open);
+        toggle.hidden = open;
+        handle.hidden = !open || !this._resizable;
+        if (open) reveal("center");
+      };
+      toggle.onclick = () => setOpen(true);
+      close.onclick = () => setOpen(false);
+      const makeItem = (it) => {
+        const d = el("div", "lp-item");
+        d.dataset.i = it.index;
+        d.title = it.title;
+        d.tabIndex = 0;
+        d.setAttribute("role", "button");
+        const info = el("div", "lp-info");
+        info.append(el("div", "lp-title", it.title));
+        if (it.channelTitle) info.append(el("div", "lp-chan", it.channelTitle));
+        if (it.thumbnailUrl) {
+          const t = el("div", "lp-thumb");
+          const img = new Image();
+          img.src = it.thumbnailUrl;
+          img.alt = "";
+          img.loading = "lazy";
+          t.append(img, el("span", "lp-tn", String(it.index + 1)));
+          d.append(t, info);
+        } else {
+          d.append(
+            el("span", "lp-num", String(it.index + 1).padStart(2, "0")),
+            info
+          );
+        }
+        const pick = (i) => {
+          fromUser = true;
+          try {
+            onSelect(i);
+          } finally {
+            fromUser = false;
+          }
+        };
+        d.onclick = () => pick(it.index);
+        d.onkeydown = (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            pick(it.index);
+          }
+        };
+        return d;
+      };
+      const groups = groupBySeason(items, seasonCounts);
+      if (!groups) items.forEach((it) => root.append(makeItem(it)));
+      else
+        groups.forEach((g) => {
+          const sec = el("div", "lp-season");
+          const sh = el("div", "lp-sh", `${g.label} (${g.end - g.start})`);
+          sh.onclick = () => sec.classList.toggle("lp-collapsed");
+          sec.append(sh, ...items.slice(g.start, g.end).map(makeItem));
+          if (!(index >= g.start && index < g.end))
+            sec.classList.add("lp-collapsed");
+          root.append(sec);
+        });
+      let drag = null;
+      handle.tabIndex = 0;
+      handle.title = "Drag to resize (double-click to reset)";
+      handle.setAttribute("role", "separator");
+      handle.onpointerdown = (e) => {
+        if (e.button) return;
+        drag = { x: e.clientX, w: root.getBoundingClientRect().width };
+        handle.setPointerCapture(e.pointerId);
+        c.classList.add("lp-resizing");
+        e.preventDefault();
+      };
+      handle.onpointermove = (e) => {
+        if (drag) width = setWidth(drag.w + drag.x - e.clientX);
+      };
+      handle.onpointerup = handle.onpointercancel = () => {
+        var _a2;
+        if (!drag) return;
+        drag = null;
+        c.classList.remove("lp-resizing");
+        (_a2 = this._widths) == null ? void 0 : _a2.set(width);
+      };
+      handle.ondblclick = () => {
+        var _a2;
+        width = setWidth(defaultWidth);
+        (_a2 = this._widths) == null ? void 0 : _a2.clear();
+      };
+      handle.onkeydown = (e) => {
+        var _a2;
+        if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+        e.preventDefault();
+        width = setWidth(
+          root.getBoundingClientRect().width + (e.key === "ArrowLeft" ? 16 : -16)
+        );
+        (_a2 = this._widths) == null ? void 0 : _a2.set(width);
+      };
+      c.append(root, toggle, handle);
+      this._panel = {
+        setActive: (i, mode = "nearest") => {
+          var _a2, _b;
+          root.querySelectorAll(".lp-item").forEach((n) => n.classList.toggle("lp-active", +n.dataset.i === i));
+          (_b = (_a2 = root.querySelector(".lp-active")) == null ? void 0 : _a2.closest(".lp-season")) == null ? void 0 : _b.classList.remove("lp-collapsed");
+          if (!fromUser) reveal(mode);
+        }
+      };
+      setOpen((cfg == null ? void 0 : cfg.open) ?? false);
+      this._panel.setActive(index, "center");
+    }
+  }
+  class Tooltip {
+    constructor() {
+      this._token = 0;
+      this._el = null;
+      this._timer = null;
+      this._hideTimer = null;
+      this._last = null;
+      document.addEventListener(
+        "pointerdown",
+        () => {
+          clearTimeout(this._timer);
+          this._hide();
+        },
+        true
+      );
+    }
+    /** provider: { id, name } of the link's provider, used for the fallback look. */
+    attach(target, getThumb, title, provider = {}) {
+      target.addEventListener("mouseenter", (e) => {
+        this._last = e;
+        this._timer = setTimeout(
+          () => this._show(getThumb, title, provider),
+          120
+        );
+      });
+      target.addEventListener("mousemove", (e) => this._move(e));
+      target.addEventListener("mouseleave", () => {
+        clearTimeout(this._timer);
+        this._hide();
+      });
+    }
+    _build() {
+      const tip = el("div", "lp-tip");
+      const img = new Image();
+      img.alt = "";
+      tip.append(
+        el("div", "lp-tip-loader"),
+        img,
+        el("div", "lp-tip-play"),
+        el("span", "lp-tip-title")
+      );
+      document.body.append(tip);
+      return this._el = tip;
+    }
+    async _show(getThumb, title, provider) {
+      injectStyles();
+      clearTimeout(this._hideTimer);
+      const token = ++this._token;
+      const tip = this._el ?? this._build();
+      const [loader, img] = tip.children;
+      tip.dataset.provider = provider.id ?? "";
+      tip.dataset.name = provider.name ?? "";
+      tip.classList.remove("lp-nothumb");
+      tip.lastChild.textContent = title;
+      loader.hidden = false;
+      img.hidden = true;
+      img.removeAttribute("src");
+      tip.style.display = "block";
+      this._move(this._last);
+      requestAnimationFrame(() => {
+        if (token === this._token) tip.classList.add("lp-show");
+      });
+      const fallback = () => {
+        loader.hidden = true;
+        tip.classList.add("lp-nothumb");
+      };
+      const url = await Promise.race([
+        getThumb(),
+        new Promise((r) => setTimeout(() => r(null), 3e3))
+      ]);
+      if (token !== this._token) return;
+      if (!url) return fallback();
+      const probe = new Image();
+      probe.onload = () => {
+        if (token !== this._token) return;
+        if (provider.id === "youtube" && probe.naturalWidth <= 120)
+          return fallback();
+        loader.hidden = true;
+        img.src = url;
+        img.hidden = false;
+      };
+      probe.onerror = () => {
+        if (token === this._token) fallback();
+      };
+      probe.src = url;
+    }
+    _move(e) {
+      if (!this._el || !e) return;
+      const m = 14;
+      const { offsetWidth: w, offsetHeight: h } = this._el;
+      this._el.style.left = `${e.clientX + m + w > innerWidth ? e.clientX - w - m : e.clientX + m}px`;
+      this._el.style.top = `${e.clientY + m + h > innerHeight ? e.clientY - h - m : e.clientY + m}px`;
+    }
+    _hide() {
+      this._token++;
+      if (!this._el) return;
+      this._el.classList.remove("lp-show");
+      clearTimeout(this._hideTimer);
+      this._hideTimer = setTimeout(() => {
+        this._el.style.display = "none";
+      }, 150);
+    }
+  }
+  class PlayerRegion {
+    constructor({
+      target,
+      registry,
+      view,
+      panel,
+      onChange,
+      onHide,
+      onItemsLoaded
+    }) {
+      this.target = target;
+      this.view = view;
+      this.links = [];
+      this.navigationService = new NavigationService({
+        registry,
+        view,
+        panel,
+        onChange,
+        onHide,
+        onItemsLoaded
+      });
+    }
+  }
+  function neighbourLink(links, currentKey, delta, wrap = false) {
+    const n = links.length;
+    if (!n) return null;
+    const at = links.findIndex((l) => l.key === currentKey);
+    if (at === -1) return delta > 0 ? links[0] : links[n - 1];
+    if (n === 1) return null;
+    const i = at + delta;
+    if (i >= 0 && i < n) return links[i];
+    return wrap ? links[(i + n) % n] : null;
+  }
+  class LinkPlayer {
+    /**
+     * @param {Object} o
+     * @param o.useStorage   save the last url + index of each region and restore it on load (default true)
+     * @param o.panel        false disables every playlist panel (data-panel="false" disables one link)
+     * @param o.resizable    panel resize handle + saved width
+     * @param o.tooltip      thumbnail on hover
+     * @param o.registry     custom ProviderRegistry (otherwise built from the options below)
+     * @param o.onNavigationState (target, state) => void
+     * @param o.onChange     (target, entry|null) => void
+     * @param o.onError      (error, linkInfo?) => void
+     */
+    constructor({
+      scope = document,
+      scanner = new LinkScanner(),
+      store = null,
+      registry = null,
+      useStorage = true,
+      panel = true,
+      resizable = true,
+      tooltip = true,
+      activeClass = "is-active",
+      youtubeApiKey = null,
+      okruEmbedBaseUrl,
+      dailymotionPlayerId = null,
+      onChange = () => {
+      },
+      onNavigationState = () => {
+      },
+      onError = (e) => console.warn("[LinkPlayer]", e)
+    } = {}) {
+      this._scope = resolveScope(scope);
+      this._scanner = scanner;
+      this._store = store ?? (useStorage ? new JsonStore() : new MemoryStore());
+      this._useStorage = useStorage;
+      this._panel = panel;
+      this._resizable = resizable;
+      this._activeClass = activeClass;
+      this._onNavState = onNavigationState;
+      this._onChange = onChange;
+      this._onError = onError;
+      this._registry = registry ?? new ProviderRegistry([
+        new YouTubeProvider({ apiKey: youtubeApiKey, store: this._store }),
+        new DailymotionProvider({ playerId: dailymotionPlayerId }),
+        new OkruProvider({ embedBaseUrl: okruEmbedBaseUrl })
+      ]);
+      this._tooltip = tooltip && !isTouch() ? new Tooltip() : null;
+      this._regions = /* @__PURE__ */ new Map();
+      this._bound = /* @__PURE__ */ new WeakSet();
+      this._thumbs = /* @__PURE__ */ new Map();
+      this._embedCount = 0;
+      this.scan();
+    }
+    getRegion(target, container = document.getElementById(target)) {
+      if (!this._regions.has(target)) {
+        if (!container) throw new Error(`Target not found: "${target}"`);
+        const widths = this._resizable ? {
+          get: () => this._store.get("panel-width"),
+          set: (w) => this._store.set("panel-width", w),
+          clear: () => this._store.remove("panel-width")
+        } : null;
+        this._regions.set(
+          target,
+          new PlayerRegion({
+            target,
+            registry: this._registry,
+            panel: this._panel,
+            view: new RegionView({
+              container,
+              widths,
+              resizable: this._resizable
+            }),
+            onChange: (entry) => this._changed(target, entry),
+            onHide: () => this._hidden(target),
+            onItemsLoaded: () => this._emitNav(target)
+          })
+        );
+      }
+      return this._regions.get(target);
+    }
+    /** Host of an existing iframe: its own parent when it holds only the iframe (.video-container...), otherwise a wrapper. */
+    _hostFor(iframe) {
+      const p = iframe.parentElement;
+      if (p && p !== this._scope && p !== document.body && p.children.length === 1 && !p.textContent.trim())
+        return p;
+      const w = +iframe.getAttribute("width") || 0;
+      const h = +iframe.getAttribute("height") || 0;
+      const wrap = document.createElement("div");
+      wrap.style.cssText = `width:100%;${w ? `max-width:${w}px;` : ""}aspect-ratio:${w && h ? `${w}/${h}` : "16/9"}`;
+      iframe.replaceWith(wrap);
+      wrap.append(iframe);
+      iframe.classList.add("lp-frame");
+      return wrap;
+    }
+    _adoptEmbeds() {
+      this._scope.querySelectorAll("iframe").forEach((iframe) => {
+        if (this._bound.has(iframe) || iframe.closest(".lp-host")) return;
+        if (iframe.dataset.panel === "false") return;
+        let url, provider;
+        try {
+          url = new URL(iframe.getAttribute("src") ?? "", location.href).href;
+          provider = this._registry.resolve(url);
+        } catch {
+          return;
+        }
+        if (!provider.panel) return;
+        this._bound.add(iframe);
+        const target = `embed-${++this._embedCount}`;
+        const region = this.getRegion(target, this._hostFor(iframe));
+        region.view.adoptIframe(iframe);
+        const info = {
+          key: target,
+          url,
+          link: iframe,
+          autoplay: "none",
+          startIndex: null,
+          seasonCounts: null
+        };
+        this._run(
+          info,
+          () => region.navigationService.navigate(info, { autoplay: false })
+        );
+      });
+    }
+    /* ── episodes (inside the current playlist) ── */
+    nextItem(target) {
+      var _a;
+      return ((_a = this._regions.get(target)) == null ? void 0 : _a.navigationService.nextItem()) ?? false;
+    }
+    previousItem(target) {
+      var _a;
+      return ((_a = this._regions.get(target)) == null ? void 0 : _a.navigationService.previousItem()) ?? false;
+    }
+    /* ── links (between the links of the zone) ── */
+    nextLink(target, opts) {
+      return this._stepLink(target, 1, opts);
+    }
+    previousLink(target, opts) {
+      return this._stepLink(target, -1, opts);
+    }
+    /** @returns {boolean} false at the edges (unless wrap) or for an unknown zone. */
+    _stepLink(target, delta, { wrap = false, autoplay } = {}) {
+      var _a;
+      const region = this._regions.get(target);
+      if (!region) return false;
+      const ns = region.navigationService;
+      const link = neighbourLink(region.links, (_a = ns.current) == null ? void 0 : _a.key, delta, wrap);
+      if (!link) return false;
+      this._run(
+        link,
+        () => ns.navigate(link, { autoplay: autoplay ?? this._clickAutoplay(link) })
+      );
+      return true;
+    }
+    /** Everything a custom navigation bar needs to enable/disable its buttons. */
+    getNavigationState(target) {
+      var _a;
+      const region = this._regions.get(target);
+      if (!region) return null;
+      const ns = region.navigationService;
+      const key = (_a = ns.current) == null ? void 0 : _a.key;
+      return {
+        target,
+        isOpen: ns.isOpen,
+        index: ns.itemIndex,
+        count: ns.itemCount,
+        hasNextItem: ns.hasNextItem,
+        hasPreviousItem: ns.hasPreviousItem,
+        hasNextLink: !!neighbourLink(region.links, key, 1),
+        hasPreviousLink: !!neighbourLink(region.links, key, -1)
+      };
+    }
+    _emitNav(target) {
+      const state = this.getNavigationState(target);
+      if (state) this._onNavState(target, state);
+    }
+    scan() {
+      var _a;
+      let infos = [];
+      try {
+        infos = this._scanner.scan(this._scope);
+      } catch (error) {
+        return this._onError(error);
+      }
+      for (const info of infos) {
+        if (this._bound.has(info.link)) continue;
+        let region;
+        try {
+          if (!info.target)
+            throw new Error(`data-target is required (${info.url})`);
+          region = this.getRegion(info.target);
+        } catch (error) {
+          this._onError(error, info);
+          continue;
+        }
+        this._bound.add(info.link);
+        region.links.push(info);
+        info.link.addEventListener("click", (e) => {
+          e.preventDefault();
+          this._click(region, info);
+        });
+        let provider = null;
+        try {
+          provider = this._registry.resolve(info.url);
+        } catch {
+        }
+        (_a = this._tooltip) == null ? void 0 : _a.attach(
+          info.link,
+          () => this._thumbnail(info),
+          info.link.textContent.trim(),
+          { id: provider == null ? void 0 : provider.id, name: provider == null ? void 0 : provider.name }
+        );
+      }
+      try {
+        this._adoptEmbeds();
+      } catch (error) {
+        this._onError(error);
+      }
+      this._regions.forEach((region) => this._init(region));
+    }
+    /** Restore the saved url/index, otherwise data-show-on-init. */
+    _init(region) {
+      if (region.navigationService.current) return;
+      const saved = this._useStorage ? this._store.get(`state:${region.target}`) : null;
+      if (saved == null ? void 0 : saved.url) {
+        const info = region.links.find((l) => l.url === saved.url) ?? {
+          url: saved.url,
+          key: saved.key,
+          autoplay: AUTOPLAY_MODES.NONE,
+          startIndex: null,
+          seasonCounts: null
+        };
+        return this._run(
+          info,
+          () => region.navigationService.navigate(info, {
+            index: saved.index,
+            autoplay: info.autoplay === AUTOPLAY_MODES.INIT
+          })
+        );
+      }
+      const first = region.links.find((l) => l.showOnInit);
+      if (first)
+        this._run(
+          first,
+          () => region.navigationService.navigate(first, {
+            autoplay: first.autoplay === AUTOPLAY_MODES.INIT
+          })
+        );
+    }
+    _clickAutoplay(info) {
+      return info.autoplay === AUTOPLAY_MODES.INIT || info.autoplay === AUTOPLAY_MODES.CLICK;
+    }
+    // _click: only the autoplay line changes
+    _click(region, info) {
+      var _a, _b;
+      const ns = region.navigationService;
+      const autoplay = this._clickAutoplay(info);
+      if (((_a = ns.current) == null ? void 0 : _a.key) === info.key && ((_b = ns.current) == null ? void 0 : _b.url) === info.url)
+        return ns.isOpen ? ns.hide() : this._run(info, () => ns.show({ autoplay }));
+      this._run(info, () => ns.navigate(info, { autoplay }));
+    }
+    _changed(target, entry) {
+      var _a;
+      const links = ((_a = this._regions.get(target)) == null ? void 0 : _a.links) ?? [];
+      links.forEach(
+        (l) => l.link.classList.toggle(this._activeClass, !!entry && l.key === entry.key)
+      );
+      if (this._useStorage) {
+        entry ? this._store.set(`state:${target}`, {
+          key: entry.key,
+          url: entry.url,
+          index: entry.index
+        }) : this._store.remove(`state:${target}`);
+      }
+      this._onChange(target, entry);
+      this._emitNav(target);
+    }
+    _hidden(target) {
+      var _a;
+      (((_a = this._regions.get(target)) == null ? void 0 : _a.links) ?? []).forEach(
+        (l) => l.link.classList.remove(this._activeClass)
+      );
+      this._emitNav(target);
+    }
+    async _thumbnail(info) {
+      if (info.thumbnail) return info.thumbnail;
+      if (!this._thumbs.has(info.url)) {
+        this._thumbs.set(
+          info.url,
+          (async () => {
+            try {
+              const provider = this._registry.resolve(info.url);
+              return await provider.getThumbnail(provider.parse(info.url));
+            } catch {
+              return null;
+            }
+          })()
+        );
+      }
+      return this._thumbs.get(info.url);
+    }
+    async _run(info, fn) {
+      try {
+        await fn();
+      } catch (error) {
+        this._onError(error, info);
+      }
+    }
+  }
+  __publicField(LinkPlayer, "VERSION", "2.0.7");
+  return LinkPlayer;
+}));
 //# sourceMappingURL=link-player.js.map

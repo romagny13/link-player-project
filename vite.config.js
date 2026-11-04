@@ -1,32 +1,32 @@
 import { defineConfig } from "vite";
+import terser from "@rollup/plugin-terser";
 
 export default defineConfig({
   test: { globals: true, environment: "jsdom" },
   build: {
-    lib: {
-      entry: "src/umd.js",
-      name: "LinkPlayer",
-      formats: ["es"],
-      fileName: () => "link-player.es.js"
-    },
+    lib: { entry: "src/umd.js", name: "LinkPlayer" },
+    minify: false, // nothing is minified unless an output asks for it
+    sourcemap: true,
     rollupOptions: {
       output: [
         {
-          format: "umd",
-          entryFileNames: "link-player.js",
-          name: "LinkPlayer",
-          exports: "auto",
-          minifyInternalExports: false
+          format: "es",
+          entryFileNames: "link-player.es.js"
         },
         {
           format: "umd",
-          entryFileNames: "link-player.min.js",
           name: "LinkPlayer",
-          exports: "auto"
+          exports: "auto",
+          entryFileNames: "link-player.js" // readable
+        },
+        {
+          format: "umd",
+          name: "LinkPlayer",
+          exports: "auto",
+          entryFileNames: "link-player.min.js",
+          plugins: [terser()] // minified, only this one
         }
       ]
-    },
-    minify: "esbuild",
-    sourcemap: true
+    }
   }
 });

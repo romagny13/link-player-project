@@ -640,6 +640,18 @@ describe("YouTubeProvider", () => {
         expect.any(Function)
       );
     });
+
+    it("next and previous post nextVideo / previousVideo", () => {
+      const iframe = fakeIframe();
+      const c = yt.createController(iframe, {});
+      expect(c.next()).toBe(true);
+      expect(c.previous()).toBe(true);
+      const funcs = iframe.contentWindow.postMessage.mock.calls.map(
+        (x) => JSON.parse(x[0]).func
+      );
+      expect(funcs).toEqual(["nextVideo", "previousVideo"]);
+      c.dispose();
+    });
   });
 });
 
@@ -1165,6 +1177,49 @@ describe("NavigationService", () => {
       await nav.navigate(linkInfo("A"));
       expect(nav.goBack()).toBeNull();
       expect(nav.goForward()).toBeNull();
+    });
+  });
+
+  describe("nextItem / previousItem", () => {
+    it("moves through the list and stops at the edges", async () => {
+      const { nav, controller } = setup({ items: mkItems(3) });
+      await nav.navigate(linkInfo("a"), { index: 1 });
+      expect(nav.hasNextItem).toBe(true);
+      expect(nav.nextItem()).toBe(true);
+      expect(controller.playAt).toHaveBeenLastCalledWith(2, { autoplay: true });
+      expect(nav.nextItem()).toBe(false); // last item
+      expect(nav.previousItem()).toBe(true);
+      expect(nav.current.index).toBe(1);
+    });
+  
+    it("treats an unknown start index as the first item", async () => {
+      const { nav } = setup({ items: mkItems(3) });
+      await nav.navigate(linkInfo("a")); // index null
+      expect(nav.previousItem()).toBe(false);
+      expect(nav.nextItem()).toBe(true);
+      expect(nav.current.index).toBe(1);
+    });
+  
+    it("works even when the panel is disabled", async () => {
+      const { nav } = setup({ panel: false, items: mkItems(3) });
+      await nav.navigate(linkInfo("a"), { index: 0 });
+      expect(nav.nextItem()).toBe(true);
+    });
+  
+    it("delegates to the player when the size is unknown", async () => {
+      const { nav, controller } = setup({ items: [] });
+      controller.next = vi.fn(() => true);
+      await nav.navigate(linkInfo("a"));
+      expect(nav.nextItem()).toBe(true);
+      expect(controller.next).toHaveBeenCalled();
+    });
+  
+    it("returns false when nothing is shown or there is no playlist", async () => {
+      const { nav } = setup({ items: [] });
+      await nav.navigate(linkInfo("a"));
+      expect(nav.nextItem()).toBe(false); // no count, controller has no next()
+      nav.hide();
+      expect(nav.nextItem()).toBe(false);
     });
   });
 
