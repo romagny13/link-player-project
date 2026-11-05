@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500;1,600&display=swap');
+
+    #footage-article {
+      --fa-gap: 16px;
+      --fa-ink: #6b4f27;
+      --fa-gold: #f0b95a;
+      --fa-line: #f1eadb;
+      --fa-shadow: 0 8px 20px rgba(120, 100, 60, .14);
+      --fa-shadow-hover: 0 16px 32px rgba(120, 100, 60, .22);
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 26px 22px 22px;
+      border-radius: 32px;
+      border: 1px solid var(--fa-line);
+      background: linear-gradient(180deg, #ffffff 0%, #fffdf9 100%);
+      box-shadow: 0 14px 40px rgba(120, 100, 60, .10), inset 0 1px 0 #fff;
+      font-family: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+      color: var(--fa-ink);
+      box-sizing: border-box;
+    }
+
+    #footage-article *,
+    #footage-article *::before,
+    #footage-article *::after {
+      box-sizing: border-box;
+    }
+
+    /* ---------- Intro ---------- */
+    #footage-article .fa-intro {
+      max-width: 720px;
+      margin: 0 auto 22px;
+      text-align: center;
+    }
+
+    #footage-article .fa-eyebrow {
+      display: inline-block;
+      padding: 5px 16px;
+      margin-bottom: 12px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: #a97a2a;
+      background: #fffaf0;
+      border: 1px solid #f1e4c4;
+      border-radius: 999px;
+    }
+
+    #footage-article .fa-intro p {
+      margin: 0;
+      font-size: 1.4rem;
+      line-height: 1.5;
+      font-style: italic;
+      font-weight: 500;
+      color: var(--fa-ink);
+    }
+
+    /* ---------- Grille : cartes rectangulaires ---------- */
+    #footage-article .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--fa-gap);
+      margin-top: var(--fa-gap);
+      width: 100%;
+    }
+
+    #footage-article .grid-4 a {
+      position: relative;
+      display: block;
+      aspect-ratio: 16 / 9;
+      padding: 0;
+      border-radius: 18px;
+      overflow: hidden;
+      text-decoration: none;
+      background: #f6f2ea;
+      border: 3px solid #fff;
+      box-shadow: var(--fa-shadow);
+      transition: transform .45s cubic-bezier(.2, .8, .2, 1), box-shadow .45s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* mqdefault = 16:9 sans bandes noires : on remplit simplement la carte */
+    #footage-article .grid-4 a img {
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      object-fit: cover;
+      display: block;
+      filter: saturate(1.08) brightness(1.05) contrast(.97);
+      transition: transform .8s ease;
+    }
+
+    /* voile léger en bas pour la lisibilité du nom */
+    #footage-article .grid-4 a::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: linear-gradient(0deg, rgba(110, 75, 20, .45) 0%, rgba(240, 185, 90, .08) 38%, transparent 55%);
+    }
+
+    /* légende */
+    #footage-article .grid-4 a div {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 10px;
+      z-index: 2;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      font-size: 1.3rem;
+      font-style: italic;
+      font-weight: 600;
+      letter-spacing: .03em;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(90, 58, 12, .65);
+    }
+
+    #footage-article .grid-4 a div::after {
+      content: "";
+      display: block;
+      width: 24px;
+      height: 2px;
+      margin: 4px auto 0;
+      border-radius: 2px;
+      background: linear-gradient(90deg, transparent, #fff, transparent);
+      transition: width .4s ease;
+    }
+
+    /* bouton lecture (verre), visible au survol */
+    #footage-article .grid-4 a::after {
+      content: "";
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      z-index: 2;
+      width: 46px;
+      height: 46px;
+      margin: -23px 0 0 -23px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, .9);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      background:
+        rgba(255, 255, 255, .35) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' d='M9 6.5v11l9-5.5z'/%3E%3C/svg%3E") 55% 50% / 22px no-repeat;
+      opacity: 0;
+      transform: scale(.7);
+      transition: opacity .35s ease, transform .35s ease;
+    }
+
+    #footage-article .grid-4 a:hover,
+    #footage-article .grid-4 a:focus-visible {
+      transform: translateY(-5px);
+      box-shadow: var(--fa-shadow-hover);
+    }
+
+    #footage-article .grid-4 a:hover img,
+    #footage-article .grid-4 a:focus-visible img {
+      transform: scale(1.08);
+    }
+
+    #footage-article .grid-4 a:hover::after,
+    #footage-article .grid-4 a:focus-visible::after {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    #footage-article .grid-4 a:hover div::after,
+    #footage-article .grid-4 a:focus-visible div::after {
+      width: 48px;
+    }
+
+    #footage-article .grid-4 a:focus-visible {
+      outline: 3px solid rgba(240, 185, 90, .8);
+      outline-offset: 3px;
+    }
+
+    /* ---------- Élément actif ---------- */
+    #footage-article .grid-4 a.is-active {
+      transform: translateY(-5px);
+      border-color: #fff;
+      box-shadow:
+        0 0 0 3px rgba(240, 185, 90, .9),
+        0 0 22px 2px rgba(255, 215, 130, .45),
+        0 16px 32px rgba(120, 100, 60, .2);
+    }
+
+    #footage-article .grid-4 a.is-active::after {
+      opacity: 0;
+    }
+
+    /* pas de bouton lecture sur la vidéo en cours */
+    #footage-article .grid-4 a.is-active div::after {
+      width: 48px;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--fa-gold), transparent);
+    }
+
+    /* ---------- Pied : vague + cœur ---------- */
+    #footage-article .fx-foot {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid var(--fa-line);
+      color: var(--fa-gold);
+    }
+
+    #footage-article .fx-wave,
+    #footage-article .fx-heart {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    /* sécurité : aucun pseudo-élément hérité du thème ou d'une police d'icônes */
+    #footage-article .fx-wave::before,
+    #footage-article .fx-wave::after,
+    #footage-article .fx-heart::before,
+    #footage-article .fx-heart::after {
+      content: none !important;
+    }
+
+    #footage-article .fx-wave svg {
+      width: 30px;
+      height: 22px;
+      opacity: .9;
+      animation: fa-drift 4s ease-in-out infinite;
+    }
+
+    #footage-article .fx-heart svg {
+      width: 20px;
+      height: 20px;
+      transition: fill .35s ease, transform .35s ease;
+    }
+
+    /* ---------- Oiseau ---------- */
+    #footage-article .fx-bird {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    #footage-article .fx-bird::before,
+    #footage-article .fx-bird::after {
+      content: none !important;
+    }
+
+    #footage-article .fx-bird svg {
+      width: 30px;
+      height: 25px;
+      opacity: .9;
+      overflow: visible;
+      transform-origin: 50% 90%;
+      transition: opacity .3s ease;
+    }
+
+    /* ---------- Navigation destinations ---------- */
+    #footage-article .fa-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: var(--fa-gap);
+    }
+
+    #footage-article .fa-nav-label {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      font-size: 1.25rem;
+      font-style: italic;
+      font-weight: 600;
+      color: var(--fa-ink);
+    }
+
+    #footage-article .fa-nav-btn {
+      flex: 0 0 auto;
+      padding: 9px 18px;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #a97a2a;
+      background: #fffaf0;
+      border: 1px solid #f1e4c4;
+      border-radius: 999px;
+      cursor: pointer;
+      box-shadow: var(--fa-shadow);
+      transition: transform .3s cubic-bezier(.2, .8, .2, 1), box-shadow .3s ease, border-color .3s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #footage-article .fa-nav-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      border-color: var(--fa-gold);
+      box-shadow: var(--fa-shadow-hover);
+    }
+
+    #footage-article .fa-nav-btn:focus-visible {
+      outline: 3px solid rgba(240, 185, 90, .8);
+      outline-offset: 3px;
+    }
+
+    #footage-article .fa-nav-btn:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    /* The target needs a size; the panel and its toggle are positioned inside it */
+    .video-container {
+      position: relative;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08),
+        0 4px 12px rgba(0, 0, 0, 0.04);
+      transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
+        box-shadow 0.4s ease-out;
+    }
+
+    .video-container:empty {
+      display: none;
+    }
+
+    .video-container::before {
+      content: "";
+      display: block;
+      padding-top: 56.25%;
+      /* 16:9 Aspect Ratio */
+    }
+
+    .video-container iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 12px;
+    }
+
+    .video-container:hover {
+      transform: scale(1.02) translateY(-5px);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1),
+        0 5px 15px rgba(0, 0, 0, 0.06);
+    }
+
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 800px) {
+      #footage-article {
+        padding: 18px 12px 12px;
+        border-radius: 24px;
+      }
+
+      #footage-article .fa-intro p {
+        font-size: 1.2rem;
+      }
+
+      #footage-article .video-container {
+        border-width: 4px;
+        border-radius: 18px;
+      }
+
+      #footage-article .grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      #footage-article .grid-4 a div {
+        font-size: 1.15rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #footage-article * {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="footage-article">
+
+    <div id="scope-1">
+      <div id="scope-1-gp-1" class="video-container"></div>
+      <div class="grid-4">
+        <a href="https://www.youtube.com/watch?v=YCfcg9gzCYc" data-show-on-init="true" data-target="scope-1-gp-1"
+          data-autoplay="click" data-link>
+          <img src="https://img.youtube.com/vi/YCfcg9gzCYc/mqdefault.jpg" alt="Bahamas" loading="lazy" />
+          <div>Bahamas</div>
+        </a>
+        <a href="https://www.youtube.com/watch?v=69iUWLA0oVc" data-target="scope-1-gp-1" data-autoplay="click"
+          data-link>
+          <img src="https://img.youtube.com/vi/69iUWLA0oVc/mqdefault.jpg" alt="Maldives" loading="lazy" />
+          <div>Maldives</div>
+        </a>
+        <a href="https://www.youtube.com/watch?v=5drmgVauSMg" data-target="scope-1-gp-1" data-autoplay="click"
+          data-link>
+          <img src="https://img.youtube.com/vi/5drmgVauSMg/mqdefault.jpg" alt="Tahiti" loading="lazy" />
+          <div>Tahiti</div>
+        </a>
+
+        <a href="https://www.youtube.com/watch?v=k8m0SaGQ_1c" data-target="scope-1-gp-1" data-autoplay="click"
+          data-link>
+          <img src="https://img.youtube.com/vi/k8m0SaGQ_1c/mqdefault.jpg" alt="Vietnam" loading="lazy" />
+          <div>Vietnam</div>
+        </a>
+      </div>
+    </div>
+
+    <div id="scope-2">
+      <div id="t-scope-2" class="video-container"></div>
+      <div class="grid-4" id="scope-2-btns"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { LinkPlayer } from "../src/index.js";
+
+    window.__YTP_API_KEY__ = "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M";
+
+    // Global : tout ce qu'aucune instance scopée ne possède (scope-1)
+    new LinkPlayer({ id: "global", youtubeApiKey: window.__YTP_API_KEY__ });
+
+    const scope2 = new LinkPlayer({
+      scope: "scope-2",
+      itemRenderer: ({ item }) => {
+        const img = new Image();
+        img.src = item.image || item.thumbnail;
+        img.alt = "";
+        img.loading = "lazy";
+        img.style.cssText = "width:80px;height:45px;object-fit:cover;border-radius:3px";
+        const info = document.createElement("div");
+        info.className = "lp-info";
+        const title = document.createElement("div");
+        title.className = "lp-title";
+        title.textContent = item.title;
+        info.append(title);
+        return [img, info];
+      }
+    });
+
+
+    const region = scope2.getRegion("t-scope-2");
+
+    // 4 entrées = 4 "data-link" (miniature dérivée de l'id)
+    region
+      .createSet("youtube", { autoplay: "click" })
+      .addVideo("YCfcg9gzCYc", { title: "Bahamas", showOnInit: true });
+
+    region
+      .createSet("youtube", { autoplay: "click" })
+      .addVideo("69iUWLA0oVc", { title: "Maldives" });
+
+    region
+      .createSet("youtube", { autoplay: "click" })
+      .addVideo("5drmgVauSMg", { title: "Tahiti" });
+
+    region
+      .createSet("youtube", { autoplay: "click" })
+      .addVideo("k8m0SaGQ_1c", { title: "Vietnam" });
+
+
+    // Un seul nav, renderer idempotent : on construit une fois, ensuite on ne fait que basculer la classe
+    region.attachNav("scope-2-btns", ({ container, entries, isActive, go }) => {
+      if (container.dataset.lpCount !== String(entries.length)) {
+        container.dataset.lpCount = String(entries.length);
+        container.replaceChildren(...entries.map((e) => {
+          const a = document.createElement("a");
+          a.href = e.url ?? "#";
+          a.dataset.key = e.key;
+          if (e.thumbnail) {
+            const img = new Image();
+            img.src = e.thumbnail;
+            img.alt = e.title;
+            img.loading = "lazy";
+            a.append(img);
+          }
+          const label = document.createElement("div");
+          label.textContent = e.title;
+          a.append(label);
+          a.onclick = (ev) => { ev.preventDefault(); go(e); };
+          return a;
+        }));
+      }
+      container.querySelectorAll("a").forEach((a) =>
+        a.classList.toggle("is-active", isActive(a.dataset.key))
+      );
+    });
+  </script>
+</body>
+
+</html>

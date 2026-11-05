@@ -718,7 +718,7 @@
 
     <script type="module">
       // Serve this folder over http (ES modules do not load from file://), e.g.:  npx serve .
-      import { LinkPlayer } from "../src/linkPlayer.js";
+      import { LinkPlayer } from "../src/index.js";
 
       const journalEl = document.querySelector("#journal");
       const errorsEl = document.querySelector("#errors");
@@ -739,7 +739,7 @@
               .map(([target, e]) => `${target}: ${e.key} #${e.index ?? 0}`)
               .join("\n")
           : "—";
-        const journal = player?.getRegion("t-mix").navigationService.journal;
+        const journal = player?.getRegion("t-mix").navigation.journal;
         backBtn.disabled = !journal?.canGoBack;
         forwardBtn.disabled = !journal?.canGoForward;
       }
@@ -767,11 +767,11 @@
       window.__player = player;
       renderState();
 
-      const navigationService = () =>
-        player.getRegion("t-mix").navigationService;
-      backBtn.addEventListener("click", () => navigationService().goBack());
+      const navigation = () =>
+        player.getRegion("t-mix").navigation;
+      backBtn.addEventListener("click", () => navigation().back());
       forwardBtn.addEventListener("click", () =>
-        navigationService().goForward()
+        navigation().forward()
       );
 
       document.querySelector("#reset").addEventListener("click", () => {
@@ -839,8 +839,6 @@
         const act = btn.dataset.act;
         const opts = { wrap: navWrapEl.checked };
         const calls = {
-          prevItem: () => player.previousItem(target),
-          nextItem: () => player.nextItem(target),
           prevLink: () => player.previousLink(target, opts),
           nextLink: () => player.nextLink(target, opts)
         };

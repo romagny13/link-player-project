@@ -1,0 +1,29 @@
+
+region
+- ajout videos + meta
+- detection links
+
+navigation par url (link)
+par index
+back forward 
+next link previous link ...
+next item previous item
+
+ajout videos manuel & metas
+par playlist (youtube par ex)
+
+region
+links
+target
+navigation service
+videos
+
+provider 
+
+global
+
+
+  // youtube
+  // video simple:    https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1&origin=https%3A%2F%2Fexample.com&autoplay=1&start=42
+  // playlist id      https://www.youtube.com/embed/_?enablejsapi=1&list=PLrEnWoR732-HnnhIoUQj-i_fXp5xQv1S9
+  // video ids        https://www.youtube.com/embed/videoseries?enablejsapi=1&playlist=video123%2Cvideo456%2Cvideo789&index=1
