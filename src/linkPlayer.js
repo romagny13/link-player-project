@@ -1,308 +1,384 @@
-import { isTouch, resolveScope, AUTOPLAY_MODES } from "./util.js";
-import { MemoryStore, defaultStore } from "./storage.js";
-import { ProviderRegistry } from "./providers/registry.js";
-import { YouTubeProvider } from "./providers/youtube.js";
-import { DailymotionProvider } from "./providers/dailymotion.js";
-import { OkruProvider } from "./providers/okru.js";
-import { Region } from "./region.js";
-import { defaultItemRenderer, defaultNavRenderer, defaultPanelRenderer } from "./renderers.js";
-import { readLinks } from "./linkScanner.js";
-import { Tooltip } from "./tooltip.js";
+import {YouTubeProvider} from "./providers/youtube/YouTubeProvider.js";
+import {OkruProvider} from "./providers/okru/OkruProvider.js";
+import {ProviderRegistry} from "./providers/ProviderRegistry.js";
+import {YouTubeDataApi} from "./providers/youtube/YouTubeDataApi.js";
+import {YouTubeMetaResolver} from "./providers/youtube/YouTubeMetaResolver.js";
+import {resolveScope} from "./utils/dom.js";
+import {defaultStore, MemoryStore} from "./storage.js";
+import {AUTOPLAY_MODES, isTouch} from "./utils/helpers.js";
+import {Emitter} from "./utils/Emitter.js";
+import {Tooltip} from "./ui/Tooltip.js";
+import {ThumbnailService} from "./ThumbnailService.js";
+import {Region} from "./Region.js";
+import {applyDefinition, applyItems, resolveDefinition} from "./MetaMerge.js";
 
-/* ───── instance registry, shared even if the plugin is bundled twice ───── */
-const REG = (globalThis[Symbol.for("linkplayer.v3")] ??= { live: new Set(), seq: 0 });
-const depthOf = (n) => {
-    let d = 0;
-    for (; n; n = n.parentElement) d++;
-    return d;
+const noop = () => {
 };
 
+let nextId = 0;
+
 /**
- * The single instance that handles `node`: the one with the deepest scope; the global one comes last.
- * Equal depth: the oldest. Independent of the order in which instances were created.
+ * Who handles which element. A WeakMap, not an attribute: cloneNode() copies attributes but not listeners,
+ * so an attribute would make a cloned link look handled when it is not. data-lp stays as a debugging aid only.
  */
-function ownerOf(node) {
-    if (node.closest?.("[data-lp-ignore]")) return null;
-    let best = null;
-    let bestDepth = -2;
-    for (const p of REG.live) {
-        if (!p._contains(node)) continue;
-        const d = p.isGlobal ? -1 : depthOf(p.scopeEl);
-        if (d > bestDepth || (d === bestDepth && p._seq < best._seq)) {
-            best = p;
-            bestDepth = d;
-        }
-    }
-    return best;
-}
+const owners = new WeakMap();
 
-const noop = () => { };
-
+/**
+ * Events (lp.on(type, handler); handler gets { type, region, ... }):
+ *   "change"  navigation state of a region changed (see Region)
+ *   "state"   player state: playing | paused | ended
+ *   "error"   anything that failed (a link, a load, a player, metadata); the scan goes on
+ *   onChange / onState / onError are shortcuts for the three of them.
+ *
+ * Metadata, in order: declared on the link (data-*) > `definitions` (code) > YouTube Data API (cached) > "Video 1"...
+ *   definitions: { [info.key]: { title, channel, thumbnail } | { videos: [{ id?, title, ... }] } } or (info) => ...
+ *   A link may then be only a navigation link (href + data-target).
+ *
+ * Existing iframes: <iframe data-link data-target="id" src="https://www.youtube.com/embed/..."> inside the target.
+ */
 export class LinkPlayer {
-    static VERSION = "3.0.0";
-    static get(id) {
-        return [...REG.live].find((p) => p.id === id) ?? null;
-    }
-    static get instances() {
-        return [...REG.live];
-    }
+    #id;
+    #scopeEl;
+    #isGlobal;
+    #useStorage;
+    #scanEmbeds;
+    #regions = new Map();
+    #names = new Map(); // your own keys -> { region, info, data }
+    #byInfo = new WeakMap(); // info -> { name, data }: events carry them
+    #initialized = new WeakSet();
+    #store;
+    #registry;
+    #tooltip;
+    #thumbnails;
+    #definitions;
+    #youtubeMeta;
+    #panelOptions;
+    #events = new Emitter();
+    #detachers = new Set();
 
-    /**
-     * @param o.id             unique name (default "lp-N")
-     * @param o.scope          element, id or selector. Omitted: global (everything no scoped instance owns)
-     * @param o.panelRenderer  override the playlist panel (see renderers.js)
-     * @param o.navRenderer    default renderer of region.attachNav()
-     * @param o.scanEmbeds     adopt existing playlist iframes
-     * @param o.onChange       (target, entry|null)
-     * @param o.onState        (target, state) after every navigation, hide, show, close
-     * @param o.onError        (error, entryOrInfo?)
-     */
     constructor({
-        id = null,
-        scope = null,
-        registry = null,
-        store = null,
-        useStorage = true,
-        panel = true,
-        panelRenderer = defaultPanelRenderer,
-        itemRenderer = defaultItemRenderer,
-        navRenderer = defaultNavRenderer,
-        resizable = true,
-        tooltip = true,
-        scanEmbeds = true,
-        activeClass = "is-active",
-        youtubeApiKey = null,
-        okruEmbedBaseUrl,
-        dailymotionPlayerId = null,
-        onChange = noop,
-        onState = noop,
-        onError = (e) => console.warn("[LinkPlayer]", e)
-    } = {}) {
-        this.scopeEl = resolveScope(scope); // throws when a given scope does not exist
-        this.isGlobal = this.scopeEl === null;
-        this._seq = ++REG.seq;
-        this.id = id ?? `lp-${this._seq}`;
-        if (LinkPlayer.get(this.id)) throw new Error(`LinkPlayer id already in use: "${this.id}"`);
+                    scope = null,
+                    autoScan = true,
+                    useStorage = true,
+                    tooltip = true,
+                    scanEmbeds = true,
+                    youtubeApiKey = null,
+                    youtubeMeta = null,
+                    definitions = null,
+                    fallbackTitle = undefined,
+                    okruEmbedBaseUrl = null,
+                    store = null,
+                    registry = null,
+                    panelRenderer = null,
+                    itemRenderer = null,
+                    headerRenderer = null,
+                    toggleRenderer = null,
+                    groupRenderer = null,
+                    thumbnails = null,
+                    onChange = noop,
+                    onState = noop,
+                    onError = (e) => console.warn("[LinkPlayer]", e.error ?? e)
+                } = {}) {
+        this.#scopeEl = resolveScope(scope); // throws when a given scope does not exist
+        this.#isGlobal = this.#scopeEl === null;
+        this.#id = `lp-${++nextId}`; // unique: two players may share a selector, or have an element as scope
 
-        this._store = store ?? (useStorage ? defaultStore() : new MemoryStore());
-        this.registry =
-            registry ??
+        // A scope is a boundary: its links belong to ITS player, the global one skips them (innermost scope wins).
+        // Declare it in the HTML too (<div data-lp-scope>) when a global player may be created first.
+        if (this.#scopeEl) {
+            const taken = this.#scopeEl.dataset.lpScope;
+            if (taken && taken !== this.#id) throw new Error("This scope already has a LinkPlayer");
+            this.#scopeEl.dataset.lpScope = this.#id;
+        }
+
+        this.#useStorage = useStorage;
+        this.#scanEmbeds = scanEmbeds;
+        this.#definitions = definitions;
+
+        this.#store = store ?? (useStorage ? defaultStore() : new MemoryStore());
+        this.#registry = registry ??
             new ProviderRegistry([
-                new YouTubeProvider({ apiKey: youtubeApiKey, store: this._store }),
-                new DailymotionProvider({ playerId: dailymotionPlayerId }),
-                new OkruProvider({ embedBaseUrl: okruEmbedBaseUrl })
+                new YouTubeProvider(),
+                new OkruProvider({embedBaseUrl: okruEmbedBaseUrl})
             ]);
-        Object.assign(this, {
-            _useStorage: useStorage, _panel: panel, _panelRenderer: panelRenderer, _itemRenderer: itemRenderer, _navRenderer: navRenderer,
-            _resizable: resizable, _scanEmbeds: scanEmbeds, _activeClass: activeClass,
-            _onChange: onChange, _onState: onState, _onError: onError
+        this.#thumbnails = thumbnails ?? new ThumbnailService();
+        this.#tooltip = tooltip && !isTouch() ? new Tooltip() : null;
+        this.#youtubeMeta = youtubeMeta ?? new YouTubeMetaResolver({
+            api: youtubeApiKey ? new YouTubeDataApi({apiKey: youtubeApiKey}) : null,
+            cache: this.#store,
+            fallbackTitle
         });
-        this._tooltip = tooltip && !isTouch() ? new Tooltip() : null;
-        this._regions = new Map();
-        this._bound = new Map(); // element → { region, entry, off }
-        this._failed = new WeakSet(); // links reported once, not retried at every scan
-        this._queued = new WeakSet();
-        this._embedCount = 0;
-        this._destroyed = false;
+        this.#panelOptions = {panelRenderer, itemRenderer, headerRenderer, toggleRenderer, groupRenderer};
 
-        REG.live.add(this);
-        for (const p of REG.live) if (p !== this) p._reconcile(); // a narrower scope takes its elements from broader ones
-        this.scan();
+        this.on("change", onChange);
+        this.on("state", onState);
+        this.on("error", onError);
+
+        if (autoScan) this.scan();
     }
 
-    _contains(node) {
-        return this.isGlobal || this.scopeEl.contains(node);
+    get id() {
+        return this.#id;
     }
 
-    /* ───── regions ───── */
+    get isGlobal() {
+        return this.#isGlobal;
+    }
 
-    getRegion(target, container = document.getElementById(target)) {
-        let region = this._regions.get(target);
-        if (region) return region;
-        if (!container) throw new Error(`Target not found: "${target}"`);
-        region = new Region({
-            target, container, registry: this.registry, store: this._store, panel: this._panel,
-            panelRenderer: this._panelRenderer, itemRenderer: this._itemRenderer, navRenderer: this._navRenderer, resizable: this._resizable
-        });
-        region.on("change", ({ entry, itemIndex }) => this._persist(region, entry, itemIndex));
-        region.on("state", (s) => this._syncActive(region, s));
-        region.on("entries", () => this._scheduleInit(region));
-        region.on("error", ({ error, entry }) => this._onError(error, entry));
-        this._regions.set(target, region);
-        return region;
+    get useStorage() {
+        return this.#useStorage;
     }
 
     get regions() {
-        return [...this._regions.values()];
+        return Object.freeze([...this.#regions.values()]);
     }
 
-    /* shortcuts, same as region.navigation.nextLink() / previousLink() */
-    nextLink(target, opts) {
-        return this._regions.get(target)?.navigation.nextLink(opts) ?? false;
-    }
-    previousLink(target, opts) {
-        return this._regions.get(target)?.navigation.previousLink(opts) ?? false;
+    on(type, handler) {
+        return this.#events.on(type, handler);
     }
 
-    /* ───── scan ───── */
+    off(type, handler) {
+        this.#events.off(type, handler);
+    }
 
+    getRegion(target) {
+        let region = this.#regions.get(target);
+        if (region) return region;
+
+        region = new Region({
+            target,
+            registry: this.#registry,
+            resolveMeta: (info) => this.#enrich(info),
+            thumbnails: this.#thumbnails,
+            ...this.#panelOptions
+        });
+        region.on("*", (event) => this.#onRegionEvent(event));
+        this.#regions.set(target, region);
+        return region;
+    }
+
+    /** Can be called again after the page changed: links and iframes already handled are skipped. */
     scan() {
-        if (this._destroyed) return;
-        const root = this.scopeEl ?? document;
-        let infos = [];
-        try {
-            infos = readLinks(root);
-        } catch (error) {
-            return this._onError(error);
-        }
-        for (const info of infos)
-            if (!this._bound.has(info.link) && !this._failed.has(info.link) && ownerOf(info.link) === this) this._bindLink(info);
-        if (this._scanEmbeds) {
+        let taken = 0;
+        for (const element of this.getLinks()) {
+            const owner = owners.get(element);
+            if (owner === this) continue; // already handled by this player
+            if (owner) {
+                taken++;
+                continue;
+            }
             try {
-                this._adoptEmbeds(root);
+                this.#register(element);
             } catch (error) {
-                this._onError(error);
+                this.#events.emit("error", {error, element}); // one bad link must not stop the others
             }
         }
-        this._regions.forEach((r) => this._init(r));
+        if (taken) {
+            this.#events.emit("error", {
+                error: new Error(`${taken} element(s) already handled by another LinkPlayer: create the scoped player first, `
+                    + `or declare the scope in the HTML (data-lp-scope)`)
+            });
+        }
+
+        for (const region of this.#regions.values()) {
+            if (this.#initialized.has(region)) continue; // init once: a second scan must not toggle the region
+            this.#initialized.add(region);
+            this.#init(region);
+        }
     }
 
-    /** An unsupported link is reported once and left alone: a click follows its href. */
-    _bindLink({ link, url, target, meta }) {
-        let region, entry;
-        try {
-            if (!target) throw new Error(`data-target is required (${url})`);
-            const provider = this.registry.resolve(url);
-            region = this.getRegion(target);
-            entry = region.detectedSet(provider)._add(url, meta, "link", { link });
-        } catch (error) {
-            this._failed.add(link);
-            return this._onError(error, { url, link });
+    /** The links this player is responsible for: those whose innermost scope boundary is its own (none for the global one). */
+    getLinks() {
+        return [...this.getRoot().querySelectorAll("[data-link]")]
+            .filter((element) => element.closest("[data-lp-scope]") === this.#scopeEl);
+    }
+
+    getRoot() {
+        return this.#scopeEl ?? document;
+    }
+
+    getSavedState(region) {
+        return this.#useStorage ? this.#store.get(`state:${region.target}`) : null;
+    }
+
+    // ───────── code-only use (no link at all) ─────────
+
+    /**
+     * Defines an info in code, then navigates to it by name: lp.define("intro", {...}); lp.navigate("intro").
+     * `url` gives the provider and the ids (video, list of videos, playlist); the rest is metadata.
+     * @param {string} name Your own key.
+     * @param {object} definition
+     * @param {string} definition.url
+     * @param {string} definition.target Id of the container.
+     * @param {string|boolean} [definition.autoplay]
+     * @param {number} [definition.start]
+     * @param {string} [definition.title] Single video only.
+     * @param {string} [definition.channel]
+     * @param {string} [definition.thumbnail]
+     * @param {Array<{id?: string, title?: string, channel?: string, thumbnail?: string}>} [definition.videos]
+     *   List / playlist: positional for a list of videos; `id` is optional for a playlist (placeholder id).
+     * @param {number} [definition.count] Playlist: number of items, without ids or titles.
+     * @param {*} [definition.data] Anything you want to find again: it comes back as `event.data` on every
+     *   "change" / "state" of this info (description, links, a view model...).
+     * @returns the info.
+     */
+    define(name, {url, target, autoplay, start, title, channel, thumbnail, videos, count, data = null} = {}) {
+        if (!name) throw new Error("define(): a name is required");
+        if (this.#names.has(name)) throw new Error(`Name '${name}' is already used`);
+        if (!url || !target) throw new Error("define(): url and target are required");
+
+        const provider = this.#registry.resolve(url);
+        const region = this.getRegion(target);
+        const parsed = provider.getInfo({tagName: "A", href: url, dataset: {target, autoplay, start}}); // the parsers only read these
+        const info = region.add(parsed) ? parsed : region.get(parsed.key);
+        this.#setName(name, region, info, data);
+        if (info === parsed) this.#applyDefinition(info, name, {title, channel, thumbnail, videos, count});
+        return info;
+    }
+
+    /** Navigates to an info by the name given with data-key or define(). */
+    navigate(name, options) {
+        const entry = this.#names.get(name);
+        if (!entry) throw new Error(`Unknown name '${name}'`);
+        entry.region.navigate(entry.info, options);
+    }
+
+    /** The info known under this name, or null. */
+    get(name) {
+        return this.#names.get(name)?.info ?? null;
+    }
+
+    dispose() {
+        this.#names.clear();
+        if (this.#scopeEl?.dataset.lpScope === this.#id) delete this.#scopeEl.dataset.lpScope;
+        for (const detach of this.#detachers) detach();
+        this.#detachers.clear();
+        this.#regions.forEach((region) => region.dispose());
+        this.#regions.clear();
+        this.#tooltip?.dispose();
+        this.#events.clear();
+    }
+
+    // ───────── internals ─────────
+
+    #register(element) {
+        const isIframe = element.tagName === "IFRAME";
+        if (isIframe && !this.#scanEmbeds) return;
+
+        const target = element.dataset.target || (isIframe ? element.parentElement?.id : null);
+        if (!target) throw new Error("Target required");
+
+        const url = isIframe ? element.src : element.tagName === "A" ? element.href : element.dataset.url;
+        if (!url) throw new Error("No URL provided");
+
+        const provider = this.#registry.resolve(url);
+        const region = this.getRegion(target);
+
+        const parsed = provider.getInfo(element);
+        const info = region.add(parsed) ? parsed : region.get(parsed.key); // same link twice: keep the first object
+        const name = element.dataset.key || null; // your own key: lp.navigate(name), definitions[name]
+        if (name) this.#setName(name, region, info);
+        if (info === parsed) this.#applyDefinition(info, name);
+
+        owners.set(element, this);
+        element.dataset.lp = this.#id; // debugging aid: the source of truth is `owners`
+        const release = () => {
+            owners.delete(element);
+            delete element.dataset.lp;
+        };
+
+        if (isIframe) {
+            region.adopt(element, info);
+            this.#detachers.add(release);
+            return;
         }
+
         const onClick = (e) => {
             e.preventDefault();
-            region.navigation.toggle(entry);
+            region.navigate(info, {
+                autoplay: info.autoplay === AUTOPLAY_MODES.INIT || info.autoplay === AUTOPLAY_MODES.CLICK,
+                index: info.index
+            });
         };
-        link.addEventListener("click", onClick);
-        const detachTip = this._tooltip?.attach(link, () => entry.resolveThumbnail(), entry.title, {
-            id: entry.provider.id,
-            name: entry.provider.name
-        });
-        this._bound.set(link, {
-            region,
-            entry,
-            off: () => {
-                link.removeEventListener("click", onClick);
-                detachTip?.();
-                link.classList.remove(this._activeClass);
-            }
+        element.addEventListener("click", onClick);
+
+        const detachTip = this.#attachTooltip(element, info, provider);
+        this.#detachers.add(() => {
+            element.removeEventListener("click", onClick);
+            detachTip();
+            release();
         });
     }
 
-    /** Host of an existing iframe: its own parent when it holds only the iframe (.video-container...), else a wrapper. */
-    _hostFor(iframe) {
-        const p = iframe.parentElement;
-        if (p && p !== this.scopeEl && p !== document.body && p.children.length === 1 && !p.textContent.trim()) return p;
-        const w = +iframe.getAttribute("width") || 0;
-        const h = +iframe.getAttribute("height") || 0;
-        const wrap = document.createElement("div");
-        wrap.style.cssText = `width:100%;${w ? `max-width:${w}px;` : ""}aspect-ratio:${w && h ? `${w}/${h}` : "16/9"}`;
-        iframe.replaceWith(wrap);
-        wrap.append(iframe);
-        iframe.classList.add("lp-frame");
-        return wrap;
+    #setName(name, region, info, data = null) {
+        const known = this.#names.get(name);
+        if (known && known.info !== info) throw new Error(`Name '${name}' is already used`);
+        this.#names.set(name, {region, info, data});
+        this.#byInfo.set(info, {name, data});
     }
 
-    _adoptEmbeds(root) {
-        root.querySelectorAll("iframe").forEach((iframe) => {
-            if (this._bound.has(iframe) || iframe.closest(".lp-host") || iframe.dataset.panel === "false") return;
-            if (ownerOf(iframe) !== this) return;
-            let url, provider, parsed;
-            try {
-                url = new URL(iframe.getAttribute("src") ?? "", location.href).href;
-                provider = this.registry.resolve(url);
-                parsed = provider.parse(url);
-            } catch {
-                return; // not an embed we know
-            }
-            if (!provider.panel || !parsed.isCollection) return; // nothing to add to a single video
-            try {
-                const target = `embed-${this.id}-${++this._embedCount}`;
-                const region = this.getRegion(target, this._hostFor(iframe));
-                region.persist = false;
-                region.view.adoptIframe(iframe);
-                const entry = region.detectedSet(provider)._add(url, { key: target }, "embed");
-                this._bound.set(iframe, { region, entry, off: () => { } });
-                region.navigation.go(entry, { autoplay: false });
-            } catch (error) {
-                this._onError(error);
-            }
-        });
-    }
-
-    /* ───── init, persistence, active class ───── */
-
-    _scheduleInit(region) {
-        if (this._queued.has(region)) return;
-        this._queued.add(region);
-        queueMicrotask(() => {
-            this._queued.delete(region);
-            if (!this._destroyed) this._init(region);
-        });
-    }
-
-    /** Restore the saved entry/item (paused: browsers block autoplay on load), otherwise showOnInit. */
-    _init(region) {
-        const nav = region.navigation;
-        if (nav.hasNavigated || !region.entries.length) return;
-        const saved = this._useStorage && region.persist ? this._store.get(`state:${region.target}`) : null;
-        const restored = saved && (region.find(saved.key) ?? region.find(saved.url));
-        if (restored) return void nav.go(restored, { itemIndex: saved.index, autoplay: false });
-        const first = region.entries.find((e) => e.showOnInit);
-        if (first) nav.go(first, { reason: "init" });
-    }
-
-    _persist(region, entry, itemIndex) {
-        if (this._useStorage && region.persist) {
-            const k = `state:${region.target}`;
-            entry ? this._store.set(k, { key: entry.key, url: entry.url, index: itemIndex }) : this._store.remove(k);
-        }
-        this._onChange(region.target, entry);
-    }
-
-    _syncActive(region, state) {
-        for (const e of region.entries) e.link?.classList.toggle(this._activeClass, state.isOpen && e === state.entry);
-        this._onState(region.target, state);
-    }
-
-    /* ───── ownership ───── */
-
-    /** Releases elements that a narrower scope now owns. */
-    _reconcile() {
-        for (const node of [...this._bound.keys()]) if (ownerOf(node) !== this) this._unbind(node);
-    }
-
-    _unbind(node) {
-        const rec = this._bound.get(node);
-        if (!rec) return;
-        this._bound.delete(node);
-        rec.off();
-        rec.region._remove(rec.entry);
-        if (!rec.region.entries.length) {
-            this._regions.delete(rec.region.target);
-            rec.region.dispose();
+    /** `inline` (from define()) first, then the `definitions` option; what is already filled is never overwritten. */
+    #applyDefinition(info, name = null, inline = null) {
+        try {
+            applyDefinition(info, inline);
+            applyDefinition(info, resolveDefinition(this.#definitions, info, name));
+        } catch (error) {
+            this.#events.emit("error", {error, info});
         }
     }
 
-    /** Releases every link, listener and player. The saved state is kept. Idempotent. */
-    destroy() {
-        if (this._destroyed) return;
-        this._destroyed = true;
-        REG.live.delete(this);
-        for (const node of [...this._bound.keys()]) this._unbind(node);
-        this._regions.forEach((r) => r.dispose());
-        this._regions.clear();
-        this._tooltip?.dispose();
-        for (const p of REG.live) p.scan(); // elements this instance owned can be taken by another
+    /** Completes the items of a playlist; called by the region the first time the playlist is shown. */
+    async #enrich(info) {
+        const items = await this.#youtubeMeta.resolve(info);
+        if (!items?.length) return false;
+        applyItems(info, items);
+        return true;
+    }
+
+    /** Forwards the region event, plus the `name` and `data` given to define() for event.info (null when there are none). */
+    #onRegionEvent(event) {
+        const entry = event.info ? this.#byInfo.get(event.info) : null;
+        this.#events.emit(event.type, {...event, name: entry?.name ?? null, data: entry?.data ?? null});
+        if (event.type === "change") this.#save(event);
+    }
+
+    /** The state is saved at every navigation change, not only when the page closes. */
+    #save({region, info, index}) {
+        if (!this.#useStorage || !info) return;
+        this.#store.set(`state:${region.target}`, {key: info.key, index});
+    }
+
+    #init(region) {
+        if (region.current) return; // adopted iframe: already showing something
+
+        const saved = this.getSavedState(region);
+        const restored = saved && region.get(saved.key);
+        if (restored) return region.navigate(restored, {index: saved.index ?? 0});
+
+        const first = region.infos.find((info) => info.showOnInit);
+        if (first) {
+            region.navigate(first, {
+                autoplay: first.autoplay === AUTOPLAY_MODES.INIT,
+                index: first.index
+            });
+        }
+    }
+
+    // ───────── tooltip ─────────
+
+    /** Values are read when the tooltip opens, so what the API or the definitions filled in later is used. */
+    #tooltipData(info) {
+        const first = info.isPlaylist ? info.videos[0] : info;
+        return {title: first?.title ?? "", thumbnail: first?.thumbnail || null};
+    }
+
+    #attachTooltip(element, info, provider) {
+        if (!this.#tooltip) return noop;
+        return this.#tooltip.attach(
+            element,
+            () => this.#thumbnails.resolve(this.#tooltipData(info).thumbnail), // no argument: the tooltip calls it bare
+            () => this.#tooltipData(info).title,
+            {id: provider.id, name: provider.name ?? provider.id}
+        );
     }
 }

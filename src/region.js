@@ -1,267 +1,338 @@
-import { el, isUrl } from "./util.js";
-import { DuplicateEntryError } from "./util.js";
-import { EntrySet } from "./model.js";
-import { NavigationService, neighbourEntry } from "./navigation.js";
-import { defaultNavRenderer, defaultPanelRenderer } from "./renderers.js";
-import { injectStyles } from "./styles.js";
-
-class Emitter {
-    #h = new Map();
-    on(event, fn) {
-        (this.#h.get(event) ?? this.#h.set(event, new Set()).get(event)).add(fn);
-        return () => this.#h.get(event)?.delete(fn);
-    }
-    emit(event, payload) {
-        for (const fn of [...(this.#h.get(event) ?? [])])
-            try {
-                fn(payload);
-            } catch (e) {
-                console.error(`[LinkPlayer] "${event}" handler failed`, e);
-            }
-    }
-    clearHandlers() {
-        this.#h.clear();
-    }
-}
-
-/** One region's DOM: iframe + the panel produced by a renderer. */
-export class RegionView {
-    constructor({ container, panelRenderer = defaultPanelRenderer, itemRenderer = defaultItemRenderer, widths = null, resizable = true }) {
-        injectStyles();
-        this._c = container;
-        container.classList.add("lp-host");
-        this._renderer = panelRenderer;
-        this._itemRenderer = itemRenderer ?? defaultItemRenderer;
-        this._widths = widths;
-        this._resizable = resizable;
-        this._handle = null;
-        this._adopted = null;
-        this._hadAdopted = false;
-    }
-
-    setPanelRenderer(fn) {
-        this._renderer = fn;
-    }
-
-    setItemRenderer(fn) { this._itemRenderer = fn ?? defaultItemRenderer; }
-
-    /** An iframe already in the page: the next showEmbed() reuses it. */
-    adoptIframe(iframe) {
-        this._adopted = iframe;
-        this._hadAdopted = true;
-    }
-
-    showEmbed(src, title) {
-        this._dropPanel();
-        if (this._adopted) {
-            const f = this._adopted;
-            this._adopted = null;
-            f.title ||= title;
-            if (f.src !== src) f.src = src; // adds enablejsapi=1 (one reload)
-            return f;
-        }
-        const f = el("iframe", "lp-frame");
-        f.src = src;
-        f.title = title;
-        f.allow = "autoplay; fullscreen; picture-in-picture; web-share";
-        f.allowFullscreen = true;
-        f.referrerPolicy = "strict-origin-when-cross-origin";
-        this._c.replaceChildren(f);
-        return f;
-    }
-    showPanel(ctx) {
-        this._dropPanel();
-        this._handle = this._renderer({
-            host: this._c,
-            widths: this._widths,
-            resizable: this._resizable,
-            itemRenderer: this._itemRenderer,
-            ...ctx
-        }) ?? null;
-    }
-    setActive(i) {
-        this._handle?.setActive?.(i);
-    }
-    clear() {
-        this._dropPanel();
-        this._c.replaceChildren();
-    }
-    /** Releases the container. An adopted iframe belongs to the page: it is left in place. */
-    dispose() {
-        this._dropPanel();
-        if (!this._hadAdopted) this._c.replaceChildren();
-        this._c.classList.remove("lp-host");
-        this._c.style.removeProperty("--lp-w");
-    }
-    _dropPanel() {
-        this._handle?.destroy?.();
-        this._handle = null;
-    }
-}
+import {PanelRenderer} from "./ui/PanelRenderer.js";
+import {NavigationJournal} from "./NavigationJournal.js";
+import {Emitter} from "./utils/Emitter.js";
 
 /**
- * A zone (data-target). Events: "change" { entry, itemIndex } · "state" snapshot · "items" { entry, items }
- * · "entries" { entry } · "error" { error, entry }.
+ * A target container: owns ONE player (one iframe), ONE panel and the navigation journal.
+ *
+ * Navigation, three levels:
+ *   journal   goBack() / goForward()                         between the states visited with navigate()
+ *   region    nextInfo() / previousInfo()                    between the infos of the region (order of the links)
+ *   item      nextItem() / previousItem() / playAt(i)       inside the active playlist / list (delegated to the player)
+ *
+ * Events (region.on(type, handler), handler gets { type, region, ... }):
+ *   "change"  { reason, info, index, params, visible }  navigation state changed. reason: navigate | back | forward | item | visibility | adopt
+ *             params: what was given to navigate(info, { params }), null otherwise.
+ *   "state"   { state, index }                  player state: playing | paused | ended
+ *   "error"   { error, info? }                  anything that failed (load, player, metadata)
+ * The `can*` getters give the enabled / disabled state of the matching controls; read them on "change".
  */
-export class Region extends Emitter {
-    constructor({ target, container, registry, store = null, panel = true, panelRenderer, itemRenderer, navRenderer = defaultNavRenderer, resizable = true }) {
-        super();
-        this.target = target;
-        this.container = container;
-        this.sets = [];
-        this.entries = []; // registration order: this is the order of next/previous link
-        this.persist = true;
-        this._registry = registry;
-        this._navRenderer = navRenderer;
-        this._itemRenderer = itemRenderer ?? defaultItemRenderer;
-        this._byKey = new Map();
-        this._auto = new Map();
-        this._navs = new Set();
-        this._navHosts = new WeakMap();
-        const widths =
-            resizable && store
-                ? {
-                    get: () => store.get("panel-width"),
-                    set: (w) => store.set("panel-width", w),
-                    clear: () => store.remove("panel-width")
-                }
-                : null;
-        this.view = new RegionView({ container, panelRenderer, itemRenderer, widths, resizable });
-        this.navigation = new NavigationService({ region: this, view: this.view, panel });
+export class Region {
+    #target;
+    #host;
+    #registry;
+    #infos = new Map();
+    #journal = new NavigationJournal();
+    #events = new Emitter();
+    #panel;
+    #player = null;
+    #unsubscribe = null;
+    #panelInfo = null; // the playlist the panel is drawn for
+    #resolveMeta;
+    #resolved = new WeakSet();
+
+    /**
+     * @param {object} options
+     * @param {(info) => Promise<boolean>|boolean} [options.resolveMeta] Completes the items of a playlist (true when it changed something).
+     */
+    constructor({
+                    target,
+                    registry,
+                    resolveMeta = null,
+                    panelRenderer = null,
+                    itemRenderer = null,
+                    headerRenderer = null,
+                    toggleRenderer = null,
+                    groupRenderer = null,
+                    thumbnails = null
+                }) {
+        const host = document.getElementById(target);
+        if (!host) throw new Error(`Target #${target} not found`);
+        this.#target = target;
+        this.#host = host;
+        this.#registry = registry;
+        this.#resolveMeta = resolveMeta;
+        this.#panel = panelRenderer ?? new PanelRenderer({
+            itemRenderer,
+            headerRenderer,
+            toggleRenderer,
+            groupRenderer,
+            thumbnails
+        });
     }
 
-    /** providerId: "youtube" | "okru" | "dailymotion" | any registered id. */
-    createSet(providerId, commonProps = {}) {
-        const set = new EntrySet(this, this._registry.get(providerId), commonProps);
-        this.sets.push(set);
-        return set;
+    // ───────── state ─────────
+
+    get target() {
+        return this.#target;
     }
 
-    /** Set that receives the detected links of a provider (created on demand). */
-    detectedSet(provider) {
-        if (!this._auto.has(provider.id)) this._auto.set(provider.id, this.createSet(provider.id));
-        return this._auto.get(provider.id);
+    get infos() {
+        return Object.freeze([...this.#infos.values()]);
     }
 
-    setPanelRenderer(fn) {
-        this.view.setPanelRenderer(fn);
+    get current() {
+        return this.#journal.current?.info ?? null;
     }
 
-    setItemRenderer(fn) { this.view.setItemRenderer(fn); }
-
-    /* ───── entries ───── */
-
-    _register(set, entry) {
-        if (this._byKey.has(entry.key)) throw new DuplicateEntryError(entry.key);
-        this._byKey.set(entry.key, entry);
-        this.entries.push(entry);
-        this.emit("entries", { entry });
+    get currentIndex() {
+        return this.#journal.current?.index ?? 0;
     }
 
-    _remove(entry) {
-        if (this._byKey.get(entry.key) !== entry) return;
-        this._byKey.delete(entry.key);
-        this.entries.splice(this.entries.indexOf(entry), 1);
-        entry.set?.entries.splice(entry.set.entries.indexOf(entry), 1);
-        if (this.navigation.entry === entry) this.navigation.hide();
-        this.emit("entries", { entry });
+    get isVisible() {
+        return !this.#host.hidden;
     }
 
-    /** Key, or any url of a registered video (youtu.be and watch?v= match). */
-    find(ref) {
-        if (typeof ref !== "string") return null;
-        const hit = this._byKey.get(ref) ?? this.entries.find((e) => e.url === ref);
-        if (hit || !isUrl(ref)) return hit ?? null;
-        try {
-            const p = this._registry.resolve(ref);
-            return this._byKey.get(p.keyOf(p.parse(ref))) ?? null;
-        } catch {
-            return null;
-        }
+    /** Number of items of the current playlist / list, null when unknown, 0 for a single video. */
+    get itemCount() {
+        const info = this.current;
+        if (!info?.isPlaylist) return 0;
+        return info.videoIds?.length ?? (info.videos.length || null);
     }
 
-    /** Registers an unknown url on the fly. @throws UnsupportedUrlError */
-    ensureEntry(url) {
-        return this.find(url) ?? this.detectedSet(this._registry.resolve(url))._add(url, {}, "link");
+    get canGoBack() {
+        return this.#journal.canGoBack;
     }
 
-    /** Entry | index | key | url → Entry (or null). */
-    resolveTarget(target) {
-        if (target && typeof target === "object") return this._byKey.get(target.key) === target ? target : null;
-        if (typeof target === "number") return this.entries[target] ?? null;
-        if (typeof target === "string") return this.find(target) ?? (isUrl(target) ? this.ensureEntry(target) : null);
-        return null;
+    get canGoForward() {
+        return this.#journal.canGoForward;
     }
 
-    /* ───── state and navigation bar ───── */
-
-    getState() {
-        const nav = this.navigation;
-        const key = nav.entry?.key;
-        return {
-            target: this.target,
-            isOpen: nav.isOpen,
-            entry: nav.entry,
-            entryIndex: key ? this.entries.findIndex((e) => e.key === key) : -1,
-            entryCount: this.entries.length,
-            itemIndex: nav.itemIndex,
-            // wrap is not considered: with { wrap: true } enable your buttons yourself
-            hasNextLink: !!neighbourEntry(this.entries, key, 1),
-            hasPreviousLink: !!neighbourEntry(this.entries, key, -1),
-            canGoBack: nav.journal.canGoBack,
-            canGoForward: nav.journal.canGoForward
-        };
+    get canGoPreviousInfo() {
+        return this.#infoIndex() > 0;
     }
 
-    setNavRenderer(fn) { this._navRenderer = fn; }
+    get canGoNextInfo() {
+        const i = this.#infoIndex();
+        return i >= 0 ? i < this.#infos.size - 1 : this.#infos.size > 0;
+    }
 
-    /** Renders the entries of this region as buttons/images in `container`. Returns a detach function. */
-    attachNav(container, renderer = this._navRenderer) {
-        const host = typeof container === "string" ? document.getElementById(container) : container;
-        if (!host) throw new Error(`Navigation container not found: "${container}"`);
-        this._navHosts.get(host)?.();
-        const nav = this.navigation;
-        const render = () => {
-            const state = this.getState();
-            renderer({
-                container: host,
-                region: this,
-                entries: this.entries,
-                state,
-                isActive: (k) => state.isOpen && state.entry?.key === (k?.key ?? k),
-                go: (t, o) => nav.go(t, o),
-                next: (o) => nav.nextLink(o),
-                previous: (o) => nav.previousLink(o),
-                back: () => nav.back(),
-                forward: () => nav.forward()
-            });
-        };
-        let pending = false; // several add() in a row render once
-        const schedule = () => {
-            if (pending) return;
-            pending = true;
-            queueMicrotask(() => {
-                pending = false;
-                render();
-            });
-        };
-        const offs = [this.on("state", schedule), this.on("entries", schedule)];
-        const detach = () => {
-            offs.forEach((off) => off());
-            this._navs.delete(detach);
-            if (this._navHosts.get(host) === detach) this._navHosts.delete(host);
-            host.replaceChildren();
-            delete host.dataset.lpCount;
-        };
-        this._navHosts.set(host, detach);
-        render();
-        return detach;
+    get canGoPreviousItem() {
+        return Boolean(this.current?.isPlaylist) && this.currentIndex > 0;
+    }
+
+    get canGoNextItem() {
+        if (!this.current?.isPlaylist) return false;
+        const count = this.itemCount;
+        return count === null || this.currentIndex < count - 1;
+    }
+
+    // ───────── events ─────────
+
+    on(type, handler) {
+        return this.#events.on(type, handler);
+    }
+
+    off(type, handler) {
+        this.#events.off(type, handler);
+    }
+
+    // ───────── infos ─────────
+
+    /** @returns {boolean} false when the key is already known (same link twice). */
+    add(info) {
+        if (this.#infos.has(info.key)) return false;
+        this.#infos.set(info.key, info);
+        return true;
+    }
+
+    has(key) {
+        return this.#infos.has(key);
+    }
+
+    get(key) {
+        return this.#infos.get(key);
+    }
+
+    // ───────── navigation ─────────
+
+    /** Navigating to the info that is already current toggles the view instead (no new journal entry). */
+    navigate(info, {autoplay = false, index = 0, params = null} = {}) {
+        if (this.#journal.current?.info === info) return this.toggle();
+        this.#journal.push({info, index, params}); // params are kept in the journal: back / forward restore them
+        this.#show(info, {autoplay, index}, "navigate");
+    }
+
+    goBack() {
+        return this.#restore(this.#journal.back(), "back");
+    }
+
+    goForward() {
+        return this.#restore(this.#journal.forward(), "forward");
+    }
+
+    nextInfo() {
+        return this.#step(1);
+    }
+
+    previousInfo() {
+        return this.#step(-1);
+    }
+
+    nextItem() {
+        this.#player?.next();
+    }
+
+    previousItem() {
+        this.#player?.previous();
+    }
+
+    playAt(index) {
+        this.#player?.playAt(index);
+        this.#journal.updateCurrent({index});
+        this.#panel.setCurrent(index); // immediate feedback; the player confirms with "itemChange"
+        this.#changed("item");
+    }
+
+    /**
+     * Takes over an iframe that is already in the page (and inside the target): the player drives it
+     * and the panel is added for a playlist / list. `info` is parsed from the iframe src.
+     */
+    adopt(iframe, info, {index = 0} = {}) {
+        if (!this.#host.contains(iframe)) throw new Error(`The iframe is not inside #${this.#target}`);
+        this.add(info);
+        this.#disposePlayer();
+        this.#player = this.#registry.get(info.provider).createPlayer({iframe});
+        this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
+        this.#journal.push({info, index});
+        this.#syncPanel(info, iframe, index);
+        this.#changed("adopt");
+        this.#resolveMetaLater(info);
+    }
+
+    // ───────── visibility ─────────
+
+    toggle() {
+        if (this.#host.hidden) this.show();
+        else this.hide();
+    }
+
+    show() {
+        this.#host.hidden = false;
+        this.#changed("visibility");
+    }
+
+    hide() {
+        this.#player?.pause();
+        this.#host.hidden = true;
+        this.#changed("visibility");
     }
 
     dispose() {
-        [...this._navs].forEach((d) => d());
-        this.navigation.dispose();
-        this.view.dispose();
-        this.clearHandlers();
+        this.#disposePlayer();
+        this.#panel.destroy();
+        this.#events.clear();
+    }
+
+    // ───────── internals ─────────
+
+    #infoIndex() {
+        return this.infos.indexOf(this.current);
+    }
+
+    #restore(entry, reason) {
+        if (!entry) return false;
+        this.#show(entry.info, {autoplay: false, index: entry.index}, reason); // restore the state, do not start playing
+        return true;
+    }
+
+    #step(delta) {
+        const target = this.infos[this.#infoIndex() + delta];
+        if (!target) return false;
+        this.navigate(target, {autoplay: true});
+        return true;
+    }
+
+    #show(info, {autoplay, index}, reason) {
+        try {
+            const provider = this.#registry.get(info.provider);
+
+            // one iframe per region: replaced only when the provider changes
+            if (this.#player?.kind !== provider.id) {
+                const previous = this.#player?.iframe; // an adopted iframe is not removed by the player
+                this.#disposePlayer();
+                previous?.remove();
+                this.#player = provider.createPlayer();
+                this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
+            }
+
+            this.#player.load(info, {autoplay, index});
+            const iframe = this.#player.iframe;
+            if (!iframe.isConnected) this.#host.prepend(iframe); // iframe before the panel (CSS anchoring)
+            this.#host.hidden = false;
+
+            this.#syncPanel(info, iframe, index);
+        } catch (error) {
+            this.#fail(error, {info});
+            return;
+        }
+        this.#changed(reason);
+        this.#resolveMetaLater(info);
+    }
+
+    #syncPanel(info, iframe, index) {
+        if (!info.isPlaylist) {
+            this.#panelInfo = null;
+            return this.#panel.clear();
+        }
+        if (info === this.#panelInfo) return this.#panel.setCurrent(index);
+
+        this.#panelInfo = info;
+        this.#panel.render({
+            host: this.#host,
+            iframe,
+            info,
+            current: index,
+            onSelectItem: (i) => this.playAt(i)
+        });
+    }
+
+    /** Titles / thumbnails of a playlist may come from an API: the panel is drawn first, then drawn again. */
+    #resolveMetaLater(info) {
+        if (!info.isPlaylist || !this.#resolveMeta || this.#resolved.has(info)) return;
+        this.#resolved.add(info);
+        Promise.resolve(this.#resolveMeta(info)).then(
+            (changed) => {
+                if (!changed || this.current !== info || !this.#player?.iframe) return;
+                this.#panelInfo = null; // force the redraw
+                this.#syncPanel(info, this.#player.iframe, this.currentIndex);
+            },
+            (error) => this.#fail(error, {info})
+        );
+    }
+
+    #onPlayerEvent(event) {
+        if (event.type === "itemChange") {
+            this.#journal.updateCurrent({index: event.index}); // going back restores the item too
+            this.#panel.setCurrent(event.index);
+            this.#changed("item");
+        } else if (event.type === "state") {
+            this.#events.emit("state", {region: this, state: event.state, index: event.index ?? this.currentIndex});
+        } else if (event.type === "error") {
+            this.#fail(event.error, {info: this.current});
+        }
+    }
+
+    #changed(reason) {
+        this.#events.emit("change", {
+            region: this,
+            reason,
+            info: this.current,
+            index: this.currentIndex,
+            params: this.#journal.current?.params ?? null,
+            visible: this.isVisible
+        });
+    }
+
+    #fail(error, context = {}) {
+        const handled = this.#events.emit("error", {region: this, error, ...context});
+        if (!handled) console.error("[Region]", error);
+    }
+
+    #disposePlayer() {
+        this.#unsubscribe?.();
+        this.#player?.dispose();
+        this.#unsubscribe = null;
+        this.#player = null;
     }
 }

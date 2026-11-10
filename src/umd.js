@@ -1,1 +1,1 @@
-export { LinkPlayer as default } from "./linkPlayer.js";
+export { LinkPlayer as default } from "./LinkPlayer.js";

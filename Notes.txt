@@ -23,7 +23,40 @@ provider
 global
 
 
-  // youtube
-  // video simple:    https://www.youtube.com/embed/dQw4w9WgXcQ?enablejsapi=1&origin=https%3A%2F%2Fexample.com&autoplay=1&start=42
-  // playlist id      https://www.youtube.com/embed/_?enablejsapi=1&list=PLrEnWoR732-HnnhIoUQj-i_fXp5xQv1S9
-  // video ids        https://www.youtube.com/embed/videoseries?enablejsapi=1&playlist=video123%2Cvideo456%2Cvideo789&index=1
+
+il faudrait generer une page d'exemples (ou plusieurs si c'est mieux) pour : 
+1. avec links , definition des infos avec les attributs data et dans l'url pour video youtube, pour liste de videos youtube, pour playlist youtube, pour une video okru. 
+    - video autoplay true, click, startSeconds
+    - videoList index
+    - playlist avec un videoId (start video different de la premiere)
+2. avec links ou buttons servant qu'a la navigation et infos definies en code region.describe . 
+3. verifier que l'ancienne version okru est toujours suportée avec video_ids et labels dans l'url 
+4. verifier que youtube data api est utilisé (+ cache)
+5. un link player global et un linkplayer scoped sans tooltip par exemple
+6. navigation a tester avec par exemple un button previous et next 
+
+niveau (data-)target(s) : 1 ou plusieurs selon le mieux
+
+Les urls et infos suivantes peuvent servir
+
+   <a data-link href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s" data-autoplay="click"
+        data-title="Bahamas" data-channel="Me" data-thumbnail="https://…/1.jpg">Single Video</a>
+
+    <a data-link href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2"
+        data-title="Trip" data-items='[{"title":"ASMR"},{"title":"Trains","channel":"Me"}]'>Video List</a>
+
+
+    <a  data-link href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ"
+        data-channel="Retime Clips"
+        data-items='[{"id":"s11CNT_hQTg","title":"V (1983) – L’arrivée des Visiteurs : la scène d’ouverture avec Mike Donovan"},{"id":"C_dEl2cMCEA","title":"V (1983) – Diana propose son expérience à Brian (Peter Nelson)"}]'>Playlist</a>
+
+
+    <a href="https://ok.ru/video/17222095800962"
+        data-title="MacGyver S03E08 VF | Accident en Haute Montagne (French) | Retour de Murdoc"
+        data-channel="Retime Clips Okru" data-link>Video
+        okru</a>
+
+    <a href="https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660,3953768860340,3953768991412,3953769188020,3953769384628,3953769712308,3953770105524&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.05%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.06%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.07%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.08%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.09%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.010%20-%20BluRay%20720p%20VF"
+        data-link>Old okru version</a>
+
+
