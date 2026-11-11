@@ -61,6 +61,7 @@
 		].includes(String(value).trim().toLowerCase());
 	}
 	var isEmpty$2 = (v) => v === "" || v == null;
+	var isTouch = () => !!globalThis.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
 	var AUTOPLAY_MODES = Object.freeze({
 		NONE: "none",
 		INIT: "init",
@@ -73,7 +74,6 @@
 		if (v === "click") return AUTOPLAY_MODES.CLICK;
 		return AUTOPLAY_MODES.NONE;
 	}
-	var isTouch = () => !!globalThis.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
 	// src/utils/ValueChecks.js
 	var ValueChecks = class {
 		static requireNotNull(value, name = "value") {
@@ -99,7 +99,7 @@
 		#channel;
 		#thumbnail;
 		#showOnInit;
-		constructor({ provider, target, videoId, autoplay, startSeconds, title, channel, thumbnail, showOnInit }) {
+		constructor({ provider, target, videoId, autoplay, startSeconds, title, channel, thumbnail, showOnInit, key = null }) {
 			ValueChecks.requireNotNullOrEmpty(provider, "provider");
 			ValueChecks.requireNotNullOrEmpty(target, "target");
 			ValueChecks.requireNotNullOrEmpty(videoId, "videoId");
@@ -112,7 +112,7 @@
 			this.#channel = channel;
 			this.#thumbnail = thumbnail;
 			this.#showOnInit = showOnInit;
-			this.#key = `${this.#provider}:${this.#videoId}`;
+			this.#key = key ?? `${this.#provider}:${this.#videoId}`;
 		}
 		get key() {
 			return this.#key;
@@ -173,7 +173,7 @@
 		#index;
 		#showOnInit;
 		#videos = [];
-		constructor(provider, target, videoIds, index, showOnInit) {
+		constructor(provider, target, videoIds, index, showOnInit, key = null) {
 			ValueChecks.requireNotNullOrEmpty(provider, "provider");
 			ValueChecks.requireNotNullOrEmpty(target, "target");
 			this.#provider = provider;
@@ -181,7 +181,8 @@
 			this.#videoIds = videoIds;
 			this.#index = index;
 			this.#showOnInit = showOnInit;
-			this.#key = `${this.#provider}:list:${this.#videoIds.join(",")}`;
+			this.#videoIds = [...videoIds];
+			this.#key = key ?? `${this.#provider}:list:${this.#videoIds.join(",")}`;
 		}
 		get key() {
 			return this.#key;
@@ -223,7 +224,7 @@
 		#videoId;
 		#showOnInit;
 		#videos = [];
-		constructor(provider, target, playlistId, videoId, showOnInit) {
+		constructor(provider, target, playlistId, videoId, showOnInit, key = null) {
 			ValueChecks.requireNotNullOrEmpty(provider, "provider");
 			ValueChecks.requireNotNullOrEmpty(target, "target");
 			ValueChecks.requireNotNullOrEmpty(playlistId, "playlistId");
@@ -232,7 +233,7 @@
 			this.#playlistId = playlistId;
 			this.#videoId = videoId;
 			this.#showOnInit = showOnInit;
-			this.#key = `${this.#provider}:playlist:${this.#playlistId}`;
+			this.#key = key ?? `${this.#provider}:playlist:${this.#playlistId}`;
 		}
 		get key() {
 			return this.#key;
@@ -265,8 +266,8 @@
 			this.#videos = [...videos];
 		}
 	};
-	// src/providers/LinkParser.js
-	var LinkParser = class {
+	// src/providers/InfoParser.js
+	var InfoParser = class {
 		getUrl(element) {
 			if (element.tagName === "A") return element.href;
 			if (element.tagName === "IFRAME") return element.src;
@@ -276,7 +277,8 @@
 			if (!t) return void 0;
 			if (/^\d+$/.test(t)) return Number(t);
 			const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(t);
-			return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : void 0;
+			if (!m || !m[1] && !m[2] && !m[3]) return void 0;
+			return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
 		}
 		parseJsonAttribute(value, name) {
 			if (value === void 0) return void 0;
@@ -293,15 +295,27 @@
 			const data = element.dataset;
 			return {
 				autoplay: data.autoplay,
-				startSeconds: data.start,
+				start: data.start,
 				title: data.title,
 				channel: data.channel,
 				thumbnail: data.thumbnail,
 				videos: this.parseJsonAttribute(data.videos, "data-videos") ?? [],
 				index: toNumber(data.index),
 				target: data.target ?? (element.tagName === "IFRAME" ? element.parentElement?.id : void 0),
-				showOnInit: toBoolean(data.showOnInit)
+				showOnInit: toBoolean(data.showOnInit),
+				key: data.key
 			};
+		}
+		parseFromElement(element) {
+			const url = this.getUrl(element);
+			if (!url) throw new Error(`No URL found for element '${element}'`);
+			return this.parseDefinition({
+				url,
+				...this.readLinkData(element)
+			});
+		}
+		parseDefinition(def) {
+			throw new Error("parseDefinition() must be implemented");
 		}
 	};
 	// src/providers/youtube/YouTubeThumbnailUrlBuilder.js
@@ -312,8 +326,8 @@
 			return `${YouTubeThumbnailUrlBuilder.#BASE_URL}/${videoId}/mqdefault.jpg`;
 		}
 	};
-	// src/providers/youtube/YouTubeLinkParser.js
-	var YouTubeLinkParser = class extends LinkParser {
+	// src/providers/youtube/YouTubeInfoParser.js
+	var YouTubeInfoParser = class extends InfoParser {
 		#thumbnailUrlBuilder;
 		/**
 		* @param {{ thumbnailUrlBuilder?: YouTubeThumbnailUrlBuilder | null }} [options]
@@ -321,6 +335,23 @@
 		constructor({ thumbnailUrlBuilder = null } = {}) {
 			super();
 			this.#thumbnailUrlBuilder = thumbnailUrlBuilder ?? new YouTubeThumbnailUrlBuilder();
+		}
+		buildUrl(def) {
+			if (!def) throw new TypeError("buildUrl(): definition is required");
+			const q = new URLSearchParams();
+			let path = "watch";
+			if (def.playlistId) {
+				q.set("list", def.playlistId);
+				if (def.videoId) q.set("v", def.videoId);
+			} else if (def.videoIds?.length) {
+				path = "watch_videos";
+				q.set("video_ids", def.videoIds.join(","));
+				if (def.index != null) q.set("index", def.index);
+			} else if (def.videoId) {
+				q.set("v", def.videoId);
+				if (def.start != null) q.set("t", def.start);
+			} else throw new TypeError("buildUrl(): need playlistId, videoIds, or videoId");
+			return `https://www.youtube.com/${path}?${q}`;
 		}
 		parseUrl(url) {
 			const u = new URL(url);
@@ -355,53 +386,56 @@
 				startSeconds: this.parseStartTime(q.get("t") ?? q.get("start"))
 			});
 		}
-		parse(element) {
-			const url = this.getUrl(element);
-			if (!url) throw new Error(`No URL found for element '${element}'`);
-			const urlInfos = this.parseUrl(url);
-			if (!urlInfos) throw new Error(`Invalid URL: '${url}'`);
-			const data = this.readLinkData(element);
+		parseDefinition(def) {
+			const urlInfos = this.parseUrl(def.url);
+			if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
+			const videos = def.videos ?? [];
+			if (!Array.isArray(videos)) throw new Error("videos must be an array");
 			switch (urlInfos.kind) {
 				case "video": return new VideoInfo({
 					provider: "youtube",
-					target: data.target,
+					target: def.target,
 					videoId: urlInfos.videoId,
-					autoplay: toAutoplayMode(data.autoplay),
-					startSeconds: this.parseStartTime(data.startSeconds) ?? urlInfos.startSeconds,
-					title: data.title ?? "",
-					channel: data.channel ?? "",
-					thumbnail: data.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(urlInfos.videoId),
-					showOnInit: data.showOnInit
+					autoplay: toAutoplayMode(def.autoplay),
+					startSeconds: this.parseStartTime(def.start) ?? urlInfos.startSeconds,
+					title: def.title ?? "",
+					channel: def.channel ?? "",
+					thumbnail: def.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(urlInfos.videoId),
+					showOnInit: def.showOnInit,
+					key: def.key
 				});
 				case "videoList": {
-					const list = new VideoListInfo("youtube", data.target, urlInfos.videoIds, urlInfos.index, data.showOnInit);
+					const index = urlInfos.index ?? def.index;
+					const list = new VideoListInfo("youtube", def.target, urlInfos.videoIds, index, def.showOnInit, def.key);
 					urlInfos.videoIds.forEach((videoId, i) => {
-						const videoInfo = data.videos[i] ?? {};
+						const v = videos[i] ?? {};
 						list.addVideo(new VideoInfo({
 							provider: "youtube",
-							target: data.target,
+							target: def.target,
 							videoId,
-							autoplay: toAutoplayMode(videoInfo.autoplay),
-							startSeconds: this.parseStartTime(data.startSeconds),
-							title: videoInfo.title ?? "",
-							channel: videoInfo.channel ?? "",
-							thumbnail: videoInfo.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId)
+							autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),
+							startSeconds: this.parseStartTime(v.start),
+							title: v.title ?? "",
+							channel: v.channel ?? "",
+							thumbnail: v.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId)
 						}));
 					});
 					return list;
 				}
 				case "playlist": {
-					const playlist = new PlaylistInfo("youtube", data.target, urlInfos.playlistId, urlInfos.videoId, data.showOnInit);
-					for (const videoInfo of data.videos) playlist.addVideo(new VideoInfo({
-						provider: "youtube",
-						target: data.target,
-						videoId: videoInfo.id,
-						autoplay: toAutoplayMode(videoInfo.autoplay),
-						startSeconds: this.parseStartTime(videoInfo.startSeconds),
-						title: videoInfo.title ?? "",
-						channel: videoInfo.channel ?? "",
-						thumbnail: videoInfo.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoInfo.id)
-					}));
+					const playlist = new PlaylistInfo("youtube", def.target, urlInfos.playlistId, urlInfos.videoId, def.showOnInit, def.key);
+					(videos.length ? videos : []).forEach((v, i) => {
+						playlist.addVideo(new VideoInfo({
+							provider: "youtube",
+							target: def.target,
+							videoId: v.videoId,
+							autoplay: toAutoplayMode(v.autoplay),
+							startSeconds: this.parseStartTime(v.start),
+							title: v.title ?? "",
+							channel: v.channel ?? "",
+							thumbnail: v.thumbnail ?? (v.id ? this.#thumbnailUrlBuilder.getThumbnailUrl(v.id) : "")
+						}));
+					});
 					return playlist;
 				}
 			}
@@ -997,10 +1031,13 @@
 			});
 			return this.#url(encodeURIComponent(videoId), q);
 		}
-		buildVideoListSrc(videoIds, { autoplay, index } = {}) {
+		buildVideoListSrc(videoIds, { autoplay, index, startSeconds } = {}) {
 			if (!Array.isArray(videoIds) || !videoIds.length) throw new TypeError("buildVideoListSrc(): a non-empty array is required");
 			const [first, ...rest] = videoIds;
-			const q = this.#params({ autoplay });
+			const q = this.#params({
+				autoplay,
+				startSeconds
+			});
 			if (rest.length) q.set("playlist", rest.join(","));
 			if (index > 0) q.set("index", String(Math.floor(index)));
 			return this.#url(encodeURIComponent(first), q);
@@ -1020,37 +1057,38 @@
 			"youtu.be",
 			"youtube-nocookie.com"
 		];
-		#linkParser;
+		#infoParser;
 		#embedSrcBuilder;
-		constructor({ linkParser = null, embedSrcBuilder = null, thumbnailUrlBuilder = null } = {}) {
-			this.#linkParser = linkParser ?? new YouTubeLinkParser({ thumbnailUrlBuilder });
+		constructor({ infoParser = null, embedSrcBuilder = null, thumbnailUrlBuilder = null } = {}) {
+			this.#infoParser = infoParser ?? new YouTubeInfoParser({ thumbnailUrlBuilder });
 			this.#embedSrcBuilder = embedSrcBuilder ?? new YouTubeEmbedSrcBuilder({ enablejsapi: true });
 		}
-		getInfo(link) {
-			return this.#linkParser.parse(link);
+		getInfoFromElement(link) {
+			return this.#infoParser.parseFromElement(link);
 		}
-		makeIframe({ src, width = "560", height = "315", title = "YouTube video player", allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share", referrerPolicy = "strict-origin-when-cross-origin", allowFullscreen = true, extraAttrs = {} }) {
-			return makeIframe({
-				width,
-				height,
-				src,
-				title,
-				allow,
-				referrerPolicy,
-				allowFullscreen,
-				extraAttrs
-			});
+		getInfoFromDefinition(definition) {
+			if (!definition.url) definition.url = this.#infoParser.buildUrl(definition);
+			return this.#infoParser.parseDefinition(definition);
 		}
 		createPlayer({ iframe = null } = {}) {
 			return new YouTubePlayer({
 				builder: this.#embedSrcBuilder,
-				createIframe: (src) => this.makeIframe({ src }),
+				createIframe: (src) => makeIframe({
+					width: "560",
+					height: "315",
+					src,
+					title: "YouTube video player",
+					allow: "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+					referrerPolicy: "strict-origin-when-cross-origin",
+					allowFullscreen: true,
+					extraAttrs: {}
+				}),
 				iframe
 			});
 		}
 	};
-	// src/providers/okru/OkruLinkParser.js
-	var OkruLinkParser = class extends LinkParser {
+	// src/providers/okru/OkruInfoParser.js
+	var OkruInfoParser = class extends InfoParser {
 		#rawQueryParam(url, name) {
 			for (const pair of url.search.slice(1).split("&")) {
 				const separator = pair.indexOf("=");
@@ -1092,40 +1130,48 @@
 				videoId: match[1]
 			}) : null;
 		}
-		parse(element) {
-			const url = this.getUrl(element);
-			if (!url) throw new Error(`No URL found for element '${element}'`);
-			const urlInfos = this.parseUrl(url);
-			if (!urlInfos) throw new Error(`Invalid URL: '${url}'`);
-			const data = this.readLinkData(element);
+		buildUrl(def) {
+			if (!def) throw new TypeError("buildUrl(): definition is required");
+			if (def.playlistId) throw new TypeError("buildUrl(): playlist not supported");
+			const id = def.videoId ?? def.videoIds?.[0];
+			if (!id) throw new TypeError("buildUrl(): need videoId or videoIds");
+			return `https://ok.ru/video/${id}`;
+		}
+		parseDefinition(def) {
+			const urlInfos = this.parseUrl(def.url);
+			if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
+			const videos = def.videos ?? [];
+			if (!Array.isArray(videos)) throw new Error("videos must be an array");
 			switch (urlInfos.kind) {
 				case "video": return new VideoInfo({
 					provider: "okru",
-					target: data.target,
+					target: def.target,
 					videoId: urlInfos.videoId,
-					autoplay: toAutoplayMode(data.autoplay),
-					startSeconds: this.parseStartTime(data.startSeconds),
-					title: data.title ?? "",
-					channel: data.channel ?? "",
-					thumbnail: data.thumbnail ?? "",
-					showOnInit: data.showOnInit
+					autoplay: toAutoplayMode(def.autoplay),
+					startSeconds: this.parseStartTime(def.start),
+					title: def.title ?? "",
+					channel: def.channel ?? "",
+					thumbnail: def.thumbnail ?? "",
+					showOnInit: def.showOnInit,
+					key: def.key
 				});
 				case "videoList": {
 					const labels = urlInfos.labels;
 					const videoIds = urlInfos.videoIds;
 					if (labels.length && labels.length !== videoIds.length) console.warn(`[OkruProvider] ${labels.length} labels for ${videoIds.length} videos (a comma in a title that is not encoded as %2C?)`);
-					const list = new VideoListInfo("okru", data.target, videoIds, urlInfos.index, data.showOnInit);
+					const index = urlInfos.index ?? def.index;
+					const list = new VideoListInfo("okru", def.target, videoIds, index, def.showOnInit, def.key);
 					videoIds.forEach((videoId, i) => {
-						const videoInfo = data.videos.length ? data.videos[i] : { title: labels[i] };
+						const v = videos.length ? videos[i] : { title: labels[i] };
 						list.addVideo(new VideoInfo({
 							provider: "okru",
-							target: data.target,
+							target: def.target,
 							videoId,
-							autoplay: toAutoplayMode(videoInfo?.autoplay ?? data.autoplay),
-							startSeconds: this.parseStartTime(videoInfo?.startSeconds),
-							title: videoInfo?.title ?? "",
-							channel: videoInfo?.channel ?? "",
-							thumbnail: videoInfo?.thumbnail ?? ""
+							autoplay: toAutoplayMode(v?.autoplay ?? def.autoplay),
+							startSeconds: this.parseStartTime(v?.start),
+							title: v?.title ?? "",
+							channel: v?.channel ?? "",
+							thumbnail: v?.thumbnail ?? ""
 						}));
 					});
 					return list;
@@ -1329,6 +1375,52 @@
 			}
 		}
 	};
+	// src/providers/okru/OkruEmbedSrcBuilder.js
+	/**
+	* Builds the src of an Ok.ru iframe.
+	* - direct mode: https://ok.ru/videoembed/ID?autoplay=1&fromTime=90
+	* - relay mode (relayBaseUrl given): <relayBaseUrl>?videoId=ID&autoplay=1&startSeconds=90&parentOrigin=...
+	*/
+	var OkruEmbedSrcBuilder = class OkruEmbedSrcBuilder {
+		static #DIRECT_BASE_URL = "https://ok.ru/videoembed";
+		#relayBaseUrl;
+		#parentOrigin;
+		/**
+		* @param {{ relayBaseUrl?: string | null, parentOrigin?: string | null }} [options]
+		*  parentOrigin defaults to globalThis.location.origin, read at build time.
+		*/
+		constructor({ relayBaseUrl = null, parentOrigin = null } = {}) {
+			this.#relayBaseUrl = relayBaseUrl;
+			this.#parentOrigin = parentOrigin;
+		}
+		get isRelay() {
+			return Boolean(this.#relayBaseUrl);
+		}
+		/**
+		* @param {{ videoId: string, autoplay?: boolean, startSeconds?: number }} params
+		* @returns {string}
+		*/
+		build({ videoId, autoplay = false, startSeconds } = {}) {
+			if (!videoId) throw new TypeError("videoId is required");
+			return this.isRelay ? this.#buildRelay(videoId, autoplay, startSeconds) : this.#buildDirect(videoId, autoplay, startSeconds);
+		}
+		#buildDirect(videoId, autoplay, startSeconds) {
+			const q = new URLSearchParams();
+			if (autoplay) q.set("autoplay", "1");
+			if (startSeconds > 0) q.set("fromTime", String(Math.floor(startSeconds)));
+			const s = q.toString();
+			return `${OkruEmbedSrcBuilder.#DIRECT_BASE_URL}/${encodeURIComponent(videoId)}${s ? `?${s}` : ""}`;
+		}
+		#buildRelay(videoId, autoplay, startSeconds) {
+			const url = new URL(this.#relayBaseUrl);
+			url.searchParams.set("videoId", videoId);
+			if (autoplay) url.searchParams.set("autoplay", "1");
+			if (startSeconds > 0) url.searchParams.set("startSeconds", String(Math.floor(startSeconds)));
+			const origin = this.#parentOrigin ?? globalThis.location?.origin;
+			if (origin) url.searchParams.set("parentOrigin", origin);
+			return url.href;
+		}
+	};
 	// src/providers/okru/OkruPlayer.js
 	/**
 	* One Ok.ru iframe + its bridge. Ok.ru has no "load" command: loading = changing the src.
@@ -1338,23 +1430,25 @@
 	var OkruPlayer = class {
 		kind = "okru";
 		#createIframe;
+		#urlBuilder;
 		#iframe = null;
-		#embedBaseUrl = null;
 		#bridge = null;
 		#owned = false;
 		#listeners = /* @__PURE__ */ new Set();
-		#videos = [];
-		#ids = [];
+		/** @type {{ id: string, info: import("../../models/VideoInfo.js").VideoInfo | null }[]} a single video is a list of one */
+		#items = [];
 		#index = 0;
 		/**
 		* @param {Object} options
 		* @param {(src: string) => HTMLIFrameElement} [options.createIframe] Required unless an iframe is adopted.
 		* @param {HTMLIFrameElement} [options.iframe] An existing iframe to adopt.
+		* @param {string} [options.embedBaseUrl] Relay page url (ignored if urlBuilder is given).
+		* @param {OkruEmbedSrcBuilder} [options.urlBuilder]
 		*/
-		constructor({ createIframe = null, iframe = null, embedBaseUrl = null } = {}) {
+		constructor({ createIframe = null, iframe = null, embedBaseUrl = null, urlBuilder = null } = {}) {
 			this.#createIframe = createIframe;
+			this.#urlBuilder = urlBuilder ?? new OkruEmbedSrcBuilder({ relayBaseUrl: embedBaseUrl });
 			if (iframe) this.#attach(iframe, false);
-			this.#embedBaseUrl = embedBaseUrl;
 		}
 		get iframe() {
 			return this.#iframe;
@@ -1364,8 +1458,13 @@
 			return () => this.#listeners.delete(onEvent);
 		}
 		load(info, { autoplay = false, index = 0 } = {}) {
-			this.#ids = info instanceof VideoListInfo ? [...info.videoIds] : [info.videoId];
-			this.#videos = info instanceof VideoListInfo ? [...info.videos] : [info];
+			this.#items = info instanceof VideoListInfo ? info.videoIds.map((id, i) => ({
+				id,
+				info: info.videos[i] ?? null
+			})) : [{
+				id: info.videoId,
+				info
+			}];
 			this.#show(index, autoplay);
 		}
 		play() {
@@ -1391,39 +1490,23 @@
 			this.#listeners.clear();
 		}
 		#show(index, autoplay) {
-			const id = this.#ids[index];
-			if (id === void 0) return;
+			const item = this.#items[index];
+			if (!item) return;
 			this.#index = index;
-			const info = this.#videos[index];
-			const src = this.#getSrc(id, autoplay, info?.startSeconds);
+			const src = this.#urlBuilder.build({
+				videoId: item.id,
+				autoplay,
+				startSeconds: item.info?.startSeconds
+			});
 			if (this.#iframe) this.#iframe.src = src;
-			else this.#attach(this.#createIframe(src), true);
-			if (this.#ids.length > 1) this.#emit({
+			else {
+				if (!this.#createIframe) throw new Error("OkruPlayer: createIframe is required when no iframe is adopted");
+				this.#attach(this.#createIframe(src), true);
+			}
+			if (this.#items.length > 1) this.#emit({
 				type: "itemChange",
 				index
 			});
-		}
-		#getSrc(videoId, autoplay, startSeconds) {
-			if (this.#embedBaseUrl) return this.#buildRelaySrc(videoId, autoplay, startSeconds);
-			return this.#buildSrc(videoId, autoplay, startSeconds);
-		}
-		#buildSrc(videoId, autoplay, startSeconds) {
-			if (!videoId) throw new TypeError("videoId is required");
-			const q = new URLSearchParams();
-			if (autoplay) q.set("autoplay", "1");
-			if (startSeconds > 0) q.set("fromTime", Math.floor(startSeconds));
-			const s = q.toString();
-			return `https://ok.ru/videoembed/${encodeURIComponent(videoId)}${s ? `?${s}` : ""}`;
-		}
-		#buildRelaySrc(videoId, autoplay, startSeconds) {
-			if (!videoId) throw new TypeError("buildOkruRelaySrc(): videoId is required");
-			const url = new URL(this.#embedBaseUrl);
-			url.searchParams.set("videoId", videoId);
-			if (autoplay) url.searchParams.set("autoplay", "1");
-			if (startSeconds > 0) url.searchParams.set("startSeconds", Math.floor(startSeconds));
-			const parentOrigin = globalThis.location?.origin;
-			if (parentOrigin) url.searchParams.set("parentOrigin", parentOrigin);
-			return url.href;
 		}
 		#attach(iframe, owned) {
 			this.#iframe = iframe;
@@ -1455,7 +1538,7 @@
 						state: "ended",
 						index: this.#index
 					});
-					if (this.#index + 1 < this.#ids.length) this.next();
+					if (this.#index + 1 < this.#items.length) this.next();
 					return;
 				case OkruBridgeEvent.Error: return this.#emit({
 					type: "error",
@@ -1471,14 +1554,18 @@
 	var OkruProvider = class {
 		id = "okru";
 		hosts = ["ok.ru"];
-		#linkParser;
+		#infoParser;
 		#embedBaseUrl;
-		constructor({ linkParser = null, embedBaseUrl = null } = {}) {
-			this.#linkParser = linkParser ?? new OkruLinkParser();
+		constructor({ infoParser = null, embedBaseUrl = null } = {}) {
+			this.#infoParser = infoParser ?? new OkruInfoParser();
 			this.#embedBaseUrl = embedBaseUrl;
 		}
-		getInfo(link) {
-			return this.#linkParser.parse(link);
+		getInfoFromElement(link) {
+			return this.#infoParser.parseFromElement(link);
+		}
+		getInfoFromDefinition(definition) {
+			if (!definition.url) definition.url = this.#infoParser.buildUrl(definition);
+			return this.#infoParser.parseDefinition(definition);
 		}
 		createPlayer({ iframe = null } = {}) {
 			return new OkruPlayer({
@@ -1501,7 +1588,7 @@
 	var ProviderRegistry = class {
 		#providers = /* @__PURE__ */ new Map();
 		constructor(providers = []) {
-			this.#providers = [...providers];
+			for (const p of providers) this.register(p);
 		}
 		get providers() {
 			return Object.freeze([...this.#providers.values()]);
@@ -1512,7 +1599,7 @@
 			return this;
 		}
 		get(id) {
-			const provider = this.#providers.find((p) => p.id === id);
+			const provider = this.#providers.get(id.toLowerCase());
 			if (!provider) throw new Error(`Unknown provider: "${id}"`);
 			return provider;
 		}
@@ -1540,7 +1627,8 @@
 	};
 	/** ISO 8601 duration ("PT1H2M3S") to seconds. */
 	function parseIsoDuration(iso) {
-		const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso ?? "");
+		if (!iso) return null;
+		const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
 		return m ? (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0) : null;
 	}
 	var snippetMeta = (s = {}) => ({
@@ -1571,8 +1659,9 @@
 		get available() {
 			return Boolean(this.#key) && !this.#disabled;
 		}
-		/** @returns {Promise<Map<string, object>>} video id -> meta. Private or deleted videos are absent. */
+		/** @returns {Promise>} video id -> meta. Private or deleted videos are absent. */
 		async videos(ids) {
+			if (!ids || ids.length === 0) return /* @__PURE__ */ new Map();
 			const result = /* @__PURE__ */ new Map();
 			for (let i = 0; i < ids.length; i += 50) {
 				const data = await this.#get("videos", {
@@ -1588,6 +1677,7 @@
 		}
 		/** @returns {Promise<{ id: string, meta: object }[]>} in playlist order, at most `maxItems`. */
 		async playlistItems(playlistId, maxItems = 200) {
+			if (!playlistId) return [];
 			const entries = [];
 			let pageToken;
 			do {
@@ -1606,6 +1696,7 @@
 			return entries.slice(0, maxItems);
 		}
 		async #get(path, params) {
+			if (!this.available) throw new YouTubeApiError(0, "ApiDisabled");
 			const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
 			for (const [k, v] of Object.entries({
 				...params,
@@ -2521,6 +2612,11 @@
 			this.#entries.push({ ...entry });
 			this.#cursor++;
 		}
+		/** Replaces the current entry (history.replaceState): nothing is added, the forward history is kept. */
+		replace(entry) {
+			if (this.#cursor < 0) return this.push(entry);
+			this.#entries[this.#cursor] = { ...entry };
+		}
 		/** E.g. the playlist item changed while the entry is the current one. */
 		updateCurrent(patch) {
 			const current = this.current;
@@ -2653,6 +2749,27 @@
 				autoplay,
 				index
 			}, "navigate");
+		}
+		replace(info, { autoplay = false, index = 0, params = null } = {}) {
+			this.#journal.replace({
+				info,
+				index,
+				params
+			});
+			this.#show(info, {
+				autoplay,
+				index
+			}, "replace");
+		}
+		navigateByKey(key, options) {
+			if (!this.has(key)) throw new Error(`No info found for key '${key}'`);
+			const info = this.get(key);
+			this.navigate(info, options);
+		}
+		replaceByKey(key, options) {
+			if (!this.has(key)) throw new Error(`No info found for key '${key}'`);
+			const info = this.get(key);
+			this.replace(info, options);
 		}
 		goBack() {
 			return this.#restore(this.#journal.back(), "back");
@@ -2817,7 +2934,7 @@
 			this.#player = null;
 		}
 	};
-	// src/MetaMerge.js
+	// src/metaMerge.js
 	var isEmpty = (v) => v === "" || v == null;
 	var pick = (declared, fallback) => isEmpty(declared) ? fallback ?? "" : declared;
 	/**
@@ -2845,25 +2962,6 @@
 		}).filter(Boolean);
 		info.setVideos(videos);
 	}
-	/**
-	* Applies what the code defines for an info (the link may then be only a navigation link).
-	* Single video: {title, channel, thumbnail}. List / playlist: {videos: [{id?, title, channel, thumbnail, startSeconds}]},
-	* positional for a list of videos (the ids are known), `id` required for a playlist without data-videos.
-	* @returns {boolean} true when something changed.
-	*/
-	function applyDefinition(info, definition) {
-		if (!definition) return false;
-		if (!info.isPlaylist) return info.fillMissing(definition);
-		const items = definition.videos ?? (definition.count > 0 ? Array.from({ length: definition.count }, () => ({})) : null);
-		if (!items?.length) return false;
-		applyItems(info, items);
-		return true;
-	}
-	/** @param {object|((info) => object|null)|null} definitions Keyed by info.key ("youtube:ID", "youtube:list:a,b", "youtube:playlist:PL..."), or a function. */
-	function resolveDefinition(definitions, info, name = null) {
-		if (typeof definitions === "function") return definitions(info, name) ?? null;
-		return name && definitions?.[name] || definitions?.[info.key] || null;
-	}
 	// src/LinkPlayer.js
 	var noop = () => {};
 	var nextId = 0;
@@ -2872,19 +2970,6 @@
 	* so an attribute would make a cloned link look handled when it is not. data-lp stays as a debugging aid only.
 	*/
 	var owners = /* @__PURE__ */ new WeakMap();
-	/**
-	* Events (lp.on(type, handler); handler gets { type, region, ... }):
-	*   "change"  navigation state of a region changed (see Region)
-	*   "state"   player state: playing | paused | ended
-	*   "error"   anything that failed (a link, a load, a player, metadata); the scan goes on
-	*   onChange / onState / onError are shortcuts for the three of them.
-	*
-	* Metadata, in order: declared on the link (data-*) > `definitions` (code) > YouTube Data API (cached) > "Video 1"...
-	*   definitions: { [info.key]: { title, channel, thumbnail } | { videos: [{ id?, title, ... }] } } or (info) => ...
-	*   A link may then be only a navigation link (href + data-target).
-	*
-	* Existing iframes: <iframe data-link data-target="id" src="https://www.youtube.com/embed/..."> inside the target.
-	*/
 	var LinkPlayer = class {
 		#id;
 		#scopeEl;
@@ -2892,8 +2977,6 @@
 		#useStorage;
 		#scanEmbeds;
 		#regions = /* @__PURE__ */ new Map();
-		#names = /* @__PURE__ */ new Map();
-		#byInfo = /* @__PURE__ */ new WeakMap();
 		#initialized = /* @__PURE__ */ new WeakSet();
 		#store;
 		#registry;
@@ -2935,6 +3018,7 @@
 			this.on("change", onChange);
 			this.on("state", onState);
 			this.on("error", onError);
+			this.#registerDefs(definitions);
 			if (autoScan) this.scan();
 		}
 		get id() {
@@ -2969,7 +3053,11 @@
 			this.#regions.set(target, region);
 			return region;
 		}
-		/** Can be called again after the page changed: links and iframes already handled are skipped. */
+		/**
+		* Can be called again after the page changed: links and iframes already handled are skipped.
+		* Also initializes (saved state / showOnInit) the regions that were not yet: call it after define() calls
+		* made once the first scan is done.
+		*/
 		scan() {
 			let taken = 0;
 			for (const element of this.getLinks()) {
@@ -3005,63 +3093,7 @@
 		getSavedState(region) {
 			return this.#useStorage ? this.#store.get(`state:${region.target}`) : null;
 		}
-		/**
-		* Defines an info in code, then navigates to it by name: lp.define("intro", {...}); lp.navigate("intro").
-		* `url` gives the provider and the ids (video, list of videos, playlist); the rest is metadata.
-		* @param {string} name Your own key.
-		* @param {object} definition
-		* @param {string} definition.url
-		* @param {string} definition.target Id of the container.
-		* @param {string|boolean} [definition.autoplay]
-		* @param {number} [definition.start]
-		* @param {string} [definition.title] Single video only.
-		* @param {string} [definition.channel]
-		* @param {string} [definition.thumbnail]
-		* @param {Array<{id?: string, title?: string, channel?: string, thumbnail?: string}>} [definition.videos]
-		*   List / playlist: positional for a list of videos; `id` is optional for a playlist (placeholder id).
-		* @param {number} [definition.count] Playlist: number of items, without ids or titles.
-		* @param {*} [definition.data] Anything you want to find again: it comes back as `event.data` on every
-		*   "change" / "state" of this info (description, links, a view model...).
-		* @returns the info.
-		*/
-		define(name, { url, target, autoplay, start, title, channel, thumbnail, videos, count, data = null } = {}) {
-			if (!name) throw new Error("define(): a name is required");
-			if (this.#names.has(name)) throw new Error(`Name '${name}' is already used`);
-			if (!url || !target) throw new Error("define(): url and target are required");
-			const provider = this.#registry.resolve(url);
-			const region = this.getRegion(target);
-			const parsed = provider.getInfo({
-				tagName: "A",
-				href: url,
-				dataset: {
-					target,
-					autoplay,
-					start
-				}
-			});
-			const info = region.add(parsed) ? parsed : region.get(parsed.key);
-			this.#setName(name, region, info, data);
-			if (info === parsed) this.#applyDefinition(info, name, {
-				title,
-				channel,
-				thumbnail,
-				videos,
-				count
-			});
-			return info;
-		}
-		/** Navigates to an info by the name given with data-key or define(). */
-		navigate(name, options) {
-			const entry = this.#names.get(name);
-			if (!entry) throw new Error(`Unknown name '${name}'`);
-			entry.region.navigate(entry.info, options);
-		}
-		/** The info known under this name, or null. */
-		get(name) {
-			return this.#names.get(name)?.info ?? null;
-		}
 		dispose() {
-			this.#names.clear();
 			if (this.#scopeEl?.dataset.lpScope === this.#id) delete this.#scopeEl.dataset.lpScope;
 			for (const detach of this.#detachers) detach();
 			this.#detachers.clear();
@@ -3069,6 +3101,15 @@
 			this.#regions.clear();
 			this.#tooltip?.dispose();
 			this.#events.clear();
+		}
+		#registerDefs(definitions) {
+			if (!definitions) return;
+			for (const def of definitions) {
+				const info = (def.url ? this.#registry.resolve(def.url) : this.#registry.get(def.provider)).getInfoFromDefinition(def);
+				const target = def.target;
+				if (!target) throw new Error("Target required");
+				this.getRegion(target).add(info);
+			}
 		}
 		#register(element) {
 			const isIframe = element.tagName === "IFRAME";
@@ -3079,11 +3120,8 @@
 			if (!url) throw new Error("No URL provided");
 			const provider = this.#registry.resolve(url);
 			const region = this.getRegion(target);
-			const parsed = provider.getInfo(element);
+			const parsed = provider.getInfoFromElement(element);
 			const info = region.add(parsed) ? parsed : region.get(parsed.key);
-			const name = element.dataset.key || null;
-			if (name) this.#setName(name, region, info);
-			if (info === parsed) this.#applyDefinition(info, name);
 			owners.set(element, this);
 			element.dataset.lp = this.#id;
 			const release = () => {
@@ -3095,45 +3133,23 @@
 				this.#detachers.add(release);
 				return;
 			}
+			const key = info.key;
+			const current = () => region.get(key) ?? info;
 			const onClick = (e) => {
 				e.preventDefault();
-				region.navigate(info, {
-					autoplay: info.autoplay === AUTOPLAY_MODES.INIT || info.autoplay === AUTOPLAY_MODES.CLICK,
-					index: info.index
+				const target = current();
+				region.navigate(target, {
+					autoplay: target.autoplay === AUTOPLAY_MODES.INIT || target.autoplay === AUTOPLAY_MODES.CLICK,
+					index: target.index
 				});
 			};
 			element.addEventListener("click", onClick);
-			const detachTip = this.#attachTooltip(element, info, provider);
+			const detachTip = this.#attachTooltip(element, current, provider);
 			this.#detachers.add(() => {
 				element.removeEventListener("click", onClick);
 				detachTip();
 				release();
 			});
-		}
-		#setName(name, region, info, data = null) {
-			const known = this.#names.get(name);
-			if (known && known.info !== info) throw new Error(`Name '${name}' is already used`);
-			this.#names.set(name, {
-				region,
-				info,
-				data
-			});
-			this.#byInfo.set(info, {
-				name,
-				data
-			});
-		}
-		/** `inline` (from define()) first, then the `definitions` option; what is already filled is never overwritten. */
-		#applyDefinition(info, name = null, inline = null) {
-			try {
-				applyDefinition(info, inline);
-				applyDefinition(info, resolveDefinition(this.#definitions, info, name));
-			} catch (error) {
-				this.#events.emit("error", {
-					error,
-					info
-				});
-			}
 		}
 		/** Completes the items of a playlist; called by the region the first time the playlist is shown. */
 		async #enrich(info) {
@@ -3142,14 +3158,9 @@
 			applyItems(info, items);
 			return true;
 		}
-		/** Forwards the region event, plus the `name` and `data` given to define() for event.info (null when there are none). */
+		/** The region events already carry `info` and `data`. */
 		#onRegionEvent(event) {
-			const entry = event.info ? this.#byInfo.get(event.info) : null;
-			this.#events.emit(event.type, {
-				...event,
-				name: entry?.name ?? null,
-				data: entry?.data ?? null
-			});
+			this.#events.emit(event.type, event);
 			if (event.type === "change") this.#save(event);
 		}
 		/** The state is saved at every navigation change, not only when the page closes. */
@@ -3179,9 +3190,10 @@
 				thumbnail: first?.thumbnail || null
 			};
 		}
-		#attachTooltip(element, info, provider) {
+		/** @param {() => object} getInfo Current info of the link (it may have been replaced). */
+		#attachTooltip(element, getInfo, provider) {
 			if (!this.#tooltip) return noop;
-			return this.#tooltip.attach(element, () => this.#thumbnails.resolve(this.#tooltipData(info).thumbnail), () => this.#tooltipData(info).title, {
+			return this.#tooltip.attach(element, () => this.#thumbnails.resolve(this.#tooltipData(getInfo()).thumbnail), () => this.#tooltipData(getInfo()).title, {
 				id: provider.id,
 				name: provider.name ?? provider.id
 			});
