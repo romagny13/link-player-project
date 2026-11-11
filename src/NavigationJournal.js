@@ -28,6 +28,12 @@ export class NavigationJournal {
         this.#cursor++;
     }
 
+    /** Replaces the current entry (history.replaceState): nothing is added, the forward history is kept. */
+    replace(entry) {
+        if (this.#cursor < 0) return this.push(entry);
+        this.#entries[this.#cursor] = {...entry};
+    }
+
     /** E.g. the playlist item changed while the entry is the current one. */
     updateCurrent(patch) {
         const current = this.current;

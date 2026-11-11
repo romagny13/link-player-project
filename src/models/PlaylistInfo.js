@@ -9,7 +9,7 @@ export class PlaylistInfo {
     #showOnInit;
     #videos = [];
 
-    constructor(provider, target, playlistId, videoId, showOnInit) {
+    constructor(provider, target, playlistId, videoId, showOnInit, key = null) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
         ValueChecks.requireNotNullOrEmpty(target, "target");
         ValueChecks.requireNotNullOrEmpty(playlistId, "playlistId");
@@ -20,7 +20,7 @@ export class PlaylistInfo {
         this.#videoId = videoId;
         this.#showOnInit = showOnInit;
 
-        this.#key = `${this.#provider}:playlist:${this.#playlistId}`;
+        this.#key = key ?? `${this.#provider}:playlist:${this.#playlistId}`;
     }
 
     get key() {

@@ -17,6 +17,9 @@ export function toBoolean(value) {
 
 export const isEmpty = (v) => v === "" || v == null;
 
+export const isTouch = () =>
+    !!globalThis.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
+
 export const AUTOPLAY_MODES = Object.freeze({
     NONE: "none", // false
     INIT: "init", // true
@@ -31,5 +34,67 @@ export function toAutoplayMode(value) {
     return AUTOPLAY_MODES.NONE;
 }
 
-export const isTouch = () =>
-    !!globalThis.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
+function normalizeSeed(input) {
+    if (input == null) throw new TypeError("Media: input is required");
+    if (typeof input === "string") return {url: input};
+    if (typeof input === "object") return {...input};
+    throw new TypeError("Media: expected url string or object");
+}
+
+function createBuilder(type, input, batchList = null) {
+    const def = {type, ...normalizeSeed(input)};
+
+    if (!batchList) {
+        batchList = [def];
+    } else {
+        batchList.push(def);
+    }
+
+    const set = (k, v) => {
+        def[k] = v;
+        return api;
+    };
+
+    const api = {
+        title: (v) => set("title", v),
+        channel(v) {
+            def.channel = v;
+            return api;
+        },
+        thumbnail: (v) => set("thumbnail", v),
+        autoplay: (v = AUTOPLAY_MODES.INIT) => set("autoplay", v),
+        start: (v) => set("start", v),
+        showOnInit: (v = true) => set("showOnInit", v),
+        target: (v) => set("target", v),
+        key: (v) => set("key", v),
+        name: (v) => set("name", v),
+        videos(v) {
+            def.videos = v;
+            return api;
+        },
+
+        // --- Permet d'enchaîner les types en conservant la même liste ---
+        video(input) {
+            return createBuilder("video", input, batchList);
+        },
+        videoList(input) {
+            return createBuilder("videoList", input, batchList);
+        },
+        playlist(input) {
+            return createBuilder("playlist", input, batchList);
+        },
+
+        // --- Retourne toujours un tableau ---
+        build() {
+            return batchList;
+        }
+    };
+
+    return api;
+}
+
+export const Media = {
+    video: (input) => createBuilder("video", input),
+    videoList: (input) => createBuilder("videoList", input),
+    playlist: (input) => createBuilder("playlist", input),
+};

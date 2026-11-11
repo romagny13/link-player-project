@@ -1,4 +1,5 @@
 import {OkruBridgeEvent, OkruIframeBridge} from "./OkruIframeBridge.js";
+import {OkruEmbedSrcBuilder} from "./OkruEmbedSrcBuilder.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 
 /**
@@ -10,24 +11,26 @@ export class OkruPlayer {
     kind = "okru";
 
     #createIframe;
+    #urlBuilder;
     #iframe = null;
-    #embedBaseUrl = null;
     #bridge = null;
     #owned = false;
     #listeners = new Set();
-    #videos = [];
-    #ids = [];
+    /** @type {{ id: string, info: import("../../models/VideoInfo.js").VideoInfo | null }[]} a single video is a list of one */
+    #items = [];
     #index = 0;
 
     /**
      * @param {Object} options
      * @param {(src: string) => HTMLIFrameElement} [options.createIframe] Required unless an iframe is adopted.
      * @param {HTMLIFrameElement} [options.iframe] An existing iframe to adopt.
+     * @param {string} [options.embedBaseUrl] Relay page url (ignored if urlBuilder is given).
+     * @param {OkruEmbedSrcBuilder} [options.urlBuilder]
      */
-    constructor({createIframe = null, iframe = null, embedBaseUrl = null} = {}) {
+    constructor({createIframe = null, iframe = null, embedBaseUrl = null, urlBuilder = null} = {}) {
         this.#createIframe = createIframe;
+        this.#urlBuilder = urlBuilder ?? new OkruEmbedSrcBuilder({relayBaseUrl: embedBaseUrl});
         if (iframe) this.#attach(iframe, false);
-        this.#embedBaseUrl = embedBaseUrl;
     }
 
     get iframe() {
@@ -40,8 +43,9 @@ export class OkruPlayer {
     }
 
     load(info, {autoplay = false, index = 0} = {}) {
-        this.#ids = info instanceof VideoListInfo ? [...info.videoIds] : [info.videoId];
-        this.#videos = info instanceof VideoListInfo ? [...info.videos] : [info];
+        this.#items = info instanceof VideoListInfo
+            ? info.videoIds.map((id, i) => ({id, info: info.videos[i] ?? null}))
+            : [{id: info.videoId, info}];
         this.#show(index, autoplay);
     }
 
@@ -76,49 +80,26 @@ export class OkruPlayer {
     // ───────── internals ─────────
 
     #show(index, autoplay) {
-        const id = this.#ids[index];
-        if (id === undefined) return; // out of range: nothing to play
+        const item = this.#items[index];
+        if (!item) return; // out of range: nothing to play
 
         this.#index = index;
-        const info = this.#videos[index];
-        const src = this.#getSrc(id, autoplay, info?.startSeconds);
-        if (this.#iframe) this.#iframe.src = src;
-        else this.#attach(this.#createIframe(src), true);
+        const src = this.#urlBuilder.build({
+            videoId: item.id,
+            autoplay,
+            startSeconds: item.info?.startSeconds
+        });
 
-        if (this.#ids.length > 1) this.#emit({type: "itemChange", index});
-    }
-
-    #getSrc(videoId, autoplay, startSeconds) {
-        if (this.#embedBaseUrl) {
-            return this.#buildRelaySrc(videoId, autoplay, startSeconds);
+        if (this.#iframe) {
+            this.#iframe.src = src;
+        } else {
+            if (!this.#createIframe) {
+                throw new Error("OkruPlayer: createIframe is required when no iframe is adopted");
+            }
+            this.#attach(this.#createIframe(src), true);
         }
-        return this.#buildSrc(videoId, autoplay, startSeconds);
-    }
 
-    #buildSrc(videoId, autoplay, startSeconds) {
-        if (!videoId) throw new TypeError("videoId is required");
-
-        const q = new URLSearchParams();
-        if (autoplay) q.set("autoplay", "1");
-        if (startSeconds > 0) q.set("fromTime", Math.floor(startSeconds));
-
-        const s = q.toString();
-        return `https://ok.ru/videoembed/${encodeURIComponent(videoId)}${
-            s ? `?${s}` : ""
-        }`;
-    }
-
-    #buildRelaySrc(videoId, autoplay, startSeconds) {
-        if (!videoId)
-            throw new TypeError("buildOkruRelaySrc(): videoId is required");
-        const url = new URL(this.#embedBaseUrl);
-        url.searchParams.set("videoId", videoId);
-        if (autoplay) url.searchParams.set("autoplay", "1");
-        if (startSeconds > 0)
-            url.searchParams.set("startSeconds", Math.floor(startSeconds));
-        const parentOrigin = globalThis.location?.origin;
-        if (parentOrigin) url.searchParams.set("parentOrigin", parentOrigin);
-        return url.href;
+        if (this.#items.length > 1) this.#emit({type: "itemChange", index});
     }
 
     #attach(iframe, owned) {
@@ -137,7 +118,7 @@ export class OkruPlayer {
             case OkruBridgeEvent.VideoPause: return this.#emit({type: "state", state: "paused", index: this.#index});
             case OkruBridgeEvent.VideoEnded:
                 this.#emit({type: "state", state: "ended", index: this.#index});
-                if (this.#index + 1 < this.#ids.length) this.next();
+                if (this.#index + 1 < this.#items.length) this.next();
                 return;
             case OkruBridgeEvent.Error: return this.#emit({type: "error", error: new Error(e.message ?? "Ok.ru player error")});
         }

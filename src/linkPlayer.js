@@ -10,7 +10,7 @@ import {Emitter} from "./utils/Emitter.js";
 import {Tooltip} from "./ui/Tooltip.js";
 import {ThumbnailService} from "./ThumbnailService.js";
 import {Region} from "./Region.js";
-import {applyDefinition, applyItems, resolveDefinition} from "./MetaMerge.js";
+import {applyDefinition, applyItems, resolveDefinition} from "./metaMerge.js";
 
 const noop = () => {
 };
@@ -23,19 +23,6 @@ let nextId = 0;
  */
 const owners = new WeakMap();
 
-/**
- * Events (lp.on(type, handler); handler gets { type, region, ... }):
- *   "change"  navigation state of a region changed (see Region)
- *   "state"   player state: playing | paused | ended
- *   "error"   anything that failed (a link, a load, a player, metadata); the scan goes on
- *   onChange / onState / onError are shortcuts for the three of them.
- *
- * Metadata, in order: declared on the link (data-*) > `definitions` (code) > YouTube Data API (cached) > "Video 1"...
- *   definitions: { [info.key]: { title, channel, thumbnail } | { videos: [{ id?, title, ... }] } } or (info) => ...
- *   A link may then be only a navigation link (href + data-target).
- *
- * Existing iframes: <iframe data-link data-target="id" src="https://www.youtube.com/embed/..."> inside the target.
- */
 export class LinkPlayer {
     #id;
     #scopeEl;
@@ -43,8 +30,6 @@ export class LinkPlayer {
     #useStorage;
     #scanEmbeds;
     #regions = new Map();
-    #names = new Map(); // your own keys -> { region, info, data }
-    #byInfo = new WeakMap(); // info -> { name, data }: events carry them
     #initialized = new WeakSet();
     #store;
     #registry;
@@ -114,6 +99,8 @@ export class LinkPlayer {
         this.on("state", onState);
         this.on("error", onError);
 
+        this.#registerDefs(definitions);
+
         if (autoScan) this.scan();
     }
 
@@ -157,7 +144,11 @@ export class LinkPlayer {
         return region;
     }
 
-    /** Can be called again after the page changed: links and iframes already handled are skipped. */
+    /**
+     * Can be called again after the page changed: links and iframes already handled are skipped.
+     * Also initializes (saved state / showOnInit) the regions that were not yet: call it after define() calls
+     * made once the first scan is done.
+     */
     scan() {
         let taken = 0;
         for (const element of this.getLinks()) {
@@ -201,55 +192,7 @@ export class LinkPlayer {
         return this.#useStorage ? this.#store.get(`state:${region.target}`) : null;
     }
 
-    // ───────── code-only use (no link at all) ─────────
-
-    /**
-     * Defines an info in code, then navigates to it by name: lp.define("intro", {...}); lp.navigate("intro").
-     * `url` gives the provider and the ids (video, list of videos, playlist); the rest is metadata.
-     * @param {string} name Your own key.
-     * @param {object} definition
-     * @param {string} definition.url
-     * @param {string} definition.target Id of the container.
-     * @param {string|boolean} [definition.autoplay]
-     * @param {number} [definition.start]
-     * @param {string} [definition.title] Single video only.
-     * @param {string} [definition.channel]
-     * @param {string} [definition.thumbnail]
-     * @param {Array<{id?: string, title?: string, channel?: string, thumbnail?: string}>} [definition.videos]
-     *   List / playlist: positional for a list of videos; `id` is optional for a playlist (placeholder id).
-     * @param {number} [definition.count] Playlist: number of items, without ids or titles.
-     * @param {*} [definition.data] Anything you want to find again: it comes back as `event.data` on every
-     *   "change" / "state" of this info (description, links, a view model...).
-     * @returns the info.
-     */
-    define(name, {url, target, autoplay, start, title, channel, thumbnail, videos, count, data = null} = {}) {
-        if (!name) throw new Error("define(): a name is required");
-        if (this.#names.has(name)) throw new Error(`Name '${name}' is already used`);
-        if (!url || !target) throw new Error("define(): url and target are required");
-
-        const provider = this.#registry.resolve(url);
-        const region = this.getRegion(target);
-        const parsed = provider.getInfo({tagName: "A", href: url, dataset: {target, autoplay, start}}); // the parsers only read these
-        const info = region.add(parsed) ? parsed : region.get(parsed.key);
-        this.#setName(name, region, info, data);
-        if (info === parsed) this.#applyDefinition(info, name, {title, channel, thumbnail, videos, count});
-        return info;
-    }
-
-    /** Navigates to an info by the name given with data-key or define(). */
-    navigate(name, options) {
-        const entry = this.#names.get(name);
-        if (!entry) throw new Error(`Unknown name '${name}'`);
-        entry.region.navigate(entry.info, options);
-    }
-
-    /** The info known under this name, or null. */
-    get(name) {
-        return this.#names.get(name)?.info ?? null;
-    }
-
     dispose() {
-        this.#names.clear();
         if (this.#scopeEl?.dataset.lpScope === this.#id) delete this.#scopeEl.dataset.lpScope;
         for (const detach of this.#detachers) detach();
         this.#detachers.clear();
@@ -260,6 +203,23 @@ export class LinkPlayer {
     }
 
     // ───────── internals ─────────
+
+    #registerDefs(definitions) {
+        if(!definitions)
+            return;
+
+        for (const def of definitions) {
+            const provider = def.url ? this.#registry.resolve(def.url) :
+                this.#registry.get(def.provider);
+            const info = provider.getInfoFromDefinition(def);
+
+            const target = def.target;
+            if (!target) throw new Error("Target required");
+
+            const region = this.getRegion(target);
+            region.add(info);
+        }
+    }
 
     #register(element) {
         const isIframe = element.tagName === "IFRAME";
@@ -274,11 +234,9 @@ export class LinkPlayer {
         const provider = this.#registry.resolve(url);
         const region = this.getRegion(target);
 
-        const parsed = provider.getInfo(element);
-        const info = region.add(parsed) ? parsed : region.get(parsed.key); // same link twice: keep the first object
-        const name = element.dataset.key || null; // your own key: lp.navigate(name), definitions[name]
-        if (name) this.#setName(name, region, info);
-        if (info === parsed) this.#applyDefinition(info, name);
+        const parsed = provider.getInfoFromElement(element); // data-key is injected in the model (info.key)
+        const info = region.add(parsed) ? parsed : region.get(parsed.key); // same key twice: keep the first object
+        // if (info === parsed) this.#applyDefinition(info);
 
         owners.set(element, this);
         element.dataset.lp = this.#id; // debugging aid: the source of truth is `owners`
@@ -293,38 +251,26 @@ export class LinkPlayer {
             return;
         }
 
+        // resolved by key when used: region.replace() may have swapped the object since the link was registered
+        const key = info.key;
+        const current = () => region.get(key) ?? info;
+
         const onClick = (e) => {
             e.preventDefault();
-            region.navigate(info, {
-                autoplay: info.autoplay === AUTOPLAY_MODES.INIT || info.autoplay === AUTOPLAY_MODES.CLICK,
-                index: info.index
+            const target = current();
+            region.navigate(target, {
+                autoplay: target.autoplay === AUTOPLAY_MODES.INIT || target.autoplay === AUTOPLAY_MODES.CLICK,
+                index: target.index
             });
         };
         element.addEventListener("click", onClick);
 
-        const detachTip = this.#attachTooltip(element, info, provider);
+        const detachTip = this.#attachTooltip(element, current, provider);
         this.#detachers.add(() => {
             element.removeEventListener("click", onClick);
             detachTip();
             release();
         });
-    }
-
-    #setName(name, region, info, data = null) {
-        const known = this.#names.get(name);
-        if (known && known.info !== info) throw new Error(`Name '${name}' is already used`);
-        this.#names.set(name, {region, info, data});
-        this.#byInfo.set(info, {name, data});
-    }
-
-    /** `inline` (from define()) first, then the `definitions` option; what is already filled is never overwritten. */
-    #applyDefinition(info, name = null, inline = null) {
-        try {
-            applyDefinition(info, inline);
-            applyDefinition(info, resolveDefinition(this.#definitions, info, name));
-        } catch (error) {
-            this.#events.emit("error", {error, info});
-        }
     }
 
     /** Completes the items of a playlist; called by the region the first time the playlist is shown. */
@@ -335,10 +281,9 @@ export class LinkPlayer {
         return true;
     }
 
-    /** Forwards the region event, plus the `name` and `data` given to define() for event.info (null when there are none). */
+    /** The region events already carry `info` and `data`. */
     #onRegionEvent(event) {
-        const entry = event.info ? this.#byInfo.get(event.info) : null;
-        this.#events.emit(event.type, {...event, name: entry?.name ?? null, data: entry?.data ?? null});
+        this.#events.emit(event.type, event);
         if (event.type === "change") this.#save(event);
     }
 
@@ -372,12 +317,13 @@ export class LinkPlayer {
         return {title: first?.title ?? "", thumbnail: first?.thumbnail || null};
     }
 
-    #attachTooltip(element, info, provider) {
+    /** @param {() => object} getInfo Current info of the link (it may have been replaced). */
+    #attachTooltip(element, getInfo, provider) {
         if (!this.#tooltip) return noop;
         return this.#tooltip.attach(
             element,
-            () => this.#thumbnails.resolve(this.#tooltipData(info).thumbnail), // no argument: the tooltip calls it bare
-            () => this.#tooltipData(info).title,
+            () => this.#thumbnails.resolve(this.#tooltipData(getInfo()).thumbnail), // no argument: the tooltip calls it bare
+            () => this.#tooltipData(getInfo()).title,
             {id: provider.id, name: provider.name ?? provider.id}
         );
     }

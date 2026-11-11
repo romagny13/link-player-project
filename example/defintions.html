@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+
+<script kind="module">
+    import {LinkPlayer} from "../src/LinkPlayer.js";
+
+
+    Media.video("suce").playlist("l").build();
+    [{ videoId },{videoIds},{ playlistId}]
+
+    // on a des infos indiquées dans l'url:
+    // - video id, start
+    // - video ids, index, start
+    // - playlist id, video id
+    // PLUS en attributs data
+    // - autoplay, show-on-init, target
+    // - title, channel, thumbnail
+    const definitions = {
+        // video : https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s
+        "my-video": {
+            provider: "youtube", videoId: "z2sv_RsNwM4", // ou url ?
+            title: "Drawing ASMR", channel: "sohanna rici" // channel Url utile
+        },
+        // video list https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=1
+        "my-video-list": {
+            provider: "youtube", videoIds: ["z2sv_RsNwM4", "-xiF9YIIUk4"], index: 1 // ou url ?
+
+        },
+        // playlist https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ
+        "my-playlist": {
+            provider: "youtube", playlistId: "PLYALQE76y6LQ", videoId: "s11CNT_hQTg"
+        }
+    };
+
+    // navigation en code par info ? par key ?
+
+    const lp = new LinkPlayer({
+        definitions: {
+            // key = info.key: infos defined in code, the link stays a plain navigation link
+            "youtube:z2sv_RsNwM4": {title: "Bruits de train et de pluie", channel: "Relaxing White Noise"},
+            "youtube:list:z2sv_RsNwM4,-xiF9YIIUk4": {
+                videos: [{title: "Train and rain"}, {title: "Second video"}]
+            }
+        },
+        onError: ({error, element, region}) => console.warn("[example]", region?.target, element, error)
+    });
+
+
+</script>
+</body>
+</html>

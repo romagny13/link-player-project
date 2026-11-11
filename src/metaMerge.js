@@ -43,15 +43,14 @@ export function applyItems(info, items) {
 export function applyDefinition(info, definition) {
     if (!definition) return false;
     if (!info.isPlaylist) return info.fillMissing(definition);
-    // `count` alone gives N items without any id or title ("Video 1" ... "Video N")
-    const items = definition.videos ?? (definition.count > 0 ? Array.from({length: definition.count}, () => ({})) : null);
+    const items = definition.videos;
     if (!items?.length) return false;
     applyItems(info, items);
     return true;
 }
 
 /** @param {object|((info) => object|null)|null} definitions Keyed by info.key ("youtube:ID", "youtube:list:a,b", "youtube:playlist:PL..."), or a function. */
-export function resolveDefinition(definitions, info, name = null) {
-    if (typeof definitions === "function") return definitions(info, name) ?? null;
-    return (name && definitions?.[name]) || definitions?.[info.key] || null; // your own name first, then info.key
+export function resolveDefinition(definitions, info) {
+    if (typeof definitions === "function") return definitions(info) ?? null;
+    return definitions?.[info.key] ?? null;
 }

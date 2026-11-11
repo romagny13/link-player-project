@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LinkPlayer · definitions generator</title>
+    <style>
+      :root {
+        --bg: #fffaf8; --ink: #6b5550; --muted: #b5a09b; --line: #f8ebe5;
+        --field: #f3e4dc; --soft: #fef6f2; --accent: #f0a28f; --accent-ink: #d47a65;
+        --white: #ffffff; --shadow: rgba(107, 85, 80, 0.07); --focus: rgba(240, 162, 143, 0.35);
+        --hover-border: #e8c4b8; --note-bg: #fff6ed; --note-border: #f0d9c8;
+        --ok: #4a9a6e; --err: #d66a6a; --item-border: #f3e9e4; --item-hover: #fef8f5;
+        --subtle: #c2b0ab; --mark: #ffe8c8; --pre-bg: #231e1c; --pre-ink: #f3ebe7;
+      }
+      body { max-width: 1000px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--ink); font-family: system-ui, sans-serif; }
+      h1 { font-size: 1.4rem; }
+      h1 span, .muted { color: var(--muted); font-weight: 400; }
+      .card { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); box-shadow: 0 2px 10px var(--shadow); }
+      .card h2 { margin: 0 0 10px; font-size: 1rem; }
+      .card h2 b { display: inline-block; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%; background: var(--accent); color: var(--white); text-align: center; font-size: 0.8rem; line-height: 22px; }
+      textarea, input[type="text"], select { padding: 6px 8px; border: 1px solid var(--field); border-radius: 6px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; }
+      textarea:focus, input[type="text"]:focus, select:focus { outline: 2px solid var(--focus); border-color: var(--accent); }
+      textarea { width: 100%; height: 120px; font-family: monospace; box-sizing: border-box; }
+      input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin: 0; border: 1.5px solid var(--field); border-radius: 4px; background: var(--white); cursor: pointer; position: relative; vertical-align: middle; transition: all 0.15s ease; }
+      input[type="checkbox"]:hover { border-color: var(--accent); background: var(--soft); }
+      input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+      input[type="checkbox"]:checked::after { content: ""; position: absolute; left: 4.5px; top: 1.5px; width: 4px; height: 8px; border: solid var(--white); border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); }
+      input[type="checkbox"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+      button { padding: 6px 12px; border: 1px solid var(--field); border-radius: 6px; background: var(--white); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+      button:hover:not(:disabled) { background: var(--soft); border-color: var(--hover-border); }
+      button:disabled, input:disabled, select:disabled { opacity: 0.45; cursor: not-allowed; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: var(--white); }
+      button.primary:hover:not(:disabled) { background: var(--accent-ink); border-color: var(--accent-ink); }
+      .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+      .grow { flex: 1; min-width: 160px; }
+      .note { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--note-border); border-radius: 6px; background: var(--note-bg); font-size: 13px; }
+      .ok { color: var(--ok); } .err { color: var(--err); }
+      .badge { padding: 3px 10px; border-radius: 999px; background: var(--soft); color: var(--accent-ink); font-size: 12px; }
+      #list { max-height: 320px; margin-top: 10px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; }
+      .item { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--item-border); font-size: 13px; }
+      .item:hover { background: var(--item-hover); }
+      .item.off { opacity: 0.5; }
+      .item .n { min-width: 28px; color: var(--subtle); }
+      .item img { width: 56px; height: 32px; object-fit: cover; border-radius: 3px; background: var(--line); }
+      .item code { min-width: 110px; color: var(--muted); }
+      .item .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .item .d { color: var(--subtle); }
+      .empty { padding: 12px; color: var(--subtle); text-align: center; }
+      mark { background: var(--mark); }
+      .opts { display: flex; flex-wrap: wrap; gap: 12px; }
+      .opts label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+      .opts label.inline { flex-direction: row; align-items: center; align-self: flex-end; padding-bottom: 6px; gap: 6px; }
+      pre { max-height: 420px; margin: 12px 0 0; padding: 14px 16px; overflow: auto; border-radius: 10px; background: var(--pre-bg); color: var(--pre-ink); font-size: 12.5px; line-height: 1.5; border: 1px solid rgba(0, 0, 0, 0.08); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>LinkPlayer <span>· definitions generator</span></h1>
+      <p class="muted">
+        Paste the HTML of a YouTube playlist page or an Ok.ru page
+        (<code>.portlet</code>): the links and the <code>definitions</code> (arrays of
+        <code>{ videoId, title, channel, thumbnail, duration }</code>) are generated
+        hardcoded, without YouTube Data API.
+      </p>
+
+      <section class="card">
+        <h2><b>1</b> Source</h2>
+        <textarea id="src" placeholder="YouTube HTML (ytd-playlist-video-renderer) or Ok.ru (.portlet)"></textarea>
+        <div class="row">
+          <button class="primary" id="go">Parse</button>
+          <button id="clear">Clear</button>
+          <span id="status" class="muted"></span>
+        </div>
+        <div class="note" id="ytNote" hidden>
+          YouTube loads the playlist in batches: scroll through the entire list
+          before copying the HTML, otherwise videos will be missing.
+        </div>
+      </section>
+
+      <section class="card" id="step2" hidden>
+        <h2><b>2</b> Selection</h2>
+        <div class="row" style="margin-top: 0">
+          <input type="text" id="q" class="grow" placeholder="Filter: term1, term2, …" />
+          <select id="sort">
+            <option value="alpha">Alphabetical</option>
+            <option value="source">Source order</option>
+            <option value="sel">Selection order</option>
+          </select>
+          <button id="all">All</button>
+          <button id="none">None</button>
+          <span class="badge" id="count"></span>
+        </div>
+        <div class="note" id="lockNote" hidden>
+          Playlist mode: the panel relies on the actual playlist index, so the
+          selection is the whole playlist (filter, sort and selection are
+          disabled). For a custom selection use the "list of videos" mode.
+        </div>
+        <div id="list"></div>
+      </section>
+
+      <section class="card" id="step3" hidden>
+        <h2><b>3</b> Code</h2>
+        <div class="opts">
+          <label>Mode
+            <select id="mode">
+              <option value="list">One link: a list of these videos (filter / sort OK)</option>
+              <option value="playlist">One link: the actual playlist (YouTube, source order)</option>
+              <option value="videos">One link per video</option>
+            </select>
+          </label>
+          <label>Title <input type="text" id="title" value="My playlist" /></label>
+          <label>Key (data-key) <input type="text" id="key" placeholder="auto" /></label>
+          <label>Autoplay
+            <select id="auto">
+              <option value="">none (default)</option>
+              <option value="click">click</option>
+              <option value="init">init</option>
+            </select>
+          </label>
+          <label>Output
+            <select id="output">
+              <option value="snippet">Snippet (links + definitions)</option>
+              <option value="page">Full page (links, controls, player)</option>
+            </select>
+          </label>
+          <label class="inline" id="ctlWrap"><input type="checkbox" id="ctl" checked />&nbsp;Controls</label>
+          <label id="pidWrap" hidden>Playlist id <input type="text" id="pid" placeholder="PL…" /></label>
+        </div>
+        <div class="note" id="longNote" hidden>
+          Long list: the link URL gets very long. The playlist mode avoids it.
+        </div>
+        <pre id="out"></pre>
+        <div class="row"><button class="primary" id="copy">Copy</button></div>
+      </section>
+    </main>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const J = JSON.stringify;
+      let provider = "", vids = [], on = new Set(), order = [];
+
+      /* the look of the generated page */
+      const STYLE = `        body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 16px; background: #f7f9fc; color: #2f3a4f; }
+
+            /* links */
+            .links { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+            .links a { padding: 6px 14px; border-radius: 999px; background: #e8eefc; color: #3f5bd6; text-decoration: none; font-size: 14px; }
+            .links a:hover { background: #d9e3fb; }
+
+            /* controls */
+            .controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+            .controls .sep { width: 1px; background: #d5dcea; margin: 0 6px; }
+            .controls button {
+                padding: 6px 12px; border: 1px solid #d5dcea; border-radius: 6px;
+                background: #fff; color: #2f3a4f; font: inherit; font-size: 13px; cursor: pointer;
+            }
+            .controls button:hover:not(:disabled) { background: #f0f4fd; border-color: #aab8e6; }
+            .controls button:disabled { opacity: .45; cursor: not-allowed; }
+
+            /* 16/9 player */
+            .video-container {
+                position: relative; width: 100%; max-width: 1200px; margin: 0 auto;
+                border-radius: 12px; overflow: hidden; background: #e9eef7;
+                box-shadow: 0 6px 20px rgba(60, 80, 140, .12);
+                /* playlist panel colors */
+                --lp-bg: #fff; --lp-border: #e2e8f2; --lp-hover: #f0f4fd;
+                --lp-text: #5b6679; --lp-text-active: #1f2a44; --lp-muted: #8a96ab; --lp-accent: #5b7cfa;
+            }
+            .video-container:empty { display: none; }
+            .video-container::before { content: ""; display: block; padding-top: 56.25%; }
+            .video-container iframe {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;
+            }`;
+
+      const CONTROLS = {
+        back: ["◀ Back", "r.goBack()", "r.canGoBack"],
+        forward: ["Forward ▶", "r.goForward()", "r.canGoForward"],
+        prevInfo: ["⏮ Previous link", "r.previousInfo()", "r.canGoPreviousInfo"],
+        nextInfo: ["Next link ⏭", "r.nextInfo()", "r.canGoNextInfo"],
+        prevItem: ["◁ Previous video", "r.previousItem()", "r.canGoPreviousItem"],
+        nextItem: ["Next video ▷", "r.nextItem()", "r.canGoNextItem"],
+        toggle: ["Show / hide", "r.toggle()", "r.current !== null"]
+      };
+
+      const URLS = {
+        youtube: {
+          video: (id) => `https://www.youtube.com/watch?v=${id}`,
+          list: (ids) => `https://www.youtube.com/watch_videos?video_ids=${ids.join(",")}`,
+          playlist: (pid) => `https://www.youtube.com/playlist?list=${pid}`
+        },
+        okru: {
+          video: (id) => `https://ok.ru/video/${id}`,
+          list: (ids) => `https://ok.ru/video?video_ids=${ids.join(",")}`
+        }
+      };
+
+      /* ───────── parsing ───────── */
+      const txt = (e) => e?.textContent.trim().replace(/\s+/g, " ") || "";
+      const secs = (t) => {
+        const p = (t || "").split(":").map(Number);
+        return !t || p.length > 3 || p.some(isNaN) ? null : p.reduce((a, n) => a * 60 + n, 0);
+      };
+      const fmt = (s) => {
+        if (s == null) return "";
+        const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, r = String(s % 60).padStart(2, "0");
+        return h ? `${h}:${String(m).padStart(2, "0")}:${r}` : `${m}:${r}`;
+      };
+
+      /** Each video: { id, title, channel, thumbnail, duration } */
+      function parse(html) {
+        const d = new DOMParser().parseFromString(html, "text/html");
+        const seen = new Set(), items = [];
+        let prov = "", playlistId = "";
+        const add = (v) => {
+          if (v.id && !seen.has(v.id)) {
+            seen.add(v.id);
+            items.push(v);
+          }
+        };
+
+        const yt = d.querySelectorAll("ytd-playlist-video-renderer");
+        if (yt.length) {
+          prov = "youtube";
+          yt.forEach((r) => {
+            const a = r.querySelector("a#video-title") || r.querySelector('a[href*="watch?v="]');
+            const u = a && new URL(a.getAttribute("href"), "https://www.youtube.com");
+            if (u && !playlistId) playlistId = u.searchParams.get("list") || "";
+            const id = u?.searchParams.get("v") || "";
+            add({
+              id,
+              title: a?.title || txt(a),
+              channel: r.querySelector("ytd-channel-name yt-formatted-string")?.title || txt(r.querySelector("ytd-channel-name a")),
+              // clean, stable URL (the <img> src carries temporary query params)
+              thumbnail: id ? `https://i.ytimg.com/vi/${id}/mqdefault.jpg` : "",
+              duration: secs(txt(r.querySelector(".ytBadgeShapeText")))
+            });
+          });
+        } else {
+          prov = "okru";
+          d.querySelectorAll('a.video-card_n[href^="/video/"]').forEach((a) => {
+            const card = a.closest(".video-card");
+            const id =
+              card?.dataset.id ||
+              card?.querySelector("[data-movie-id]")?.dataset.movieId ||
+              a.getAttribute("href").match(/^\/video\/(\d+)/)?.[1];
+            add({
+              id,
+              title: a.title || txt(a),
+              channel: card?.querySelector("[data-author-name]")?.dataset.authorName || "",
+              thumbnail: card?.querySelector("img.vid-card_img")?.getAttribute("src") || "",
+              duration: secs(txt(card?.querySelector(".vid-card_duration")))
+            });
+          });
+        }
+        return { prov, playlistId, items };
+      }
+
+      /* ───────── selection ───────── */
+      const locked = () => provider === "youtube" && $("mode").value === "playlist";
+      const terms = () => $("q").value.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+      const shown = () => {
+        const t = terms();
+        return locked() || !t.length ? vids : vids.filter((v) => t.some((x) => v.title.toLowerCase().includes(x)));
+      };
+      const chosen = () => {
+        if (locked()) return vids;
+        let l = vids.filter((v) => on.has(v.id));
+        const s = $("sort").value;
+        if (s === "alpha") l.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: "base" }));
+        if (s === "sel") l = order.filter((id) => on.has(id)).map((id) => vids.find((v) => v.id === id));
+        return l;
+      };
+
+      /* ───────── generation ───────── */
+      const slug = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+      const indent = (s, n) => s.split("\n").map((l, i) => (i ? " ".repeat(n) + l : l)).join("\n");
+
+      /** One video object of a definition. */
+      function item(v, key) {
+        const parts = [
+          key && `key: ${J(key)}`,
+          `videoId: ${J(v.id)}`,
+          `title: ${J(v.title)}`,
+          v.channel && `channel: ${J(v.channel)}`,
+          v.thumbnail && `thumbnail: ${J(v.thumbnail)}`,
+          v.duration != null && `duration: ${v.duration}`
+        ];
+        return `{ ${parts.filter(Boolean).join(", ")} }`;
+      }
+
+      function build(c) {
+        const title = $("title").value.trim() || "Videos";
+        const key = $("key").value.trim() || (provider === "youtube" ? "yt-" : "ok-") + (slug(title) || "videos");
+        const urls = URLS[provider];
+        const mode = $("mode").value;
+        let links, entries, groups, warn = "";
+
+        if (mode === "videos") {
+          links = c.map((v, i) => ({ key: `${key}-${String(i + 1).padStart(2, "0")}`, href: urls.video(v.id), text: v.title }));
+          // one link per video: `key` ties each entry to its link (data-key)
+          entries = c.map((v, i) => item(v, links[i].key));
+          groups = [["back", "forward"], ["prevInfo", "nextInfo"], ["toggle"]];
+        } else if (mode === "playlist") {
+          const pid = $("pid").value.trim();
+          if (!pid) warn = "// ⚠ Playlist id not found in the HTML: enter it above\n";
+          links = [{ key, href: urls.playlist(pid || "PLAYLIST_ID"), text: title }];
+          entries = c.map((v) => item(v));
+          groups = [["back", "forward"], ["prevItem", "nextItem"], ["toggle"]];
+        } else {
+          links = [{ key, href: urls.list(c.map((v) => v.id)), text: title }];
+          entries = c.map((v) => item(v));
+          groups = [["back", "forward"], ["prevItem", "nextItem"], ["toggle"]];
+        }
+
+        // definitions = flat array of video objects
+        const lines = ["[", ...entries.map((x) => `    ${x},`), "]"];
+
+        return { title, links, groups, warn, definitions: lines.join("\n") };
+      }
+
+      function linkHtml(l, auto) {
+        return `<a data-link data-key="${esc(l.key)}" data-target="player"${auto ? ` data-autoplay="${auto}"` : ""} href="${esc(l.href)}">${esc(l.text)}</a>`;
+      }
+
+      function controlsHtml(groups) {
+        const parts = groups.map((g) => g.map((a) => `<button type="button" data-action="${a}">${CONTROLS[a][0]}</button>`).join("\n        "));
+        return `    <div class="controls" id="controls">\n        ${parts.join('\n        <span class="sep"></span>\n        ')}\n    </div>`;
+      }
+
+      function controlsJs(groups) {
+        const used = groups.flat();
+        return `
+        // controls: enabled / disabled from the state of the region
+        const region = lp.getRegion("player");
+        const controls = document.getElementById("controls");
+        const ACTIONS = {
+${used.map((a) => `            ${a}: [(r) => ${CONTROLS[a][1]}, (r) => ${CONTROLS[a][2]}]`).join(",\n")}
+        };
+
+        function refresh() {
+            for (const button of controls.querySelectorAll("[data-action]")) {
+                button.disabled = !ACTIONS[button.dataset.action][1](region);
+            }
+        }
+
+        controls.addEventListener("click", (e) => {
+            const button = e.target.closest("[data-action]");
+            if (button) ACTIONS[button.dataset.action][0](region);
+        });
+        lp.on("change", refresh);
+        refresh();
+`;
+      }
+
+      function generate(c) {
+        const auto = $("auto").value;
+        const { title, links, groups, warn, definitions } = build(c);
+        const linksHtml = links.map((l) => linkHtml(l, auto)).join("\n        ");
+
+        if ($("output").value === "snippet") {
+          return `${warn}<!-- links: the page only needs a navigation link (data-link, data-key, data-target) -->\n${links.map((l) => linkHtml(l, auto)).join("\n")}\n<div id="player" class="video-container"></div>\n\n`
+            + `// definitions: array of { videoId, title, channel, thumbnail, duration }\nconst definitions = ${definitions};\n\nconst lp = new LinkPlayer({ definitions });`;
+        }
+
+        const withControls = $("ctl").checked;
+        return `${warn}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${esc(title)}</title>
+    <style>
+${STYLE}
+    </style>
+</head>
+<body>
+    <nav class="links">
+        ${linksHtml}
+    </nav>
+${withControls ? controlsHtml(groups) + "\n" : ""}    <div id="player" class="video-container"></div>
+
+    <script type="module">
+        import {LinkPlayer} from "../src/LinkPlayer.js"; // adapt the path
+
+        // definitions: array of { videoId, title, channel, thumbnail, duration }
+        const definitions = ${indent(definitions, 8)};
+
+        const lp = new LinkPlayer({ definitions });
+${withControls ? controlsJs(groups) : ""}    <\/script>
+</body>
+</html>`;
+      }
+
+      /* ───────── rendering ───────── */
+      function hl(el, text, ts) {
+        const low = text.toLowerCase(), r = [];
+        ts.forEach((t) => {
+          let i = -1;
+          while ((i = low.indexOf(t, i + 1)) !== -1) r.push([i, i + t.length]);
+        });
+        if (!r.length) return void (el.textContent = text);
+        r.sort((a, b) => a[0] - b[0]);
+        const m = [r[0]];
+        for (const x of r.slice(1)) {
+          const l = m[m.length - 1];
+          x[0] <= l[1] ? (l[1] = Math.max(l[1], x[1])) : m.push(x);
+        }
+        let c = 0;
+        m.forEach(([s, e]) => {
+          el.append(text.slice(c, s));
+          const k = document.createElement("mark");
+          k.textContent = text.slice(s, e);
+          el.append(k);
+          c = e;
+        });
+        el.append(text.slice(c));
+      }
+
+      function syncMode() {
+        const pl = $("mode").querySelector('[value="playlist"]');
+        pl.disabled = provider !== "youtube";
+        if (pl.disabled && $("mode").value === "playlist") $("mode").value = "list";
+      }
+
+      function render() {
+        const lk = locked(), ts = terms();
+        ["q", "sort", "all", "none"].forEach((id) => ($(id).disabled = lk));
+        $("lockNote").hidden = !lk;
+        $("pidWrap").hidden = !lk;
+        $("ctlWrap").hidden = $("output").value !== "page";
+
+        const list = $("list"), top = list.scrollTop;
+        list.replaceChildren();
+        const rows = shown();
+        if (!rows.length) {
+          const e = document.createElement("div");
+          e.className = "empty";
+          e.textContent = "No results";
+          list.append(e);
+        }
+        rows.forEach((v) => {
+          const checked = lk || on.has(v.id);
+          const l = document.createElement("label");
+          l.className = "item" + (checked ? "" : " off");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = checked;
+          cb.disabled = lk;
+          cb.onchange = () => {
+            if (cb.checked) {
+              on.add(v.id);
+              order.push(v.id);
+            } else {
+              on.delete(v.id);
+              order = order.filter((x) => x !== v.id);
+            }
+            render();
+          };
+          const n = document.createElement("span");
+          n.className = "n";
+          n.textContent = vids.indexOf(v) + 1;
+          const th = document.createElement("img");
+          th.loading = "lazy";
+          th.referrerPolicy = "no-referrer";
+          if (v.thumbnail) th.src = v.thumbnail;
+          const id = document.createElement("code");
+          id.textContent = v.id;
+          const t = document.createElement("span");
+          t.className = "t";
+          t.title = v.title;
+          hl(t, v.title, ts);
+          const d = document.createElement("span");
+          d.className = "d";
+          d.textContent = fmt(v.duration);
+          l.append(cb, n, th, id, t, d);
+          list.append(l);
+        });
+        list.scrollTop = top;
+
+        const c = chosen();
+        $("count").textContent = `${c.length} / ${vids.length}`;
+        $("longNote").hidden = !($("mode").value === "list" && c.length > 50);
+        $("out").textContent = c.length ? generate(c) : "// No video selected";
+        $("copy").disabled = !c.length;
+      }
+
+      /* ───────── actions ───────── */
+      $("go").onclick = () => {
+        const status = $("status");
+        const r = parse($("src").value);
+        provider = r.prov;
+        vids = r.items;
+        on = new Set(vids.map((v) => v.id));
+        order = vids.map((v) => v.id);
+
+        if (!vids.length) {
+          status.className = "err";
+          status.textContent = "No videos found: paste the HTML of a YouTube playlist or an Ok.ru page.";
+          $("step2").hidden = $("step3").hidden = true;
+          return;
+        }
+        status.className = "ok";
+        status.textContent = `${provider === "youtube" ? "YouTube" : "Ok.ru"} · ${vids.length} video${vids.length > 1 ? "s" : ""}`;
+        $("ytNote").hidden = provider !== "youtube";
+        $("sort").value = provider === "youtube" ? "source" : "alpha"; // default sort per provider
+        $("pid").value = r.playlistId;
+        $("step2").hidden = $("step3").hidden = false;
+        syncMode();
+        render();
+      };
+
+      $("clear").onclick = () => {
+        $("src").value = "";
+        $("status").textContent = "";
+        $("ytNote").hidden = $("step2").hidden = $("step3").hidden = true;
+        vids = [];
+        on = new Set();
+        order = [];
+        provider = "";
+      };
+
+      $("all").onclick = () => {
+        shown().forEach((v) => {
+          if (!on.has(v.id)) {
+            on.add(v.id);
+            order.push(v.id);
+          }
+        });
+        render();
+      };
+      $("none").onclick = () => {
+        shown().forEach((v) => on.delete(v.id));
+        order = order.filter((id) => on.has(id));
+        render();
+      };
+      ["q", "sort", "mode", "title", "key", "auto", "pid", "output", "ctl"].forEach((id) => $(id).addEventListener("input", render));
+
+      $("copy").onclick = async () => {
+        const b = $("copy"), old = b.textContent;
+        try {
+          await navigator.clipboard.writeText($("out").textContent);
+          b.textContent = "Copied ✓";
+        } catch {
+          b.textContent = "Copy failed";
+        }
+        setTimeout(() => (b.textContent = old), 1500);
+      };
+    </script>
+  </body>
+</html>

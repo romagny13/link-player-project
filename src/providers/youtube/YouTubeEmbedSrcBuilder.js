@@ -39,12 +39,12 @@ export class YouTubeEmbedSrcBuilder {
         return this.#url(encodeURIComponent(videoId), q);
     }
 
-    buildVideoListSrc(videoIds, {autoplay, index} = {}) {
+    buildVideoListSrc(videoIds, { autoplay, index, startSeconds } = {}) {
         if (!Array.isArray(videoIds) || !videoIds.length)
             throw new TypeError("buildVideoListSrc(): a non-empty array is required");
 
         const [first, ...rest] = videoIds;
-        const q = this.#params({autoplay});
+        const q = this.#params({ autoplay, startSeconds }); // ← ajouter startSeconds
         if (rest.length) q.set("playlist", rest.join(","));
         if (index > 0) q.set("index", String(Math.floor(index)));
         return this.#url(encodeURIComponent(first), q);

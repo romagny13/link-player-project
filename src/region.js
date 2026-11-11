@@ -153,6 +153,25 @@ export class Region {
         this.#show(info, {autoplay, index}, "navigate");
     }
 
+    replace(info, {autoplay = false, index = 0, params = null} = {}) {
+        this.#journal.replace({info, index, params});
+        this.#show(info, {autoplay, index}, "replace");
+    }
+
+    navigateByKey(key, options){
+        if(!this.has(key))
+            throw  new Error(`No info found for key '${key}'`);
+        const info = this.get(key);
+        this.navigate(info,options);
+    }
+
+    replaceByKey(key, options) {
+        if(!this.has(key))
+            throw  new Error(`No info found for key '${key}'`);
+        const info = this.get(key);
+        this.replace(info, options);
+    }
+
     goBack() {
         return this.#restore(this.#journal.back(), "back");
     }

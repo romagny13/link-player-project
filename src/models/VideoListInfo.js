@@ -1,62 +1,65 @@
-import {ValueChecks} from "../utils/ValueChecks.js";
+import { ValueChecks } from "../utils/ValueChecks.js";
 
 export class VideoListInfo {
-    #key;
-    #provider;
-    #target;
-    #videoIds;
-    #index;
-    #showOnInit;
-    #videos = [];
+  #key;
+  #provider;
+  #target;
+  #videoIds;
+  #index;
+  #showOnInit;
+  #videos = [];
 
-    constructor(provider, target, videoIds, index, showOnInit) {
-        ValueChecks.requireNotNullOrEmpty(provider, "provider");
-        ValueChecks.requireNotNullOrEmpty(target, "target");
+  constructor(provider, target, videoIds, index, showOnInit, key = null) {
+    ValueChecks.requireNotNullOrEmpty(provider, "provider");
+    ValueChecks.requireNotNullOrEmpty(target, "target");
 
-        this.#provider = provider;
-        this.#target = target;
-        this.#videoIds = videoIds;
-        this.#index = index;
-        this.#showOnInit = showOnInit;
+    this.#provider = provider;
+    this.#target = target;
+    this.#videoIds = videoIds;
+    this.#index = index;
+    this.#showOnInit = showOnInit;
+    this.#videoIds = [...videoIds];
 
-        this.#key = `${this.#provider}:list:${this.#videoIds.join(",")}`;
-    }
+    this.#key = key ?? `${this.#provider}:list:${this.#videoIds.join(",")}`;
+  }
 
-    get key() {
-        return this.#key;
-    }
+  get key() {
+    return this.#key;
+  }
 
-    get provider() {
-        return this.#provider;
-    }
+  get provider() {
+    return this.#provider;
+  }
 
-    get target() {
-        return this.#target;
-    }
+  get target() {
+    return this.#target;
+  }
 
-    get isPlaylist() {
-        return true;
-    }
+  get isPlaylist() {
+    return true;
+  }
 
-    get videoIds() {
-        return Object.freeze([...this.#videoIds]);
-    }
+  get videoIds() {
+    return Object.freeze([...this.#videoIds]);
+  }
 
-    get index() {
-        return this.#index;
-    }
+  get index() {
+    return this.#index;
+  }
 
-    get showOnInit() {
-        return this.#showOnInit;
-    }
+  get showOnInit() {
+    return this.#showOnInit;
+  }
 
-    get videos() {
-        return Object.freeze([...this.#videos]);
-    }
+  get videos() {
+    return Object.freeze([...this.#videos]);
+  }
 
-    addVideo(video) {
-        this.#videos.push(video);
-    }
+  addVideo(video) {
+    this.#videos.push(video);
+  }
 
-    setVideos(videos) { this.#videos = [...videos]; }
+  setVideos(videos) {
+    this.#videos = [...videos];
+  }
 }

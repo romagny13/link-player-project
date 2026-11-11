@@ -97,7 +97,7 @@
 </div>
 <div class="controls" data-controls="t-2"></div>
 
-<script type="module">
+<script kind="module">
     import {LinkPlayer} from "../src/LinkPlayer.js";
 
     const lp = new LinkPlayer({
@@ -130,7 +130,7 @@
     for (const box of document.querySelectorAll("[data-controls]")) {
         for (const [action, label] of ACTIONS) {
             const button = document.createElement("button");
-            button.type = "button";
+            button.kind = "button";
             button.dataset.action = action;
             button.textContent = label;
             box.append(button);

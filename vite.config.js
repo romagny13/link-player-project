@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import terser from "@rollup/plugin-terser";
 
 export default defineConfig({
-  test: { globals: true, environment: "jsdom" },
+  test: { globals: true, environment: "jsdom", disableConsoleIntercept: true },
   build: {
     lib: { entry: "src/umd.js", name: "LinkPlayer" },
     minify: false, // nothing is minified unless an output asks for it

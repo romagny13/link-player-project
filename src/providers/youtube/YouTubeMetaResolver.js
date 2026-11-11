@@ -104,7 +104,7 @@ export class YouTubeMetaResolver {
         const base = declared.length ? declared : fetched; // declared positions are kept, even for a video the API did not return
 
         return base.map(({id, meta}, index) => {
-            // "PL123#3" is a placeholder id (playlist defined with `count` or without ids): matched by position
+
             const entry = byId.has(id) ? {id, meta: byId.get(id)} : id.includes("#") ? fetched[index] : null;
             const filled = fillEmpty(meta, entry?.meta);
             return {id: entry?.id ?? id, ...filled, title: filled.title || this.#fallbackTitle(index)};

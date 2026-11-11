@@ -8,7 +8,8 @@ export class YouTubeApiError extends Error {
 
 /** ISO 8601 duration ("PT1H2M3S") to seconds. */
 export function parseIsoDuration(iso) {
-    const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso ?? "");
+    if (!iso) return null;
+    const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(iso);
     return m ? (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0) : null;
 }
 
@@ -38,8 +39,9 @@ export class YouTubeDataApi {
         return Boolean(this.#key) && !this.#disabled;
     }
 
-    /** @returns {Promise<Map<string, object>>} video id -> meta. Private or deleted videos are absent. */
+    /** @returns {Promise>} video id -> meta. Private or deleted videos are absent. */
     async videos(ids) {
+        if (!ids || ids.length === 0) return new Map();
         const result = new Map();
         for (let i = 0; i < ids.length; i += 50) {            // 50 ids per call at most
             const data = await this.#get("videos", { part: "snippet,contentDetails", id: ids.slice(i, i + 50).join(",") });
@@ -51,6 +53,7 @@ export class YouTubeDataApi {
 
     /** @returns {Promise<{ id: string, meta: object }[]>} in playlist order, at most `maxItems`. */
     async playlistItems(playlistId, maxItems = 200) {
+        if (!playlistId) return [];
         const entries = [];
         let pageToken;
         do {
@@ -63,13 +66,19 @@ export class YouTubeDataApi {
     }
 
     async #get(path, params) {
+        if (!this.available) {
+            throw new YouTubeApiError(0, "ApiDisabled");
+        }
+
         const url = new URL(`https://www.googleapis.com/youtube/v3/${path}`);
         for (const [k, v] of Object.entries({ ...params, key: this.#key })) if (v != null) url.searchParams.set(k, v);
 
         const res = await this.#fetch(url, { signal: AbortSignal.timeout(this.#timeoutMs) });
         if (!res.ok) {
             const reason = (await res.json().catch(() => null))?.error?.errors?.[0]?.reason;
-            if (res.status === 401 || res.status === 429 || DISABLING_REASONS.has(reason)) this.#disabled = true;
+            if (res.status === 401 || res.status === 429 || DISABLING_REASONS.has(reason)) {
+                this.#disabled = true;
+            }
             throw new YouTubeApiError(res.status, reason);
         }
         return res.json();

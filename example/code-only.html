@@ -1,292 +1,349 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Footage : navigation en code</title>
     <style>
-        :root {
-            --ink: #6b4f27;
-            --gold: #f0b95a;
-            --line: #f1eadb;
-        }
+      :root {
+        --ink: #6b4f27;
+        --gold: #f0b95a;
+        --line: #f1eadb;
+      }
 
-        body {
-            margin: 0;
-            padding: 24px 12px;
-            font-family: "Segoe UI", system-ui, sans-serif;
-            color: var(--ink);
-            background: #fffdf9;
-        }
+      body {
+        margin: 0;
+        padding: 24px 12px;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        color: var(--ink);
+        background: #fffdf9;
+      }
 
-        #footage {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
+      #footage {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
 
-        /* the container of the player: the library only puts the iframe (and nothing else for a single video) in it */
-        .video-container {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            overflow: hidden;
-            border-radius: 20px;
-            background: #f6f2ea;
-            border: 5px solid #fff;
-            box-shadow: 0 18px 44px rgba(120, 100, 60, .22), 0 0 0 1px var(--line);
-        }
+      /* the container of the player: the library only puts the iframe (and nothing else for a single video) in it */
+      .video-container {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border-radius: 20px;
+        background: #f6f2ea;
+        border: 5px solid #fff;
+        box-shadow: 0 18px 44px rgba(120, 100, 60, 0.22), 0 0 0 1px var(--line);
+      }
 
-        .video-container iframe {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            border: 0;
-        }
+      .video-container iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
 
-        /* destinations: plain buttons */
+      /* destinations: plain buttons */
+      .grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .dest {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        padding: 0;
+        overflow: hidden;
+        cursor: pointer;
+        border: 3px solid #fff;
+        border-radius: 16px;
+        background: #f6f2ea;
+        box-shadow: 0 8px 20px rgba(120, 100, 60, 0.14);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+      }
+
+      .dest img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .dest span {
+        position: absolute;
+        inset: auto 0 8px;
+        color: #fff;
+        font: italic 600 1.2rem Georgia, serif;
+        text-shadow: 0 2px 10px rgba(90, 58, 12, 0.7);
+      }
+
+      .dest:hover,
+      .dest:focus-visible {
+        transform: translateY(-4px);
+      }
+
+      .dest.is-playing {
+        transform: translateY(-4px);
+        box-shadow: 0 0 0 3px rgba(240, 185, 90, 0.9),
+          0 16px 32px rgba(120, 100, 60, 0.2);
+      }
+
+      /* previous / label / next */
+      .nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .nav-label {
+        flex: 1;
+        text-align: center;
+        font: italic 600 1.2rem Georgia, serif;
+      }
+
+      .nav button {
+        padding: 9px 18px;
+        cursor: pointer;
+        color: #a97a2a;
+        background: #fffaf0;
+        border: 1px solid #f1e4c4;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .nav button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* the dependent view: a section shown with the destination */
+      .details {
+        margin-top: 16px;
+        padding: 14px 20px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fff;
+      }
+
+      .details h2 {
+        margin: 0 0 6px;
+        font: italic 600 1.4rem Georgia, serif;
+      }
+
+      .details p {
+        margin: 0 0 8px;
+        line-height: 1.5;
+      }
+
+      .details small {
+        display: block;
+        margin-top: 6px;
+        color: #a97a2a;
+      }
+
+      @media (max-width: 800px) {
         .grid-4 {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-            margin-top: 16px;
+          grid-template-columns: repeat(2, 1fr);
         }
-
-        .dest {
-            position: relative;
-            aspect-ratio: 16 / 9;
-            padding: 0;
-            overflow: hidden;
-            cursor: pointer;
-            border: 3px solid #fff;
-            border-radius: 16px;
-            background: #f6f2ea;
-            box-shadow: 0 8px 20px rgba(120, 100, 60, .14);
-            transition: transform .3s ease, box-shadow .3s ease;
-        }
-
-        .dest img {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .dest span {
-            position: absolute;
-            inset: auto 0 8px;
-            color: #fff;
-            font: italic 600 1.2rem Georgia, serif;
-            text-shadow: 0 2px 10px rgba(90, 58, 12, .7);
-        }
-
-        .dest:hover,
-        .dest:focus-visible {
-            transform: translateY(-4px);
-        }
-
-        .dest.is-playing {
-            transform: translateY(-4px);
-            box-shadow: 0 0 0 3px rgba(240, 185, 90, .9), 0 16px 32px rgba(120, 100, 60, .2);
-        }
-
-        /* previous / label / next */
-        .nav {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 16px;
-        }
-
-        .nav-label {
-            flex: 1;
-            text-align: center;
-            font: italic 600 1.2rem Georgia, serif;
-        }
-
-        .nav button {
-            padding: 9px 18px;
-            cursor: pointer;
-            color: #a97a2a;
-            background: #fffaf0;
-            border: 1px solid #f1e4c4;
-            border-radius: 999px;
-            font-size: .72rem;
-            font-weight: 600;
-            letter-spacing: .16em;
-            text-transform: uppercase;
-        }
-
-        .nav button:disabled {
-            opacity: .4;
-            cursor: not-allowed;
-        }
-
-        /* the dependent view: a section shown with the destination */
-        .details {
-            margin-top: 16px;
-            padding: 14px 20px;
-            border: 1px solid var(--line);
-            border-radius: 16px;
-            background: #fff;
-        }
-
-        .details h2 {
-            margin: 0 0 6px;
-            font: italic 600 1.4rem Georgia, serif;
-        }
-
-        .details p {
-            margin: 0 0 8px;
-            line-height: 1.5;
-        }
-
-        .details small {
-            display: block;
-            margin-top: 6px;
-            color: #a97a2a;
-        }
-
-        @media (max-width: 800px) {
-            .grid-4 {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
+      }
     </style>
-</head>
-<body>
-<div id="footage">
-    <div id="footage-gp1" class="video-container"></div>
+  </head>
+  <body>
+    <div id="footage">
+      <div id="footage-gp1" class="video-container"></div>
 
-    <!-- dependent view: filled from the data of the current destination (below the video; move it above if you prefer) -->
-    <section class="details" id="details" hidden>
+      <!-- dependent view: filled from the data of the current destination (below the video; move it above if you prefer) -->
+      <section class="details" id="details" hidden>
         <h2></h2>
         <p></p>
         <a target="_blank" rel="noopener"></a>
         <small></small>
-    </section>
+      </section>
 
-    <div class="grid-4" id="destinations"></div>
-    <div class="nav">
-        <button type="button" id="prev" aria-label="Destination précédente">← Précédent</button>
-        <span class="nav-label" id="label" aria-live="polite">Choisissez une destination</span>
-        <button type="button" id="next" aria-label="Destination suivante">Suivant →</button>
+      <div class="grid-4" id="destinations"></div>
+      <div class="nav">
+        <button type="button" id="prev" aria-label="Destination précédente">
+          ← Précédent
+        </button>
+        <span class="nav-label" id="label" aria-live="polite"
+          >Choisissez une destination</span
+        >
+        <button type="button" id="next" aria-label="Destination suivante">
+          Suivant →
+        </button>
+      </div>
     </div>
-</div>
 
-<script type="module">
-    import {LinkPlayer} from "../src/LinkPlayer.js";
+    <script type="module">
+      import { LinkPlayer } from "../src/LinkPlayer.js";
 
-    const TARGET = "footage-gp1";
+      const TARGET = "footage-gp1";
 
-    // The only place where the destinations are described. No link, no data-* attribute in the page.
-    const LOREM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+      // The only place where the destinations are described. No link, no data-* attribute in the page.
+      const LOREM =
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 
-    // `data` is yours: it is given back with every event of this destination
-    const DESTINATIONS = [
+      // `data` is yours: it is given back with every event of this destination
+      const DESTINATIONS = [
         {
-            name: "bahamas", label: "Bahamas", id: "YCfcg9gzCYc",
-            data: {
-                description: "Un archipel de plus de 700 îles : eaux turquoise, bancs de sable à perte de vue, cochons nageurs et lagons à peine "
-                    + "profonds. Blabla blabla. " + LOREM,
-                link: {href: "https://example.com/bahamas", text: "Préparer son voyage aux Bahamas"}
+          key: "bahamas",
+          title: "Bahamas",
+          videoId: "YCfcg9gzCYc",
+          provider: "youtube",
+          target: "footage-gp1",
+          data: {
+            description:
+              "Un archipel de plus de 700 îles : eaux turquoise, bancs de sable à perte de vue, cochons nageurs et lagons à peine " +
+              "profonds. Blabla blabla. " +
+              LOREM,
+            link: {
+              href: "https://example.com/bahamas",
+              text: "Préparer son voyage aux Bahamas"
             }
+          }
         },
         {
-            name: "maldives", label: "Maldives", id: "69iUWLA0oVc",
-            data: {description: LOREM, link: {href: "https://example.com/maldives", text: "Guide des Maldives"}}
+          key: "maldives",
+          title: "Maldives",
+          videoId: "69iUWLA0oVc",
+          provider: "youtube",
+          target: "footage-gp1",
+          data: {
+            description: LOREM,
+            link: {
+              href: "https://example.com/maldives",
+              text: "Guide des Maldives"
+            }
+          }
         },
         {
-            name: "tahiti", label: "Tahiti", id: "5drmgVauSMg",
-            data: {description: LOREM, link: {href: "https://example.com/tahiti", text: "Guide de Tahiti"}}
+          key: "tahiti",
+          title: "Tahiti",
+          videoId: "5drmgVauSMg",
+          provider: "youtube",
+          target: "footage-gp1",
+          data: {
+            description: LOREM,
+            link: {
+              href: "https://example.com/tahiti",
+              text: "Guide de Tahiti"
+            }
+          }
         },
         {
-            name: "vietnam", label: "Vietnam", id: "k8m0SaGQ_1c",
-            data: {description: LOREM, link: {href: "https://example.com/vietnam", text: "Guide du Vietnam"}}
+          key: "vietnam",
+          title: "Vietnam",
+          videoId: "k8m0SaGQ_1c",
+          provider: "youtube",
+          target: "footage-gp1",
+          data: {
+            description: LOREM,
+            link: {
+              href: "https://example.com/vietnam",
+              text: "Guide du Vietnam"
+            }
+          }
         }
-    ];
+      ];
 
-    // ── player: nothing is scanned, everything is defined in code ──
-    const lp = new LinkPlayer({autoScan: false, tooltip: false});
+      // ── player: nothing is scanned, everything is defined in code ──
+      const lp = new LinkPlayer({
+        autoScan: false,
+        tooltip: false,
+        definitions: DESTINATIONS
+      });
 
-    for (const {name, label, id, data} of DESTINATIONS) {
-        lp.define(name, {
-            target: TARGET,
-            url: `https://www.youtube.com/watch?v=${id}`,
-            title: label,
-            data
-        });
-    }
-    const region = lp.getRegion(TARGET);
+      const region = lp.getRegion(TARGET);
 
-    // ── own navigation ──
-    const label = document.getElementById("label");
-    const prev = document.getElementById("prev");
-    const next = document.getElementById("next");
-    const grid = document.getElementById("destinations");
-    const details = document.getElementById("details");
+      // ── own navigation ──
+      const label = document.getElementById("label");
+      const prev = document.getElementById("prev");
+      const next = document.getElementById("next");
+      const grid = document.getElementById("destinations");
+      const details = document.getElementById("details");
 
-    const currentIndex = () => DESTINATIONS.findIndex(({name}) => lp.get(name) === region.current);
+      const currentIndex = () =>
+        DESTINATIONS.findIndex(({ key }) => region.get(key) === region.current);
 
-    // `from` is a navigation parameter: it travels with this navigation, and back / forward restore it
-    function go(name, from) {
-        if (lp.get(name) === region.current) return; // already showing it (navigating to the current info would hide it)
-        lp.navigate(name, {autoplay: true, params: {from}});
-    }
+      // `from` is a navigation parameter: it travels with this navigation, and back / forward restore it
+      function go(key, from) {
+        if (region.get(key) === region.current) return; // already showing it (navigating to the current info would hide it)
+        region.navigateByKey(key, { autoplay: true, params: { from } });
+      }
 
-    function step(delta) {
+      function step(delta) {
         const i = currentIndex();
         const n = DESTINATIONS.length;
-        go(DESTINATIONS[i < 0 ? (delta > 0 ? 0 : n - 1) : (i + delta + n) % n].name, "les flèches"); // wraps around
-    }
+        go(
+          DESTINATIONS[i < 0 ? (delta > 0 ? 0 : n - 1) : (i + delta + n) % n]
+            .key,
+          "les flèches"
+        ); // wraps around
+      }
 
-    for (const {name, label: text, id} of DESTINATIONS) {
+      for (const { key, label: text, videoId } of DESTINATIONS) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "dest";
-        button.dataset.dest = name;
-        button.innerHTML = `<img src="https://img.youtube.com/vi/${id}/mqdefault.jpg" alt="" loading="lazy"><span></span>`;
+        button.dataset.dest = key;
+        button.innerHTML = `<img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" alt="" loading="lazy"><span></span>`;
         button.querySelector("span").textContent = text;
-        button.addEventListener("click", () => go(name, "la grille"));
+        button.addEventListener("click", () => go(key, "la grille"));
         grid.append(button);
-    }
-    prev.addEventListener("click", () => step(-1));
-    next.addEventListener("click", () => step(1));
-    prev.disabled = next.disabled = DESTINATIONS.length < 2;
+      }
+      prev.addEventListener("click", () => step(-1));
+      next.addEventListener("click", () => step(1));
+      prev.disabled = next.disabled = DESTINATIONS.length < 2;
 
-    // ── the page only reacts to events ──
-    // event: { region, reason, info, index, params, visible, name, data }
-    function render({data, params, visible}) {
+      // ── the page only reacts to events ──
+      // event: { region, reason, info, index, params, visible, key, data }
+      function render({ data, params, visible }) {
         const i = currentIndex();
-        for (const button of grid.children) {
-            const active = button.dataset.dest === DESTINATIONS[i]?.name;
-            button.classList.toggle("is-playing", active);
-            if (active) button.setAttribute("aria-current", "true");
-            else button.removeAttribute("aria-current");
+
+        if (!data) {
+          data = DESTINATIONS[i].data;
         }
-        label.textContent = i >= 0
-            ? `${DESTINATIONS[i].label} · ${i + 1} / ${DESTINATIONS.length}`
+
+        for (const button of grid.children) {
+          const active = button.dataset.dest === DESTINATIONS[i]?.key;
+          button.classList.toggle("is-playing", active);
+          if (active) button.setAttribute("aria-current", "true");
+          else button.removeAttribute("aria-current");
+        }
+        label.textContent =
+          i >= 0
+            ? `${DESTINATIONS[i].title} · ${i + 1} / ${DESTINATIONS.length}`
             : "Choisissez une destination";
 
         // the dependent view: built from what the event carries (data of define(), params of navigate())
         details.hidden = !(visible && data);
         if (data) {
-            details.querySelector("h2").textContent = DESTINATIONS[i]?.label ?? "";
-            details.querySelector("p").textContent = data.description;
-            const link = details.querySelector("a");
-            link.href = data.link.href;
-            link.textContent = data.link.text;
-            details.querySelector("small").textContent = params?.from ? `Ouvert depuis ${params.from}` : "";
+          details.querySelector("h2").textContent =
+            DESTINATIONS[i]?.title ?? "";
+          details.querySelector("p").textContent = data.description;
+          const link = details.querySelector("a");
+          link.href = data.link.href;
+          link.textContent = data.link.text;
+          details.querySelector("small").textContent = params?.from
+            ? `Ouvert depuis ${params.from}`
+            : "";
         }
-    }
+      }
 
-    lp.on("change", render);
-    lp.on("error", ({error}) => console.warn("[footage]", error));
+      lp.on("change", render);
+      lp.on("error", ({ error }) => console.warn("[footage]", error));
 
-    // restores the last destination (the state is saved at every change), without playing it
-    lp.scan();
-    if (!region.current) lp.navigate(DESTINATIONS[0].name); // first visit: first destination, not playing
-</script>
-</body>
+      // restores the last destination (the state is saved at every change), without playing it
+      lp.scan();
+      if (!region.current) region.navigateByKey(DESTINATIONS[0].key); // first visit: first destination, not playing
+    </script>
+  </body>
 </html>

@@ -2,11 +2,11 @@ export class ProviderRegistry {
     #providers = new Map();
 
     constructor(providers = []) {
-        this.#providers = [...providers];
+        for (const p of providers) this.register(p);
     }
 
-    get providers (){
-        return Object.freeze([...this.#providers.values()])
+    get providers() {
+        return Object.freeze([...this.#providers.values()]);
     }
 
     register(provider) {
@@ -19,7 +19,7 @@ export class ProviderRegistry {
     }
 
     get(id) {
-        const provider = this.#providers.find((p) => p.id === id);
+        const provider = this.#providers.get(id.toLowerCase());
         if (!provider) throw new Error(`Unknown provider: "${id}"`);
         return provider;
     }

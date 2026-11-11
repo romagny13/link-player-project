@@ -2,9 +2,9 @@ import {UrlInfo} from "../../models/UrlInfo.js";
 import {toAutoplayMode, toInt} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
-import {LinkParser} from "../LinkParser.js";
+import {InfoParser} from "../InfoParser.js";
 
-export class OkruLinkParser extends LinkParser {
+export class OkruInfoParser extends InfoParser {
 
     #rawQueryParam(url, name) {
         for (const pair of url.search.slice(1).split("&")) {
@@ -63,60 +63,66 @@ export class OkruLinkParser extends LinkParser {
             null;
     }
 
-    parse(element) {
-        const url = this.getUrl(element);
-        if (!url) throw new Error(`No URL found for element '${element}'`);
+    buildUrl(def) {
+        if (!def) throw new TypeError("buildUrl(): definition is required");
 
-        const urlInfos = this.parseUrl(url);
-        if (!urlInfos) throw new Error(`Invalid URL: '${url}'`);
+        if (def.playlistId) throw new TypeError("buildUrl(): playlist not supported");
 
-        const data = this.readLinkData(element);
+        const id = def.videoId ?? def.videoIds?.[0];
+        if (!id) throw new TypeError("buildUrl(): need videoId or videoIds");
+
+        return `https://ok.ru/video/${id}`;
+    }
+
+    parseDefinition(def) {
+        const urlInfos = this.parseUrl(def.url);
+        if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
+
+        const videos = def.videos ?? [];
+        if (!Array.isArray(videos)) throw new Error("videos must be an array");
 
         switch (urlInfos.kind) {
             case "video":
                 return new VideoInfo({
                     provider: "okru",
-                    target: data.target,
+                    target: def.target,
                     videoId: urlInfos.videoId,
-                    autoplay: toAutoplayMode(data.autoplay),
-                    startSeconds: this.parseStartTime(data.startSeconds),
-                    title: data.title ?? "",
-                    channel: data.channel ?? "",
-                    thumbnail: data.thumbnail ?? "",
-                    showOnInit: data.showOnInit
+                    autoplay: toAutoplayMode(def.autoplay),
+                    startSeconds: this.parseStartTime(def.start),
+                    title: def.title ?? "",
+                    channel: def.channel ?? "",
+                    thumbnail: def.thumbnail ?? "",
+                    showOnInit: def.showOnInit,
+                    key: def.key
                 });
             case "videoList": {
                 const labels = urlInfos.labels;
                 const videoIds = urlInfos.videoIds;
-                if (
-                    labels.length &&
-                    labels.length !== videoIds.length
-                ) {
+                if (labels.length && labels.length !== videoIds.length) {
                     console.warn(
                         `[OkruProvider] ${labels.length} labels for ${videoIds.length} videos (a comma in a title that is not encoded as %2C?)`
                     );
                 }
 
-                const list = new VideoListInfo("okru", data.target, videoIds, urlInfos.index, data.showOnInit);
+                const index = urlInfos.index ?? def.index;
+                const list = new VideoListInfo(
+                    "okru", def.target, videoIds, index, def.showOnInit, def.key
+                );
 
                 videoIds.forEach((videoId, i) => {
-                    // data-items wins over labels= in the URL
-                    const videoInfo = data.videos.length
-                        ? data.videos[i]
-                        : {title: labels[i]};
+                    // videos (data-videos or code) wins over labels= in the URL
+                    const v = videos.length ? videos[i] : {title: labels[i]};
 
-                    list.addVideo(
-                        new VideoInfo({
-                            provider: "okru",
-                            target: data.target,
-                            videoId: videoId,
-                            autoplay: toAutoplayMode(videoInfo?.autoplay ?? data.autoplay),
-                            startSeconds: this.parseStartTime(videoInfo?.startSeconds),
-                            title: videoInfo?.title ?? "",
-                            channel: videoInfo?.channel ?? "",
-                            thumbnail: videoInfo?.thumbnail ?? ""
-                        })
-                    );
+                    list.addVideo(new VideoInfo({
+                        provider: "okru",
+                        target: def.target,
+                        videoId,
+                        autoplay: toAutoplayMode(v?.autoplay ?? def.autoplay),
+                        startSeconds: this.parseStartTime(v?.start),
+                        title: v?.title ?? "",
+                        channel: v?.channel ?? "",
+                        thumbnail: v?.thumbnail ?? ""
+                    }));
                 });
 
                 return list;
