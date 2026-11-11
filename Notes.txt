@@ -43,6 +43,8 @@ custom panel, custom tooltip renderers, styles "overrides"
 
 dependent views
 
+>> PLUS: adoption iframes existantes dans la page (youtube avec playlist/liste de videos), autoplay "click"
+
 un link player global et un linkplayer scoped sans tooltip par exemple
 
 niveau (data-)target(s) : 1 ou plusieurs selon le mieux

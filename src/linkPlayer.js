@@ -256,20 +256,17 @@ export class LinkPlayer {
             return;
         }
 
-        // resolved by key when used: region.replace() may have swapped the object since the link was registered
         const key = info.key;
-        const current = () => region.get(key) ?? info;
-
         const onClick = (e) => {
             e.preventDefault();
-            const target = current();
-            region.navigate(target.key, {
-                autoplay: target.autoplay === AUTOPLAY_MODES.INIT || target.autoplay === AUTOPLAY_MODES.CLICK,
-                index: target.index
+            region.navigate(key, {
+                autoplay: info.autoplay === AUTOPLAY_MODES.INIT || info.autoplay === AUTOPLAY_MODES.CLICK,
+                index: info.index
             });
         };
         element.addEventListener("click", onClick);
 
+        const current = () => region.get(key) ?? info;
         const detachTip = this.#attachTooltip(element, current, provider);
         this.#detachers.add(() => {
             element.removeEventListener("click", onClick);

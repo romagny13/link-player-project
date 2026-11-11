@@ -1,117 +1,117 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>LinkPlayer</title>
+    <title>LinkPlayer – Link only</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 16px; }
-
-        /* links */
-        .links { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-        .links a { padding: 6px 12px; border-radius: 999px; background: #eee; color: #222; text-decoration: none; font-size: 14px; }
-        .links a:hover { background: #ddd; }
-
-        /* controls */
-        .controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
-        .controls .sep { width: 1px; background: #ccc; margin: 0 6px; }
-        .controls button {
-            padding: 6px 12px; border: 1px solid #ccc; border-radius: 6px;
-            background: #fff; color: #222; font: inherit; font-size: 13px; cursor: pointer;
-        }
-        .controls button:hover:not(:disabled) { background: #f3f3f3; border-color: #999; }
-        .controls button:disabled { opacity: .4; cursor: not-allowed; }
-
-        /* 16/9 player */
+        :root { --ink:#6b4f27; --gold:#f0b95a; --line:#f1eadb; }
+        body { margin:0; padding:24px 12px; font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); background:#fffdf9; }
+        .wrap { max-width:1100px; margin:0 auto; }
+        h1 { font:italic 600 1.8rem Georgia,serif; margin:0 0 8px; }
+        .hint { color:#a97a2a; margin-bottom:20px; }
         .video-container {
-            position: relative; width: 100%; max-width: 1200px; margin: 0 auto;
-            border-radius: 12px; overflow: hidden; background: #000;
+            position:relative; width:100%; aspect-ratio:16/9; overflow:hidden;
+            border-radius:20px; background:#f6f2ea; border:5px solid #fff;
+            box-shadow:0 18px 44px rgba(120,100,60,.22),0 0 0 1px var(--line);
         }
-        .video-container:empty { display: none; }
-        .video-container::before { content: ""; display: block; padding-top: 56.25%; }
-        .video-container iframe {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;
+        .video-container iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+        .links { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+        .links a {
+            display:inline-block; padding:10px 16px; border-radius:999px;
+            background:#fffaf0; border:1px solid #f1e4c4; color:#a97a2a;
+            text-decoration:none; font-weight:600; font-size:.85rem;
         }
+        .links a:hover { background:#f0b95a; color:#fff; }
+        .section { margin-top:28px; }
+        .section h2 { font:italic 600 1.3rem Georgia,serif; margin:0 0 10px; }
     </style>
 </head>
 <body>
+<div class="wrap">
+    <h1>Link only</h1>
+    <p class="hint">Toutes les infos viennent des attributs <code>data-*</code>. Un seul player global.</p>
 
-<h2>YouTube</h2>
-<div class="links">
-    <a href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s"
-       data-show-on-init="true" data-start="120" data-target="t-1" data-link>Single Video</a>
-    <a href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=1"
-       data-target="t-1" data-link>Video List</a>
-    <a href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ"
-       data-target="t-1" data-link>Playlist</a>
+    <div id="player-main" class="video-container"></div>
+
+    <div class="section">
+        <h2>YouTube</h2>
+        <div class="links">
+            <!-- Vidéo simple + start + autoplay au clic -->
+            <a data-link
+               href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s"
+               data-target="player-main"
+               data-autoplay="click"
+               data-title="Bahamas"
+               data-channel="Me"
+               data-thumbnail="https://i.ytimg.com/vi/z2sv_RsNwM4/mqdefault.jpg">
+                Single Video (start 45:12)
+            </a>
+
+            <!-- Liste de vidéos + index -->
+            <a data-link
+               href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2"
+               data-target="player-main"
+               data-title="Trip"
+               data-items='[{"title":"ASMR"},{"title":"Trains","channel":"Me"}]'>
+                Video List (index=2)
+            </a>
+
+            <!-- Playlist avec vidéo de départ -->
+            <a data-link
+               href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ"
+               data-target="player-main"
+               data-channel="Retime Clips"
+               data-items='[
+           {"id":"s11CNT_hQTg","title":"V (1983) – L’arrivée des Visiteurs"},
+           {"id":"C_dEl2cMCEA","title":"V (1983) – Diana propose son expérience"}
+         ]'>
+                Playlist (start video ≠ first)
+            </a>
+
+            <!-- Playlist sans videoId de départ -->
+            <a data-link
+               href="https://www.youtube.com/playlist?list=PLYALQE76y6LQ"
+               data-target="player-main"
+               data-title="Playlist pure"
+               data-channel="Retime Clips">
+                Playlist (sans videoId)
+            </a>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>OK.ru</h2>
+        <div class="links">
+            <a data-link
+               href="https://ok.ru/video/17222095800962"
+               data-target="player-main"
+               data-title="MacGyver S03E08 VF | Accident en Haute Montagne"
+               data-channel="Retime Clips Okru">
+                Video okru simple
+            </a>
+
+            <!-- Ancienne version : video_ids + labels dans l’URL -->
+            <a data-link
+               href="https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660,3953768860340,3953768991412,3953769188020,3953769384628,3953769712308,3953770105524&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.05%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.06%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.07%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.08%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.09%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.010%20-%20BluRay%20720p%20VF"
+               data-target="player-main">
+                Old okru version (video_ids + labels)
+            </a>
+        </div>
+    </div>
 </div>
-
-<h2>Okru</h2>
-<div class="links">
-    <a href="https://ok.ru/video/17222095800962"
-       data-title="MacGyver S03E08 VF" data-channel="Retime Clips Okru"
-       data-autoplay="true" data-start="120" data-target="t-1" data-link>Video okru</a>
-    <a href="https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660,3953768860340,3953768991412,3953769188020,3953769384628,3953769712308,3953770105524&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.05%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.06%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.07%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.08%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.09%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.010%20-%20BluRay%20720p%20VF"
-       data-target="t-1" data-link>Old okru version</a>
-</div>
-
-<nav class="controls" id="controls">
-    <button data-action="goBack">◀ Back</button>
-    <button data-action="goForward">Forward ▶</button>
-    <span class="sep"></span>
-    <button data-action="previousInfo">⏮ Previous link</button>
-    <button data-action="nextInfo">Next link ⏭</button>
-    <span class="sep"></span>
-    <button data-action="previousItem">◀ Previous video</button>
-    <button data-action="nextItem">Next video ▶</button>
-    <span class="sep"></span>
-    <button data-action="toggle">Show / hide</button>
-</nav>
-
-<div id="t-1" class="video-container"></div>
 
 <script type="module">
-    import {LinkPlayer} from "../src/LinkPlayer.js";
+    import { LinkPlayer } from "../src/LinkPlayer.js";
 
-
-    const lp = new LinkPlayer({okruEmbedBaseUrl: "https://okru-embed.vercel.app/"});
-    const region = lp.getRegion("t-1");
-
-    const controls = document.getElementById("controls");
-    const buttons = [...controls.querySelectorAll("[data-action]")];
-
-    // which action is enabled, computed from what Region exposes today
-    function enabled() {
-        const infos = region.infos;
-        const current = region.current;
-        const at = infos.indexOf(current);
-        const list = Boolean(current?.isPlaylist);
-        return {
-            goBack: region.canGoBack,
-            goForward: region.canGoForward,
-            previousInfo: at > 0,
-            nextInfo: at !== -1 && at < infos.length - 1,
-            previousItem: list,
-            nextItem: list,
-            toggle: Boolean(current)
-        };
-    }
-
-    function refresh() {
-        const state = enabled();
-        for (const b of buttons) b.disabled = !state[b.dataset.action];
-    }
-
-    controls.addEventListener("click", (e) => {
-        const action = e.target.closest("[data-action]")?.dataset.action;
-        if (!action || !enabled()[action]) return;
-        region[action]();
-        refresh();
+    const okruEmbedBaseUrl = "https://okru-embed.vercel.app/";
+    // Player global (tout le document)
+    const lp = new LinkPlayer({
+        useStorage: true,
+        currentBehavior: "toggle",   // ou "skip"
+        // youtubeApiKey: "VOTRE_CLE", // optionnel pour enrichir titres/thumbs
+        fallbackTitle: (i) => `Vidéo ${i + 1}`,
     });
-
-    // Region has no events yet: a light poll also catches player-driven changes
-    setInterval(refresh, 250);
-    refresh();
 </script>
 </body>
 </html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>LinkPlayer – Mixed</title>
+    <style>
+        :root { --ink:#6b4f27; --gold:#f0b95a; --line:#f1eadb; }
+        body { margin:0; padding:24px 12px; font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); background:#fffdf9; }
+        .wrap { max-width:1100px; margin:0 auto; }
+        .video-container {
+            position:relative; width:100%; aspect-ratio:16/9; overflow:hidden;
+            border-radius:20px; background:#f6f2ea; border:5px solid #fff;
+            box-shadow:0 18px 44px rgba(120,100,60,.22),0 0 0 1px var(--line);
+        }
+        .video-container iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+        .links { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+        .links a {
+            padding:10px 16px; border-radius:999px; background:#fffaf0;
+            border:1px solid #f1e4c4; color:#a97a2a; text-decoration:none; font-weight:600;
+        }
+        .links a:hover { background:var(--gold); color:#fff; }
+        .note { margin-top:12px; font-size:.9rem; color:#a97a2a; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Mixed mode</h1>
+    <p class="note">
+        Les liens ne portent que <code>data-link</code> (+ éventuellement <code>data-target</code>).
+        Les titres, channels, items, autoplay, etc. viennent des <strong>definitions</strong>.
+    </p>
+
+    <div id="mixed-player" class="video-container"></div>
+
+    <div class="links">
+        <a data-link data-key="bahamas" href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s">Bahamas</a>
+        <a data-link data-key="list-trip" href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2">Trip list</a>
+        <a data-link data-key="playlist-v" href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ">Playlist V</a>
+        <a data-link data-key="okru-mac" href="https://ok.ru/video/17222095800962">MacGyver okru</a>
+    </div>
+</div>
+
+<script type="module">
+    import { LinkPlayer } from "../src/LinkPlayer.js";
+
+    const TARGET = "mixed-player";
+
+    const definitions = [
+        {
+            key: "bahamas",
+            provider: "youtube",
+            target: TARGET,
+            videoId: "z2sv_RsNwM4",
+            start: 2712,
+            autoplay: "click",
+            title: "Bahamas",
+            channel: "Me",
+            thumbnail: "https://i.ytimg.com/vi/z2sv_RsNwM4/mqdefault.jpg",
+            showOnInit: true,
+        },
+        {
+            key: "list-trip",
+            provider: "youtube",
+            target: TARGET,
+            url: "https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2",
+            title: "Trip",
+            videos: [
+                { title: "ASMR" },
+                { title: "Trains", channel: "Me" },
+            ],
+        },
+        {
+            key: "playlist-v",
+            provider: "youtube",
+            target: TARGET,
+            playlistId: "PLYALQE76y6LQ",
+            videoId: "s11CNT_hQTg",
+            channel: "Retime Clips",
+            videos: [
+                { videoId: "s11CNT_hQTg", title: "V (1983) – L’arrivée des Visiteurs" },
+                { videoId: "C_dEl2cMCEA", title: "V (1983) – Diana propose son expérience" },
+            ],
+        },
+        {
+            key: "okru-mac",
+            provider: "okru",
+            target: TARGET,
+            videoId: "17222095800962",
+            title: "MacGyver S03E08 VF | Accident en Haute Montagne",
+            channel: "Retime Clips Okru",
+        },
+    ];
+
+    const lp = new LinkPlayer({
+        definitions,
+        useStorage: true,
+        currentBehavior: "toggle",
+        youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
+    });
+</script>
+</body>
+</html>
