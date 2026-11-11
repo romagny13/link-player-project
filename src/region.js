@@ -2,21 +2,7 @@ import {PanelRenderer} from "./ui/PanelRenderer.js";
 import {NavigationJournal} from "./NavigationJournal.js";
 import {Emitter} from "./utils/Emitter.js";
 
-/**
- * A target container: owns ONE player (one iframe), ONE panel and the navigation journal.
- *
- * Navigation, three levels:
- *   journal   goBack() / goForward()                         between the states visited with navigate()
- *   region    nextInfo() / previousInfo()                    between the infos of the region (order of the links)
- *   item      nextItem() / previousItem() / playAt(i)       inside the active playlist / list (delegated to the player)
- *
- * Events (region.on(type, handler), handler gets { type, region, ... }):
- *   "change"  { reason, info, index, params, visible }  navigation state changed. reason: navigate | back | forward | item | visibility | adopt
- *             params: what was given to navigate(info, { params }), null otherwise.
- *   "state"   { state, index }                  player state: playing | paused | ended
- *   "error"   { error, info? }                  anything that failed (load, player, metadata)
- * The `can*` getters give the enabled / disabled state of the matching controls; read them on "change".
- */
+
 export class Region {
     #target;
     #host;
@@ -167,16 +153,16 @@ export class Region {
         this.#navigate(info,options);
     }
 
-    #navigate(info, {autoplay = false, index = 0, params = null} = {}) {
-        this.#journal.push({info, index, params}); // params are kept in the journal: back / forward restore them
+    #navigate(info, {autoplay = false, index = 0} = {}) {
+        this.#journal.push({info, index}); 
         this.#show(info, {autoplay, index}, "navigate");
     }
 
-    replace(key, {autoplay = false, index = 0, params = null} = {}) {
+    replace(key, {autoplay = false, index = 0} = {}) {
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
         const info = this.get(key);
-        this.#journal.replace({info, index, params});
+        this.#journal.replace({info, index});
         this.#show(info, {autoplay, index}, "replace");
     }
 
@@ -379,7 +365,6 @@ export class Region {
             reason,
             info: this.current,
             index: this.currentIndex,
-            params: this.#journal.current?.params ?? null,
             visible: this.isVisible
         });
     }

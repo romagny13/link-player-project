@@ -34,18 +34,16 @@ ce que ca doit montrer pour youtube :
 pour okru
 - video simple
 - ancienne version (avec videos_ids et labels dans l'url)
--
 
-il faudrait generer une page d'exemples (ou plusieurs si c'est mieux) pour : 
-1. avec links , definition des infos avec les attributs data et dans l'url pour video youtube, pour liste de videos youtube, pour playlist youtube, pour une video okru. 
-    - video autoplay true, click, startSeconds
-    - videoList index
-    - playlist avec un videoId (start video different de la premiere)
-2. avec links ou buttons servant qu'a la navigation et infos definies en code region.describe . 
-3. verifier que l'ancienne version okru est toujours suportée avec video_ids et labels dans l'url 
-4. verifier que youtube data api est utilisé (+ cache)
-5. un link player global et un linkplayer scoped sans tooltip par exemple
-6. navigation a tester avec par exemple un button previous et next 
++ show on init, use storagen currentBehavior (skip ou toggle quand on navigue vers la meme key)
+
+utilisation de youtube data api, fallbacktitle, DefBuilder
+
+custom panel, custom tooltip renderers, styles "overrides"
+
+dependent views
+
+un link player global et un linkplayer scoped sans tooltip par exemple
 
 niveau (data-)target(s) : 1 ou plusieurs selon le mieux
 

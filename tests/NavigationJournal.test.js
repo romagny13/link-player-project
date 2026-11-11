@@ -56,12 +56,6 @@ describe("NavigationJournal", () => {
             original.index = 99;
             expect(journal.current.index).toBe(2);
         });
-
-        it("conserve les paramètres de l'entrée", () => {
-            journal.push(entree("A", 0, {params: {t: 12}}));
-            expect(journal.current.params).toEqual({t: 12});
-        });
-
         it("supprime l'historique « avant » quand on pousse après un retour", () => {
             journal.push(entree("A"));
             journal.push(entree("B"));
@@ -164,15 +158,7 @@ describe("NavigationJournal", () => {
     });
 
     describe("updateCurrent()", () => {
-        it("fusionne le patch dans l'entrée courante", () => {
-            journal.push(entree("A", 0, {params: {x: 1}}));
-            journal.updateCurrent({index: 7});
-
-            expect(journal.current.index).toBe(7);
-            expect(journal.current.params).toEqual({x: 1});
-            expect(journal.current.info.key).toBe("A");
-        });
-
+ 
         it("ne modifie que l'entrée courante", () => {
             journal.push(entree("A", 1));
             journal.push(entree("B", 2));

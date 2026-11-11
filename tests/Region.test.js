@@ -250,24 +250,22 @@ describe("Region", () => {
         reason: "navigate",
         info: a,
         index: 0,
-        params: null,
         visible: true
       });
     });
 
-    it("transmet autoplay, index et params (options de navigate)", () => {
+    it("transmet autoplay, index  (options de navigate)", () => {
       const { region, lastPlayer } = createEnv();
       const p = playlist("P", 5);
       region.add(p);
       const handler = listen(region);
-      region.navigate("P", { autoplay: true, index: 2, params: { t: 30 } });
+      region.navigate("P", { autoplay: true, index: 2 });
 
       expect(lastPlayer().load).toHaveBeenCalledWith(p, {
         autoplay: true,
         index: 2
       });
       expect(region.currentIndex).toBe(2);
-      expect(handler.mock.calls[0][0].params).toEqual({ t: 30 });
     });
 
     it("réutilise le même lecteur quand le fournisseur ne change pas", () => {
@@ -372,12 +370,12 @@ describe("Region", () => {
       expect(region.canGoBack).toBe(false);
     });
 
-    it("transmet autoplay, index et params", () => {
+    it("transmet autoplay, index", () => {
       const { region, lastPlayer } = createEnv();
       const p = playlist("P", 4);
       region.add(p);
       const handler = listen(region);
-      region.replace("P", { autoplay: true, index: 1, params: { a: 1 } });
+      region.replace("P", { autoplay: true, index: 1 });
 
       expect(lastPlayer().load).toHaveBeenCalledWith(p, {
         autoplay: true,
@@ -386,7 +384,6 @@ describe("Region", () => {
       expect(handler.mock.calls[0][0]).toMatchObject({
         reason: "replace",
         index: 1,
-        params: { a: 1 }
       });
     });
   });
