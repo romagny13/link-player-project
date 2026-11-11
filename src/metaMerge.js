@@ -1,33 +1,48 @@
 import {VideoInfo} from "./models/VideoInfo.js";
-import {AUTOPLAY_MODES} from "./utils/helpers.js";
+import {isEmpty, toAutoplayMode} from "./utils/helpers.js";
 
-const isEmpty = (v) => v === "" || v == null;
-const pick = (declared, fallback) => (isEmpty(declared) ? fallback ?? "" : declared);
+/** A text: what is declared, else the fallback, else "". A text is never undefined. */
+const text = (declared, fallback) => (isEmpty(declared) ? fallback ?? "" : declared);
+
+/**
+ * Anything that is not a text (a number, a flag, an object, a key): what is declared, else the fallback,
+ * else left as it was. Never turned into "": the model gives its own default (key, extra...).
+ */
+const fill = (declared, fallback) => (isEmpty(declared) && !isEmpty(fallback) ? fallback : declared);
 
 /**
  * Items -> videos of a list / playlist, IN PLACE (the info keeps its identity: regions and journal compare by reference).
- * Values already declared on the link (data-*, data-videos) win; items only fill the gaps.
+ * Values already declared (data-*, data-videos, definitions) win; items only fill the gaps.
+ * An item: { id?, title, description, channel, channelUrl, thumbnail, duration, startSeconds (seconds), showOnInit, key, extra, autoplay }.
  * @param {VideoListInfo|PlaylistInfo} info
- * @param {Array<{id?: string, title?: string, channel?: string, thumbnail?: string, startSeconds?: number}>} items
+ * @param {object[]} items
  */
 export function applyItems(info, items) {
     const current = info.videos;
     const videos = items
         .map((item, i) => {
-            // a playlist whose ids are unknown gets placeholder ids: playback goes by index, not by id
-            const id = item.id ?? info.videoIds?.[i] ?? current[i]?.videoId
+            // the id of the item, else the one the list / the existing video already has; a playlist whose ids
+            // are unknown gets a placeholder id: playback goes by index, not by id
+            const id = [item.id, info.videoIds?.[i], current[i]?.videoId].find((v) => !isEmpty(v))
                 ?? (info.playlistId ? `${info.playlistId}#${i}` : null);
             if (isEmpty(id)) return null;
+
             const old = current[i]?.videoId === id ? current[i] : current.find((v) => v.videoId === id);
             return new VideoInfo({
                 provider: info.provider,
                 target: info.target,
                 videoId: id,
-                autoplay: old?.autoplay ?? AUTOPLAY_MODES.NONE,
-                startSeconds: old?.startSeconds ?? item.startSeconds,
-                title: pick(old?.title, item.title),
-                channel: pick(old?.channel, item.channel),
-                thumbnail: pick(old?.thumbnail, item.thumbnail)
+                autoplay: old ? old.autoplay : toAutoplayMode(item.autoplay),
+                startSeconds: fill(old?.startSeconds, item.startSeconds),
+                title: text(old?.title, item.title),
+                description: text(old?.description, item.description),
+                channel: text(old?.channel, item.channel),
+                channelUrl: text(old?.channelUrl, item.channelUrl),
+                thumbnail: text(old?.thumbnail, item.thumbnail),
+                duration: fill(old?.duration, item.duration),
+                showOnInit: fill(old?.showOnInit, item.showOnInit),
+                key: fill(old?.key, item.key),
+                extra: fill(old?.extra, item.extra) ?? null
             });
         })
         .filter(Boolean);
@@ -36,8 +51,8 @@ export function applyItems(info, items) {
 
 /**
  * Applies what the code defines for an info (the link may then be only a navigation link).
- * Single video: {title, channel, thumbnail}. List / playlist: {videos: [{id?, title, channel, thumbnail, startSeconds}]},
- * positional for a list of videos (the ids are known), `id` required for a playlist without data-videos.
+ * Single video: {title, description, channel, channelUrl, thumbnail, duration}, only the empty fields are filled.
+ * List / playlist: {videos: [item]} (see applyItems), positional for a list of videos (the ids are known).
  * @returns {boolean} true when something changed.
  */
 export function applyDefinition(info, definition) {
@@ -49,7 +64,7 @@ export function applyDefinition(info, definition) {
     return true;
 }
 
-/** @param {object|((info) => object|null)|null} definitions Keyed by info.key ("youtube:ID", "youtube:list:a,b", "youtube:playlist:PL..."), or a function. */
+/** @param {object|((info) => object|null)|null} definitions Keyed by info.key ("youtube:ID", "youtube:list:a,b", "youtube:playlist:PL...", or your own key), or a function. */
 export function resolveDefinition(definitions, info) {
     if (typeof definitions === "function") return definitions(info) ?? null;
     return definitions?.[info.key] ?? null;

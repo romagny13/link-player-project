@@ -2,8 +2,9 @@ import {YouTubeInfoParser} from "./YouTubeInfoParser.js";
 import {YouTubePlayer} from "./YouTubePlayer.js";
 import {makeIframe} from "../../utils/dom.js";
 import {YouTubeEmbedSrcBuilder} from "./YouTubeEmbedSrcBuilder.js";
+import {MediaProvider} from "../MediaProvider.js";
 
-export class YouTubeProvider {
+export class YouTubeProvider extends MediaProvider {
     id = "youtube";
     hosts = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
     #infoParser;
@@ -14,6 +15,8 @@ export class YouTubeProvider {
                     embedSrcBuilder = null,
                     thumbnailUrlBuilder = null
                 } = {}) {
+        super();
+
         this.#infoParser =
             infoParser ?? new YouTubeInfoParser({thumbnailUrlBuilder});
         this.#embedSrcBuilder =

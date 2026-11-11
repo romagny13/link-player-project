@@ -7,7 +7,7 @@ export class InfoParser {
         return element.dataset?.url;
     }
 
-    parseStartTime(t) {
+    parseTime(t) {
         if (!t) return undefined;
 
         // If it's just a raw number (e.g., "120" in seconds)
@@ -38,16 +38,28 @@ export class InfoParser {
         const data = element.dataset;
         return {
             autoplay: data.autoplay,
-            start: data.start,            // raw: parseStartTime reads "90" and "1m30s"
+            start: data.start,            // raw: parseTime reads "90" and "1m30s"
             title: data.title,
+            description : data.description,
             channel: data.channel,
+            channelUrl: data.channelUrl,
             thumbnail: data.thumbnail,
+            duration : data.duration,
             videos: this.parseJsonAttribute(data.videos, "data-videos") ?? [],
             index: toNumber(data.index),
             target: data.target ?? (element.tagName === "IFRAME" ? element.parentElement?.id : undefined),
             showOnInit: toBoolean(data.showOnInit),
             key: data.key,
+            extra: data.extra
         };
+    }
+
+    parseUrl(url) {
+        throw new Error("parseUrl() must be implemented");
+    }
+
+    buildUrl(def){
+        throw new Error("buildUrl() must be implemented");
     }
 
     parseFromElement(element) {

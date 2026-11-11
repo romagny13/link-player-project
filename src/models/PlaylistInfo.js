@@ -1,63 +1,79 @@
-import {ValueChecks} from "../utils/ValueChecks.js";
+import { ValueChecks } from "../utils/ValueChecks.js";
 
 export class PlaylistInfo {
-    #key;
-    #provider;
-    #target;
-    #playlistId;
-    #videoId;
-    #showOnInit;
-    #videos = [];
+  #key;
+  #provider;
+  #target;
+  #playlistId;
+  #videoId;
+  #showOnInit;
+  #videos = [];
+  #extra;
 
-    constructor(provider, target, playlistId, videoId, showOnInit, key = null) {
-        ValueChecks.requireNotNullOrEmpty(provider, "provider");
-        ValueChecks.requireNotNullOrEmpty(target, "target");
-        ValueChecks.requireNotNullOrEmpty(playlistId, "playlistId");
+  constructor(
+    provider,
+    target,
+    playlistId,
+    videoId,
+    showOnInit,
+    key = null,
+    extra = null
+  ) {
+    ValueChecks.requireNotNullOrEmpty(provider, "provider");
+    ValueChecks.requireNotNullOrEmpty(target, "target");
+    ValueChecks.requireNotNullOrEmpty(playlistId, "playlistId");
 
-        this.#provider = provider;
-        this.#target = target;
-        this.#playlistId = playlistId;
-        this.#videoId = videoId;
-        this.#showOnInit = showOnInit;
+    this.#provider = provider;
+    this.#target = target;
+    this.#playlistId = playlistId;
+    this.#videoId = videoId;
+    this.#showOnInit = showOnInit;
+    this.#extra = extra;
 
-        this.#key = key ?? `${this.#provider}:playlist:${this.#playlistId}`;
-    }
+    this.#key = key ?? `${this.#provider}:playlist:${this.#playlistId}`;
+  }
 
-    get key() {
-        return this.#key;
-    }
+  get key() {
+    return this.#key;
+  }
 
-    get isPlaylist() {
-        return true;
-    }
+  get isPlaylist() {
+    return true;
+  }
 
-    get provider() {
-        return this.#provider;
-    }
+  get provider() {
+    return this.#provider;
+  }
 
-    get target() {
-        return this.#target;
-    }
+  get target() {
+    return this.#target;
+  }
 
-    get playlistId() {
-        return this.#playlistId;
-    }
+  get playlistId() {
+    return this.#playlistId;
+  }
 
-    get videoId() {
-        return this.#videoId;
-    }
+  get videoId() {
+    return this.#videoId;
+  }
 
-    get videos() {
-        return Object.freeze([...this.#videos]);
-    }
+  get videos() {
+    return Object.freeze([...this.#videos]);
+  }
 
-    get showOnInit(){
-        return this.#showOnInit;
-    }
+  get showOnInit() {
+    return this.#showOnInit;
+  }
 
-    addVideo(video) {
-        this.#videos.push(video);
-    }
+  get extra() {
+    return this.#extra;
+  }
 
-    setVideos(videos) { this.#videos = [...videos]; }
+  addVideo(video) {
+    this.#videos.push(video);
+  }
+
+  setVideos(videos) {
+    this.#videos = [...videos];
+  }
 }

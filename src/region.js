@@ -30,6 +30,8 @@ export class Region {
     #panelInfo = null; // the playlist the panel is drawn for
     #resolveMeta;
     #resolved = new WeakSet();
+    #dependentViews = new Map();
+    #currentBehavior;
 
     /**
      * @param {object} options
@@ -38,6 +40,7 @@ export class Region {
     constructor({
                     target,
                     registry,
+                    currentBehavior = "toggle",
                     resolveMeta = null,
                     panelRenderer = null,
                     itemRenderer = null,
@@ -51,6 +54,7 @@ export class Region {
         this.#target = target;
         this.#host = host;
         this.#registry = registry;
+        this.#currentBehavior = currentBehavior;
         this.#resolveMeta = resolveMeta;
         this.#panel = panelRenderer ?? new PanelRenderer({
             itemRenderer,
@@ -146,30 +150,34 @@ export class Region {
 
     // ───────── navigation ─────────
 
+    isCurrent(key) {
+        const info = this.get(key);
+        return !!(info && this.#journal.current?.info === info);
+    }
+
     /** Navigating to the info that is already current toggles the view instead (no new journal entry). */
-    navigate(info, {autoplay = false, index = 0, params = null} = {}) {
-        if (this.#journal.current?.info === info) return this.toggle();
+    navigate(key, options) {
+        if (!this.has(key))
+            throw new Error(`No info found for key '${key}'`);
+        if (this.isCurrent(key)) {
+            if (this.#currentBehavior === "skip") return;
+            if (this.#currentBehavior === "toggle") return this.toggle();
+        }
+        const info = this.get(key);
+        this.#navigate(info,options);
+    }
+
+    #navigate(info, {autoplay = false, index = 0, params = null} = {}) {
         this.#journal.push({info, index, params}); // params are kept in the journal: back / forward restore them
         this.#show(info, {autoplay, index}, "navigate");
     }
 
-    replace(info, {autoplay = false, index = 0, params = null} = {}) {
+    replace(key, {autoplay = false, index = 0, params = null} = {}) {
+        if (!this.has(key))
+            throw new Error(`No info found for key '${key}'`);
+        const info = this.get(key);
         this.#journal.replace({info, index, params});
         this.#show(info, {autoplay, index}, "replace");
-    }
-
-    navigateByKey(key, options){
-        if(!this.has(key))
-            throw  new Error(`No info found for key '${key}'`);
-        const info = this.get(key);
-        this.navigate(info,options);
-    }
-
-    replaceByKey(key, options) {
-        if(!this.has(key))
-            throw  new Error(`No info found for key '${key}'`);
-        const info = this.get(key);
-        this.replace(info, options);
     }
 
     goBack() {
@@ -243,6 +251,37 @@ export class Region {
         this.#events.clear();
     }
 
+    // ───────── dependent Views ─────────
+
+    hasDependentView(id) {
+        return this.#dependentViews.has(id);
+    }
+
+    registerDependentView(id, fn) {
+        if (this.hasDependentView(id)) {
+            throw new Error(`Duplicate dependent view ID: '${id}' is already registered.`);
+        }
+        this.#dependentViews.set(id, fn);
+    }
+
+    unregisterDependentView(id) {
+        if (!this.hasDependentView(id)) {
+            console.warn(`Attempted to unregister non-existent dependent view: '${id}'`);
+            return false;
+        }
+        return this.#dependentViews.delete(id);
+    }
+
+    notifyDependentViews(info) {
+        for (const [id, fn] of this.#dependentViews) {
+            try {
+                fn(info);
+            } catch (error) {
+                console.error(`Error processing dependent view '${id}':`, error);
+            }
+        }
+    }
+
     // ───────── internals ─────────
 
     #infoIndex() {
@@ -258,7 +297,7 @@ export class Region {
     #step(delta) {
         const target = this.infos[this.#infoIndex() + delta];
         if (!target) return false;
-        this.navigate(target, {autoplay: true});
+        this.#navigate(target, {autoplay: true});
         return true;
     }
 
@@ -324,9 +363,11 @@ export class Region {
         if (event.type === "itemChange") {
             this.#journal.updateCurrent({index: event.index}); // going back restores the item too
             this.#panel.setCurrent(event.index);
+            this.notifyDependentViews(this.current);
             this.#changed("item");
         } else if (event.type === "state") {
             this.#events.emit("state", {region: this, state: event.state, index: event.index ?? this.currentIndex});
+
         } else if (event.type === "error") {
             this.#fail(event.error, {info: this.current});
         }

@@ -88,12 +88,16 @@ export class OkruInfoParser extends InfoParser {
                     target: def.target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(def.autoplay),
-                    startSeconds: this.parseStartTime(def.start),
+                    startSeconds: this.parseTime(def.start),
                     title: def.title ?? "",
+                    description : def.description ?? "",
                     channel: def.channel ?? "",
+                    channelUrl: def.channelUrl ?? "",
                     thumbnail: def.thumbnail ?? "",
+                    duration: this.parseTime(def.duration),
                     showOnInit: def.showOnInit,
-                    key: def.key
+                    key: def.key,
+                    extra: def.extra
                 });
             case "videoList": {
                 const labels = urlInfos.labels;
@@ -118,10 +122,15 @@ export class OkruInfoParser extends InfoParser {
                         target: def.target,
                         videoId,
                         autoplay: toAutoplayMode(v?.autoplay ?? def.autoplay),
-                        startSeconds: this.parseStartTime(v?.start),
+                        startSeconds: this.parseTime(v?.start),
                         title: v?.title ?? "",
+                        description : v?.description ?? "",
                         channel: v?.channel ?? "",
-                        thumbnail: v?.thumbnail ?? ""
+                        channelUrl: v?.channelUrl ?? "",
+                        thumbnail: v?.thumbnail ?? "",
+                        duration: this.parseTime(v?.duration),
+                        key: v?.key,
+                        extra: v?.extra
                     }));
                 });
 

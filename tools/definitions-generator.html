@@ -14,6 +14,7 @@
         --subtle: #c2b0ab; --mark: #ffe8c8; --pre-bg: #231e1c; --pre-ink: #f3ebe7;
       }
       body { max-width: 1000px; margin: 0 auto; padding: 16px; background: var(--bg); color: var(--ink); font-family: system-ui, sans-serif; }
+      [hidden] { display: none !important; }
       h1 { font-size: 1.4rem; }
       h1 span, .muted { color: var(--muted); font-weight: 400; }
       .card { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); box-shadow: 0 2px 10px var(--shadow); }
@@ -110,6 +111,7 @@
             </select>
           </label>
           <label>Title <input type="text" id="title" value="My playlist" /></label>
+          <label>Target (region id) <input type="text" id="target" value="player" /></label>
           <label>Key (data-key) <input type="text" id="key" placeholder="auto" /></label>
           <label>Autoplay
             <select id="auto">
@@ -125,6 +127,7 @@
             </select>
           </label>
           <label class="inline" id="ctlWrap"><input type="checkbox" id="ctl" checked />&nbsp;Controls</label>
+          <label class="inline" id="thumbWrap" hidden><input type="checkbox" id="thumb" />&nbsp;Include thumbnails</label>
           <label id="pidWrap" hidden>Playlist id <input type="text" id="pid" placeholder="PL…" /></label>
         </div>
         <div class="note" id="longNote" hidden>
@@ -284,7 +287,7 @@
           `videoId: ${J(v.id)}`,
           `title: ${J(v.title)}`,
           v.channel && `channel: ${J(v.channel)}`,
-          v.thumbnail && `thumbnail: ${J(v.thumbnail)}`,
+          v.thumbnail && (provider !== "youtube" || $("thumb").checked) && `thumbnail: ${J(v.thumbnail)}`,
           v.duration != null && `duration: ${v.duration}`
         ];
         return `{ ${parts.filter(Boolean).join(", ")} }`;
@@ -294,6 +297,7 @@
         const title = $("title").value.trim() || "Videos";
         const key = $("key").value.trim() || (provider === "youtube" ? "yt-" : "ok-") + (slug(title) || "videos");
         const urls = URLS[provider];
+        const target = $("target").value.trim() || "player";
         const mode = $("mode").value;
         let links, entries, groups, warn = "";
 
@@ -315,13 +319,15 @@
         }
 
         // definitions = flat array of video objects
-        const lines = ["[", ...entries.map((x) => `    ${x},`), "]"];
+        const lines = ["[", ...entries.map((x) => `    video(${x}),`), "]"];
+        // DEFAULTS applied to every entry through a small factory
+        const header = `const DEFAULTS = { provider: ${J(provider)}, target: ${J(target)} };\nconst video = (v) => ({ ...DEFAULTS, ...v });`;
 
-        return { title, links, groups, warn, definitions: lines.join("\n") };
+        return { title, target, links, groups, warn, header, definitions: lines.join("\n") };
       }
 
-      function linkHtml(l, auto) {
-        return `<a data-link data-key="${esc(l.key)}" data-target="player"${auto ? ` data-autoplay="${auto}"` : ""} href="${esc(l.href)}">${esc(l.text)}</a>`;
+      function linkHtml(l, auto, target) {
+        return `<a data-link data-key="${esc(l.key)}" data-target="${esc(target)}"${auto ? ` data-autoplay="${auto}"` : ""} href="${esc(l.href)}">${esc(l.text)}</a>`;
       }
 
       function controlsHtml(groups) {
@@ -329,11 +335,11 @@
         return `    <div class="controls" id="controls">\n        ${parts.join('\n        <span class="sep"></span>\n        ')}\n    </div>`;
       }
 
-      function controlsJs(groups) {
+      function controlsJs(groups, target) {
         const used = groups.flat();
         return `
         // controls: enabled / disabled from the state of the region
-        const region = lp.getRegion("player");
+        const region = lp.getRegion(${J(target)});
         const controls = document.getElementById("controls");
         const ACTIONS = {
 ${used.map((a) => `            ${a}: [(r) => ${CONTROLS[a][1]}, (r) => ${CONTROLS[a][2]}]`).join(",\n")}
@@ -356,12 +362,12 @@ ${used.map((a) => `            ${a}: [(r) => ${CONTROLS[a][1]}, (r) => ${CONTROL
 
       function generate(c) {
         const auto = $("auto").value;
-        const { title, links, groups, warn, definitions } = build(c);
-        const linksHtml = links.map((l) => linkHtml(l, auto)).join("\n        ");
+        const { title, target, links, groups, warn, header, definitions } = build(c);
+        const linksHtml = links.map((l) => linkHtml(l, auto, target)).join("\n        ");
 
         if ($("output").value === "snippet") {
-          return `${warn}<!-- links: the page only needs a navigation link (data-link, data-key, data-target) -->\n${links.map((l) => linkHtml(l, auto)).join("\n")}\n<div id="player" class="video-container"></div>\n\n`
-            + `// definitions: array of { videoId, title, channel, thumbnail, duration }\nconst definitions = ${definitions};\n\nconst lp = new LinkPlayer({ definitions });`;
+          return `${warn}<!-- links: the page only needs a navigation link (data-link, data-key, data-target) -->\n${links.map((l) => linkHtml(l, auto, target)).join("\n")}\n<div id="${esc(target)}" class="video-container"></div>\n\n`
+            + `${header}\n\n// definitions: array of { provider, target, videoId, title, channel, thumbnail, duration }\nconst definitions = ${definitions};\n\nconst lp = new LinkPlayer({ definitions });`;
         }
 
         const withControls = $("ctl").checked;
@@ -379,16 +385,18 @@ ${STYLE}
     <nav class="links">
         ${linksHtml}
     </nav>
-${withControls ? controlsHtml(groups) + "\n" : ""}    <div id="player" class="video-container"></div>
+${withControls ? controlsHtml(groups) + "\n" : ""}    <div id="${esc(target)}" class="video-container"></div>
 
     <script type="module">
         import {LinkPlayer} from "../src/LinkPlayer.js"; // adapt the path
 
-        // definitions: array of { videoId, title, channel, thumbnail, duration }
+        ${indent(header, 8)}
+
+        // definitions: array of { provider, target, videoId, title, channel, thumbnail, duration }
         const definitions = ${indent(definitions, 8)};
 
         const lp = new LinkPlayer({ definitions });
-${withControls ? controlsJs(groups) : ""}    <\/script>
+${withControls ? controlsJs(groups, target) : ""}    <\/script>
 </body>
 </html>`;
       }
@@ -429,6 +437,7 @@ ${withControls ? controlsJs(groups) : ""}    <\/script>
         ["q", "sort", "all", "none"].forEach((id) => ($(id).disabled = lk));
         $("lockNote").hidden = !lk;
         $("pidWrap").hidden = !lk;
+        $("thumbWrap").hidden = provider !== "youtube"; // YouTube thumbnails can be deduced from the id
         $("ctlWrap").hidden = $("output").value !== "page";
 
         const list = $("list"), top = list.scrollTop;
@@ -535,7 +544,7 @@ ${withControls ? controlsJs(groups) : ""}    <\/script>
         order = order.filter((id) => on.has(id));
         render();
       };
-      ["q", "sort", "mode", "title", "key", "auto", "pid", "output", "ctl"].forEach((id) => $(id).addEventListener("input", render));
+      ["q", "sort", "mode", "title", "target", "key", "auto", "pid", "output", "ctl", "thumb"].forEach((id) => $(id).addEventListener("input", render));
 
       $("copy").onclick = async () => {
         const b = $("copy"), old = b.textContent;

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTubePlayer : load vs cue</title>
+    <style>
+        body{font:14px/1.5 system-ui,sans-serif;margin:0;padding:20px;max-width:640px}
+        section{margin-bottom:32px}
+        iframe{display:block;width:100%;aspect-ratio:16/9;height:auto;border:0;background:#000}
+        .bar{display:flex;gap:6px;margin:8px 0}
+        li[aria-current]{color:#f7931e;font-weight:600}
+        li{cursor:pointer}
+        .log{max-height:120px;overflow:auto;font:11px/1.4 monospace;color:#777;white-space:pre-wrap}
+    </style>
+</head>
+<body>
+
+<section>
+    <h2>Instance 1 · mode « load » (loadVideoById)</h2>
+    <iframe id="yt1" width="560" height="315"
+            src="https://www.youtube.com/embed/?playlist=z2sv_RsNwM4,-xiF9YIIUk4"
+            title="YouTube video player" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    <div class="bar" data-for="p1"></div>
+    <ol data-list="p1"></ol>
+    <pre class="log" data-log="p1"></pre>
+</section>
+
+<section>
+    <h2>Instance 2 · mode « cue » (cueVideoById)</h2>
+    <iframe id="yt2" width="560" height="315"
+            src="https://www.youtube.com/embed/?playlist=z2sv_RsNwM4,-xiF9YIIUk4"
+            title="YouTube video player" frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+    <div class="bar" data-for="p2"></div>
+    <ol data-list="p2"></ol>
+    <pre class="log" data-log="p2"></pre>
+</section>
+
+<script>
+    /**
+     * Pilote UNE iframe YouTube via postMessage (sans script externe).
+     * L'iframe ne reçoit qu'une vidéo à la fois : YouTube n'enchaîne jamais seul,
+     * c'est cette classe qui décide de la suite.
+     *
+     * mode "load" : à la fin, la suivante est chargée ET lue   (loadVideoById)
+     * mode "cue"  : à la fin, la suivante est chargée sans démarrer (cueVideoById)
+     *
+     * Événements : "item" {index, id} · "state" {state} · "end" {}
+     */
+    class YouTubePlayer {
+        static ENDED = 0;
+        #iframe; #mode; #ids = []; #index = 0;
+        #lastState = null; #duration = 0; #ready = false;
+        #handlers = {};
+        #channel = "yt-" + Math.random().toString(36).slice(2, 8);
+
+        constructor(iframe, {mode = "load"} = {}) {
+            this.#iframe = iframe;
+            this.#mode = mode;
+            this.#ids = this.#readIds(iframe.src);
+            if (!this.#ids.length) throw new Error("Aucune vidéo trouvée dans l'iframe");
+
+            window.addEventListener("message", (e) => this.#onMessage(e));
+            iframe.addEventListener("load", () => this.#listen());
+            iframe.src = this.#buildSrc(this.#ids[0]); // une seule vidéo : plus de playlist native
+        }
+
+        get ids() { return [...this.#ids]; }
+        get index() { return this.#index; }
+        get mode() { return this.#mode; }
+
+        on(type, fn) { (this.#handlers[type] ??= []).push(fn); return this; }
+
+        next()     { this.playAt(this.#index + 1); }
+        previous() { this.playAt(this.#index - 1); }
+        play()     { this.#command("playVideo"); }
+        pause()    { this.#command("pauseVideo"); }
+
+        /** Selon le mode : lance la vidéo (load) ou la prépare seulement (cue). */
+        playAt(i) {
+            if (i < 0 || i >= this.#ids.length) return;
+            this.#index = i;
+            this.#lastState = null;
+            const verb = this.#mode === "load" ? "loadVideoById" : "cueVideoById";
+            this.#command(verb, [this.#ids[i], 0]);
+            this.#emit("item", {index: i, id: this.#ids[i]});
+        }
+
+        /** Pour tester : saute à quelques secondes de la fin. */
+        seekNearEnd(seconds = 3) {
+            if (this.#duration > seconds) this.#command("seekTo", [this.#duration - seconds, true]);
+        }
+
+        // ───────── internals ─────────
+
+        #readIds(src) {
+            const url = new URL(src);
+            const fromPath = url.pathname.split("/embed/")[1]?.replace(/\/$/, "");
+            const list = (url.searchParams.get("playlist") ?? "").split(",").filter(Boolean);
+            return fromPath ? [fromPath, ...list] : list;
+        }
+
+        #buildSrc(id) {
+            const url = new URL(`https://www.youtube.com/embed/${id}`);
+            url.searchParams.set("enablejsapi", "1");
+            url.searchParams.set("rel", "0");
+            if (/^https?:$/.test(location.protocol)) url.searchParams.set("origin", location.origin);
+            return url.href;
+        }
+
+        #post(message) {
+            this.#iframe.contentWindow?.postMessage(JSON.stringify(message), "https://www.youtube.com");
+        }
+
+        #command(func, args = []) {
+            this.#post({event: "command", func, args});
+        }
+
+        /** Abonne l'iframe aux événements (onStateChange, infoDelivery). */
+        #listen() {
+            this.#post({event: "listening", id: this.#channel, channel: "widget"});
+            this.#emit("item", {index: this.#index, id: this.#ids[this.#index]});
+        }
+
+        #onMessage(e) {
+            if (e.source !== this.#iframe.contentWindow) return;
+            let d = e.data;
+            if (typeof d === "string") { try { d = JSON.parse(d); } catch { return; } }
+            if (!d || typeof d !== "object") return;
+
+            if (!this.#ready) { this.#ready = true; this.#listen(); }
+            if (d.info?.duration) this.#duration = d.info.duration;
+
+            let state = null;
+            if (d.event === "onStateChange") state = d.info;
+            else if (d.event === "infoDelivery" && typeof d.info?.playerState === "number") state = d.info.playerState;
+            if (state !== null) this.#setState(state);
+        }
+
+        #setState(state) {
+            if (state === this.#lastState) return;
+            this.#lastState = state;
+            this.#emit("state", {state});
+            if (state === YouTubePlayer.ENDED) this.#onEnded();
+        }
+
+        #onEnded() {
+            if (this.#index < this.#ids.length - 1) this.next();
+            else this.#emit("end", {});
+        }
+
+        #emit(type, payload) {
+            for (const fn of this.#handlers[type] ?? []) fn(payload);
+        }
+    }
+
+    // ───────── démo ─────────
+    const STATES = {"-1": "unstarted", 0: "ended", 1: "playing", 2: "paused", 3: "buffering", 5: "cued"};
+
+    function mount(key, iframeId, mode) {
+        const player = new YouTubePlayer(document.getElementById(iframeId), {mode});
+        const bar = document.querySelector(`[data-for=${key}]`);
+        const list = document.querySelector(`[data-list=${key}]`);
+        const log = document.querySelector(`[data-log=${key}]`);
+        const write = (t) => { log.textContent += t + "\n"; log.scrollTop = log.scrollHeight; };
+
+        for (const [label, fn] of [
+            ["⏮", () => player.previous()],
+            ["⏭", () => player.next()],
+            ["−3 s avant la fin", () => player.seekNearEnd(3)]
+        ]) {
+            const b = document.createElement("button");
+            b.type = "button"; b.textContent = label; b.onclick = fn;
+            bar.append(b);
+        }
+
+        player.ids.forEach((id, i) => {
+            const li = document.createElement("li");
+            li.textContent = id;
+            li.onclick = () => player.playAt(i);
+            list.append(li);
+        });
+
+        player.on("item", ({index, id}) => {
+            [...list.children].forEach((li, i) => li.toggleAttribute("aria-current", i === index));
+            write(`item ${index + 1} → ${id}`);
+        });
+        player.on("state", ({state}) => write(`état : ${STATES[state] ?? state}`));
+        player.on("end", () => write("fin de la liste"));
+    }
+
+    mount("p1", "yt1", "load");
+    mount("p2", "yt2", "cue");
+</script>
+</body>
+</html>

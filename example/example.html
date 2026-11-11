@@ -97,20 +97,20 @@
 </div>
 <div class="controls" data-controls="t-2"></div>
 
-<script kind="module">
+<script type="module">
     import {LinkPlayer} from "../src/LinkPlayer.js";
 
     const lp = new LinkPlayer({
         okruEmbedBaseUrl: "https://okru-embed.vercel.app/",
         fallbackTitle: (i) => `Vidéo ${i + 1}`,
         //youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",  // titles / thumbnails of a playlist that has no data-videos (cached)
-        definitions: {
-            // key = info.key: infos defined in code, the link stays a plain navigation link
-            "youtube:z2sv_RsNwM4": {title: "Bruits de train et de pluie", channel: "Relaxing White Noise"},
-            "youtube:list:z2sv_RsNwM4,-xiF9YIIUk4": {
-                videos: [{title: "Train and rain"}, {title: "Second video"}]
-            }
-        },
+        // definitions: {
+        //     // key = info.key: infos defined in code, the link stays a plain navigation link
+        //     "youtube:z2sv_RsNwM4": {title: "Bruits de train et de pluie", channel: "Relaxing White Noise"},
+        //     "youtube:list:z2sv_RsNwM4,-xiF9YIIUk4": {
+        //         videos: [{title: "Train and rain"}, {title: "Second video"}]
+        //     }
+        // },
         onError: ({error, element, region}) => console.warn("[example]", region?.target, element, error)
     });
 

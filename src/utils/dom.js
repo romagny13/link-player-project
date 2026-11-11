@@ -46,7 +46,7 @@ export function makeIframe({
     iframe.frameBorder = "0";
 
     /*
-          Media and playback
+          DefBuilder and playback
             Value                Allows the iframe to…
             autoplay             start playback without user gesture
             encrypted-media      play protected media (DRM, EME)

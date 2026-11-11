@@ -35,33 +35,38 @@ export function toAutoplayMode(value) {
 }
 
 function normalizeSeed(input) {
-    if (input == null) throw new TypeError("Media: input is required");
+    if (input == null) throw new TypeError("DefBuilder: input is required");
     if (typeof input === "string") return {url: input};
     if (typeof input === "object") return {...input};
-    throw new TypeError("Media: expected url string or object");
+    throw new TypeError("DefBuilder: expected url string or object");
 }
 
 function createBuilder(type, input, batchList = null) {
-    const def = {type, ...normalizeSeed(input)};
+    const data = {type, ...normalizeSeed(input)};
 
     if (!batchList) {
-        batchList = [def];
+        batchList = [data];
     } else {
-        batchList.push(def);
+        batchList.push(data);
     }
 
     const set = (k, v) => {
-        def[k] = v;
+        data[k] = v;
         return api;
     };
 
     const api = {
         title: (v) => set("title", v),
-        channel(v) {
-            def.channel = v;
+        description: (v) => set("description", v),
+        channel(v, url = null) {
+            data.channel = v;
+            if (url) {
+                data.channelUrl = url;
+            }
             return api;
         },
         thumbnail: (v) => set("thumbnail", v),
+        duration: (v) => set("duration", v),
         autoplay: (v = AUTOPLAY_MODES.INIT) => set("autoplay", v),
         start: (v) => set("start", v),
         showOnInit: (v = true) => set("showOnInit", v),
@@ -69,11 +74,11 @@ function createBuilder(type, input, batchList = null) {
         key: (v) => set("key", v),
         name: (v) => set("name", v),
         videos(v) {
-            def.videos = v;
+            data.videos = v;
             return api;
         },
+        extra: (v) => set("extra", v),
 
-        // --- Permet d'enchaîner les types en conservant la même liste ---
         video(input) {
             return createBuilder("video", input, batchList);
         },
@@ -84,7 +89,6 @@ function createBuilder(type, input, batchList = null) {
             return createBuilder("playlist", input, batchList);
         },
 
-        // --- Retourne toujours un tableau ---
         build() {
             return batchList;
         }
@@ -93,7 +97,7 @@ function createBuilder(type, input, batchList = null) {
     return api;
 }
 
-export const Media = {
+export const DefBuilder = {
     video: (input) => createBuilder("video", input),
     videoList: (input) => createBuilder("videoList", input),
     playlist: (input) => createBuilder("playlist", input),

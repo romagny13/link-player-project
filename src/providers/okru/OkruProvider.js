@@ -1,14 +1,17 @@
 import {OkruInfoParser} from "./OkruInfoParser.js";
 import {OkruPlayer} from "./OkruPlayer.js";
+import {MediaProvider} from "../MediaProvider.js";
 import {makeIframe} from "../../utils/dom.js";
 
-export class OkruProvider {
+export class OkruProvider extends MediaProvider {
     id = "okru";
     hosts = ["ok.ru"];
     #infoParser;
     #embedBaseUrl;
 
     constructor({infoParser = null, embedBaseUrl = null} = {}) {
+        super();
+
         this.#infoParser = infoParser ?? new OkruInfoParser();
         this.#embedBaseUrl = embedBaseUrl;
     }

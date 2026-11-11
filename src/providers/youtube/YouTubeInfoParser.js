@@ -79,7 +79,7 @@ export class YouTubeInfoParser extends InfoParser {
         return new UrlInfo({
             kind: "video",
             videoId,
-            startSeconds: this.parseStartTime(q.get("t") ?? q.get("start"))
+            startSeconds: this.parseTime(q.get("t") ?? q.get("start"))
         });
     }
 
@@ -97,12 +97,16 @@ export class YouTubeInfoParser extends InfoParser {
                     target: def.target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(def.autoplay),
-                    startSeconds: this.parseStartTime(def.start) ?? urlInfos.startSeconds,
+                    startSeconds: this.parseTime(def.start) ?? urlInfos.startSeconds,
                     title: def.title ?? "",
+                    description: def.description ?? "",
                     channel: def.channel ?? "",
+                    channelUrl: def.channelUrl ?? "",
+                    duration: this.parseTime(def.duration),
                     thumbnail: def.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(urlInfos.videoId),
                     showOnInit: def.showOnInit,
-                    key: def.key
+                    key: def.key,
+                    extra: def.extra
                 });
             case "videoList": {
                 const index = urlInfos.index ?? def.index;
@@ -116,10 +120,15 @@ export class YouTubeInfoParser extends InfoParser {
                         target: def.target,
                         videoId,
                         autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),   // repli sur l'autoplay du lien (comme Okru)
-                        startSeconds: this.parseStartTime(v.start),       // plus de def.start sur toutes les vidéos
+                        startSeconds: this.parseTime(v.start),       // plus de def.start sur toutes les vidéos
                         title: v.title ?? "",
+                        description: v.description ?? "",
                         channel: v.channel ?? "",
-                        thumbnail: v.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId)
+                        channelUrl: v.channelUrl ?? "",
+                        duration: this.parseTime(v.duration),
+                        thumbnail: v.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId),
+                        key: v.key,
+                        extra: v.extra
                     }));
                 });
                 return list;
@@ -128,18 +137,23 @@ export class YouTubeInfoParser extends InfoParser {
                 const playlist = new PlaylistInfo(
                     "youtube", def.target, urlInfos.playlistId, urlInfos.videoId, def.showOnInit, def.key
                 );
-                const items = videos.length ? videos: [];
-            
+                const items = videos.length ? videos : [];
+
                 items.forEach((v, i) => {
                     playlist.addVideo(new VideoInfo({
                         provider: "youtube",
                         target: def.target,
                         videoId: v.videoId,
                         autoplay: toAutoplayMode(v.autoplay),
-                        startSeconds: this.parseStartTime(v.start),
+                        startSeconds: this.parseTime(v.start),
                         title: v.title ?? "",
+                        description: v.description ?? "",
                         channel: v.channel ?? "",
-                        thumbnail: v.thumbnail ?? (v.id ? this.#thumbnailUrlBuilder.getThumbnailUrl(v.id) : "")
+                        channelUrl: v.channelUrl ?? "",
+                        thumbnail: v.thumbnail ?? (v.videoId ? this.#thumbnailUrlBuilder.getThumbnailUrl(v.videoId) : ""),
+                        duration: this.parseTime(v.duration),
+                        key: v.key,
+                        extra: v.extra
                     }));
                 });
                 return playlist;

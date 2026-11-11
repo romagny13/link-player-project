@@ -1,0 +1,816 @@
+<div id="series-article">
+    <style>
+        /* ====================================================================
+           Thème "étagère vidéoclub" — scoping strict à #series-article
+           ==================================================================== */
+        #series-article {
+            --sa-bg: #1c140f;
+            --sa-bg-alt: #241a13;
+            --sa-paper: #f4ead8;
+            --sa-ink: #2b1d12;
+            --sa-ink-soft: #4a3826;
+            --sa-amber: #e8923a;
+            --sa-teal: #2f8f86;
+            --sa-mustard: #cf9a2e;
+            --sa-cream: #f3e8d6;
+            --sa-line: #52402c;
+
+            --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+            background: var(--sa-bg);
+            color: var(--sa-cream);
+            font-family: var(--font-body);
+            padding: 24px;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        #series-article *,
+        #series-article *::before,
+        #series-article *::after {
+            box-sizing: inherit;
+        }
+
+        #series-article a {
+            color: inherit;
+        }
+
+        /* --- Lecteur --- */
+        #series-article .sa-player {
+            position: relative;
+            background: var(--sa-bg-alt);
+            border: 2px solid var(--sa-line);
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 28px;
+        }
+
+        #series-article .sa-player-badge {
+            position: absolute;
+            top: -14px;
+            left: 16px;
+            background: var(--sa-amber);
+            color: var(--sa-ink);
+            font-family: var(--font-display);
+            letter-spacing: 0.04em;
+            font-size: 15px;
+            padding: 3px 12px 4px;
+            border-radius: 2px;
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.35);
+        }
+
+        #series-article .sa-player-frame {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: repeating-linear-gradient(
+                    0deg,
+                    rgba(255, 255, 255, 0.025) 0px,
+                    rgba(255, 255, 255, 0.025) 1px,
+                    transparent 1px,
+                    transparent 3px
+            ),
+            #0e0b08;
+            border-radius: 2px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #series-article .sa-player-frame iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        #series-article .sa-player-placeholder {
+            color: var(--sa-ink-soft);
+            font-size: 14px;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        /* --- Étagère de séries --- */
+        #series-article .sa-shelf-heading {
+            font-family: var(--font-display);
+            font-size: 22px;
+            letter-spacing: 0.02em;
+            color: var(--sa-mustard);
+            margin: 0 0 14px;
+        }
+
+        #series-article .sa-shelf {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+            align-items: start;
+        }
+
+        /* Chaque série = une "cassette" */
+        #series-article .sa-tape {
+            background: var(--sa-bg-alt);
+            border: 2px solid var(--sa-line);
+            border-radius: 3px;
+            overflow: hidden;
+            transition: border-color 0.15s ease;
+        }
+
+        #series-article .sa-tape.is-open {
+            border-color: var(--sa-amber);
+            /* la fiche dépliée prend toute la largeur de la grille pour rester lisible */
+            grid-column: 1 / -1;
+        }
+
+        #series-article .sa-tape-spine {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+            color: var(--sa-cream);
+            padding: 12px 14px;
+            text-align: left;
+            font: inherit;
+        }
+
+        #series-article .sa-tape-spine:hover {
+            background: rgba(232, 146, 58, 0.08);
+        }
+
+        #series-article .sa-tape-spine:focus-visible {
+            outline: 2px solid var(--sa-amber);
+            outline-offset: -2px;
+        }
+
+        #series-article .sa-tape-title {
+            font-family: var(--font-display);
+            font-size: 18px;
+            letter-spacing: 0.01em;
+            line-height: 1.15;
+        }
+
+        #series-article .sa-tape-chevron {
+            flex: 0 0 auto;
+            color: var(--sa-teal);
+            transition: transform 0.2s ease;
+            font-size: 14px;
+        }
+
+        #series-article .sa-tape.is-open .sa-tape-chevron {
+            transform: rotate(180deg);
+        }
+
+        #series-article .sa-tape-body {
+            padding: 4px 16px 18px;
+            border-top: 1px dashed var(--sa-line);
+        }
+
+        #series-article .sa-tape-desc {
+            background: var(--sa-paper);
+            color: var(--sa-ink);
+            padding: 14px 16px;
+            border-radius: 2px;
+            margin: 14px 0;
+            font-size: 14.5px;
+            line-height: 1.55;
+        }
+
+        #series-article .sa-tape-desc p {
+            margin: 0 0 10px;
+        }
+
+        #series-article .sa-tape-desc p:last-child {
+            margin-bottom: 0;
+        }
+
+        #series-article .sa-tape-desc strong {
+            color: var(--sa-ink);
+        }
+
+        #series-article .sa-tape-desc a {
+            color: #8a3f14;
+            text-decoration: underline;
+            text-decoration-color: rgba(138, 63, 20, 0.4);
+        }
+
+        #series-article .sa-tape-desc a:hover {
+            text-decoration-color: #8a3f14;
+        }
+
+        /* Boutons "ticket" pour les liens (Épisodes, etc.) */
+        #series-article .sa-tape-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        #series-article .sa-link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--sa-teal);
+            color: #06211e;
+            font-weight: 600;
+            font-size: 14px;
+            padding: 9px 16px;
+            border-radius: 2px;
+            text-decoration: none;
+            border: 1px dashed rgba(6, 33, 30, 0.35);
+            box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.3);
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
+        }
+
+        #series-article .sa-link-btn:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        #series-article .sa-link-btn:focus-visible {
+            outline: 2px solid var(--sa-cream);
+            outline-offset: 2px;
+        }
+
+        #series-article .sa-link-btn.is-active {
+            background: var(--sa-amber);
+            color: var(--sa-ink);
+        }
+
+        #series-article .sa-link-btn.is-active::after {
+            content: "\25B6 en cours";
+            font-size: 11px;
+            font-weight: 700;
+            opacity: 0.75;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #series-article .sa-tape-chevron,
+            #series-article .sa-link-btn {
+                transition: none;
+            }
+        }
+
+        @media (max-width: 560px) {
+            #series-article {
+                padding: 16px;
+            }
+
+            #series-article .sa-tape-title {
+                font-size: 17px;
+            }
+        }
+
+        /* --- Badge "NEW" pour les séries récemment ajoutées --- */
+        #series-article .sa-new {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px 3px;
+            background: var(--sa-amber);
+            color: var(--sa-ink);
+            font-family: var(--font-display);
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            line-height: 1.1;
+            text-transform: uppercase;
+            border-radius: 2px;
+            box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+            transform: rotate(-3deg);
+            vertical-align: middle;
+        }
+    </style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <style>@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');</style>
+
+    <div id="series-articles">
+
+        <div class="sa-player">
+            <span class="sa-player-badge">À l'écran</span>
+            <div id="series-gp1" class="sa-player-frame">
+                <p class="sa-player-placeholder">Choisissez un épisode ci-dessous pour lancer la lecture.</p>
+            </div>
+        </div>
+
+        <h3 class="sa-shelf-heading">Séries à (re)découvrir</h3>
+        <div class="sa-shelf" id="sa-shelf"></div>
+
+    </div>
+    <script src="../dist/link-player.js"></script>
+    <script>
+        (function () {
+            const SERIES = [
+                {
+                    title: "Hartley, cœurs à vif (Heartbreak High)",
+                    desc: `<p><strong>Hartley, cœurs à vif</strong> est une série télévisée <strong>australienne</strong> de <strong>210 épisodes</strong>, créée par <strong>Ben Gannon et Michael Jenkins</strong> et diffusée sur <strong>Network Ten puis ABC Australie (1994-1999)</strong>.</p>
+    
+    <p>Elle suit <strong>Nick Poulos</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0222150/"
+        data-card-title="Alex Dimitriades"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRNmCtNIrZH_ZLxFFsv1PG6ZUTgXBWEG6RgnSDXSg5ORw"
+        target="_blank">Alex Dimitriades</a></em>) et ses camarades du lycée multiracial <strong>de Hartley High, à Sydney</strong>, entre cours, amitiés, histoires d'amour et drames adolescents.
+    
+    Avec <strong>Jodie Cooper</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0875793/"
+        data-card-title="Abi Tucker"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BZTIyOWZlZTgtMmViMy00YmFlLWIyOWItNjVmZmM1NDk4MWU1XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"
+        target="_blank">Abi Tucker</a></em>),
+    
+    <strong>Costa Bordino</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0169566/"
+        data-card-title="Salvatore Coco"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTbfvOheaS5-ni8Yc-QZP5C_ag3JtA21NoAFi5jAby93A"
+        target="_blank">Salvatore Coco</a></em>) et
+    
+    <strong>Drazic</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0611982/"
+        data-card-title="Callan Mulvey"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BN2E4MDU2ZjMtN2QyNi00NGMwLWE4MmYtMjAyMGJhZTQzOTg4XkEyXkFqcGc@._V1_FMjpg_UX1000_.jpg"
+        target="_blank">Callan Mulvey</a></em>), la série mélange <strong>réalisme, adolescence et bande-son culte</strong> pendant <strong>six saisons</strong>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/1629710060278?video_ids=1629710060278,1629720677110,1629721070326,1629723429622,1629725264630,1629734374134,1629734963958,1629735029494,1629735226102,1629735291638,1629735619318,1629735684854,1629737192182,1629737323254,1629902670582,1629737847542,1629738044150,1630920641270,1630921165558,1630921558774,1630921755382,1630921886454,1630921820918,1630922017526,1630922148598,1630922279670,1630922345206,1630922214134,1630922083062,1630922935030,1630923066102,1630922803958,1630922672886,1630922738422,1630922869494,1630923000566,1630923131638,1631025433334,1631025498870,1631025564406,1631025629942,1631025695478,1631025826550,1631025957622,1631026088694,1631026219766,1631026285302,1631026154230,1631026023158,1631025892086,1631025761014,1631026678518,1631026744054,1631026875126,1631027006198,1631027137270,1631027268342,1631027399414,1631027464950,1631027333878,1631027202806,1631027071734,1631026940662,1631026809590,1631027858166,1631027989238,1631028120310,1631029103350,1631029234422,1631028972278,1631028841206,1631028710134,1631028579062,1631028447990,1631028316918,1631027923702,1631028185846,1631028054774,1631029365494,1631029299958,1631029431030,1631029496566,1631029168886,1631029037814,1631028251382,1631028906742,1631028775670,1631028644598,1631028382454,1631028513526,1631029824246,1631031921398,1631032052470,1631032183542,1631032314614,1631032249078,1631032118006,1631031986934,1631031855862,1631031724790,1631031134966,1631031003894,1631031593718,1631030872822,1631030741750,1631030610678,1631030479606,1631030348534,1631030217462,1631030086390,1631030807286,1631030676214,1631030151926,1631030545142,1631031462646,1631031331574,1631031200502,1631031069430,1631030938358,1631030020854,1631029889782,1631031790326,1631031397110,1631031266038,1631029955318,1631031659254,1631031528182,1631030414070,1631030282998&labels=Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E01%20-%20Le%20premier%20jour,Hartley%20Coeurs%20A%20Vif%20S1E02%20-%20Bapteme%20du%20feu,Hartley%20Coeurs%20A%20Vif%20S1E03%20-%20L%27atout%20Danielle,Hartley%20Coeurs%20A%20Vif%20S1E04%20-%20Conflits,Hartley%20Coeurs%20A%20Vif%20S1E05%20-%20Ce%20n%27est%20qu%27un%20au%20revoir,Hartley%20Coeurs%20A%20Vif%20S1E06%20-%20Solidarite,Hartley%20Coeurs%20A%20Vif%20S1E07%20-%20Les%20heros%20et%20les%20perdants,Hartley%20Coeurs%20A%20Vif%20S1E08%20-%20Une%20perte%20douloureuse,Hartley%20Coeurs%20A%20Vif%20S1E09%20-%20Victoire%20%21,Hartley%20Coeurs%20A%20Vif%20S1E10%20-%20Deceptions%20en%20serie,Hartley%20Coeurs%20A%20Vif%20S1E11%20-%20Palpitation,Hartley%20Coeurs%20A%20Vif%20S1E12%20-%20Mauvaises%20nouvelles,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E13%20-%20Combat%20en%20musique,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E14%20-%20Bye%20Chaka,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E15%20-%20Fete%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E17%20-%20Ca%20tourne%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E18%20-%20Passion,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E19%20-%20Mensonges%20et%20trahisons,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E20%20-%20Revelations,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E21%20-%20Bandit,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E22%20-%20Qui%20est%20avec%20qui,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E23%20-%20Star%20Quest,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E24%20-%20Epreuve%20de%20force,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E25%20-%20Deception,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E26%20-%20Nouveaux%20departs,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E27%20-%20Rivalite,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E28%20-%20Etoile%28s%29%20Filante%28s%29,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E29%20-%20Perte%20de%20reperes,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E30%20-%20Depart%20pour%20la%20Grece,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E31%20-%20Rocco,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E32%20-%20La%20tempete%20approche,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E33%20-%20Le%20Shark%20Pool,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E34%20-%20Relations%20amoureuses,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E35%20-%20Sex%2C%20drogue%20et%20Rock%27n%20Roll,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E36%20-%20Separation,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E37%20-%20Naissance...,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S1E38%20-%20...Chaos,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E39%20-%20L%27hommage%20a%20Nick,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E40%20-%20Dur%20d%27etre%20maman,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E41%20-%20Ahhh%20Yaya%20%21%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E42%20-%20Camera%20au%20poing,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E43%20-%20Ciao%20Vic,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E44%20-%20Vieux%20gar%C3%A7on,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E45%20-%2018%20ans,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E46%20-%20Adultere,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E47%20-%20Autour%20de%20Lucy,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E48%20-%20Hey%20Joe,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E49%20-%20Just%20married,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E50%20-%20En%20cavale,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E51%20-%20Un%20depart%20inattendu,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S2E52%20-%20Au%20revoir%20Bill%20et%20Yola%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E53%20-%20Un%20retour%20provisoire,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E54%20-%20La%20tornade%20Katerina,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E55%20-%20La%20fille%20au%20pull-over,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E56%20-%20Un%20jeune%20prof%20trop%20idealiste,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E57%20-%20Bye%20Ste%20Catherine%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E58%20-%20Romeo%20%26%20Juliette,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E59%20-%20Engagement,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E60%20-%20En%20cavale,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E61%20-%20Duel%20culinaire,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E62%20-%20Avenir%20incertain,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E63%20-%20Rancune,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E64%20-%20Second%20Chance,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S3E65%20-%20Sauvons%20Hartley%20High%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E66%20-%20La%20disparition,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E67%20-%20Adieu%20Steve,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E68%20-%20Pari%20perdant%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E69%20-%20Tenebre%20et%20Renaissance,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E70%20-%20Indiscipline,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E71%20-%20A%20un%20de%20ses%204%20Costa,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E72%20-%20Gar%C3%A7on%20mysterieux,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E73%20-%20Fausses%20accusations,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E74%20-%20La%20peur%20aux%20trousses,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E75%20-%20Trompee%20et%20trahie,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E76%20-%20Jeu%20dangereux,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E77%20-%20Semaine%20de%20stage,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E78%20-%20L%27equipee%20spatiale,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E79%20-%20Bolton%20et%20Linda,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E80%20-%20Bizutage,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E81%20-%20Entre%20Bowie%20et%20Pitt,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E82%20-%20Creatiions%20et%20recyclages,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E83%20-%20Coeur%20fragile,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E84%20-%20Supercherie,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E85%20-%2010%20raisons%20d%27etre%20cool,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E86%20-%20Un%20etrange%20sentiment,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E87%20-%20Depart%20pour%20Londres,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E88%20-%20Tricheur,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E89%20-%20Ronnie%2C%20Dyson%20et%20Roger%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E90%20-%20La%20secte,Hartley%20Coeurs%20A%20Vif%20-%20L%27integrale%20-%20S4E91%20-%20Journee%20des%20monstres,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E92%20-%20Who%20cares...if%20we%20fail,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E93%20-%20Panique%20avant%20le%20bac,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E94%20-%20Les%20exams,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E95%20-%20Ce%20n%27est%20qu%27un%20au%20revoir%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E96%20-%20Le%20Shark%20Pool%20en%20danger,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E97%20-%20R%C3%A9sultats%20du%20bac,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E98%20-%20Nouvelle%20g%C3%A9n%C3%A9ration,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E99%20-%20Nouvelle%20ann%C3%A9e%2C%20nouvelle%20amiti%C3%A9,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E100%20-%20Vague%20de%20chaleur,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E101%20-%20Travail%20difficile,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E102%20-%20Retour%20intriguant,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E103%20-%20Populaire_,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E104%20-%20Une%20fille%20pas%20comme%20les%20autres,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E105%20-%20Ennemis%20jur%C3%A9s%20-%20YouTube,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E106%20-%20Tout%20les%20oppose,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E107%20-%20En%20secret,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E108%20-%20Stero%C3%AFde,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E109%20-%20Enl%C3%A8vement%20-%20YouTube,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E110%20-%20Vol,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E111%20-%20Jugement,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E112%20-%20Inter%C3%AAt%20public,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E113%20-%20Le%20h%C3%A9ros,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E114%20-%20Crise%20d%27identit%C3%A9,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E115%20-%20Accident,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E116%20-%20Lui%20ou%20moi,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E117%20-%20True%20blood,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E118%20-%20Intol%C3%A9rance,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E119%20-%20Culture%20diff%C3%AArente,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E120%20-%20Bio%20ou%20arnaque,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E121%20-%20Trop%20jeune%20pour%20elle%20%21,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E122%20-%20Aux%20portes%20du%20succ%C3%A8s,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E123%20-%20D%C3%A9sillusions,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E124%20-%20Un%20service%20b%C3%A9n%C3%A9vole,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E125%20-%20Week-end%20de%20Jeun,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E126%20-%20Anita%20et%20Drazic,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E127%20-%20Bonne%20guerre,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E128%20-%20M%C3%A9thodes%20d%C3%A9pass%C3%A9es,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E129%20-%20Argent%20sale,Hartley%20Coeurs%20A%20Vif%20-%20L%27int%C3%A9grale%20-%20S5E130%20-%20La%20fin%20d%27une%20%C3%A9poque",
+                            showOnInit: true
+                        }
+                    ]
+                },
+                {
+                    title: "Sauvés par le gong (Saved by the Bell)",
+                    desc: `<p><strong>Sauvés par le gong</strong> est une série télévisée américaine de <strong>86 épisodes</strong>, créée par <strong>Sam Bobrick</strong> et diffusée sur <strong>NBC (1989-1993)</strong>.</p>
+    
+    <p>Elle suit <strong>Zack Morris</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0004971/"
+        data-card-title="Mark-Paul Gosselaar"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5J9bnxaAE66S2dxRI_6GuH2DABscgSo8eARODMoHspQ&s=10"
+        target="_blank">Mark-Paul Gosselaar</a></em>) et ses amis du lycée <strong>de Bayside</strong>, entre cours, amitiés, histoires d’amour et situations humoristiques.
+    
+    Avec <strong>Kelly Kapowski</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0005485/"
+        data-card-title="Tiffani Thiessen"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTtzwdWnaOZsMB4kMkVsv50YyvNr81jSj9dfPZZbyM4K1w0qEj4Abqdryg&s=10"
+        target="_blank">Tiffani Thiessen</a></em>),
+    
+    <strong>Slater</strong> (<em><a
+        href="https://www.imdb.com/name/nm0530249/"
+        data-card-title="Mario Lopez"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRroM6jutTXvxE4b-J0FqoDYt5fm2N-PLedVBO-GcqYmg&s=10"
+        target="_blank">Mario Lopez</a></em>) et
+    
+    <strong>Screech</strong> (<em><a
+        href="https://www.imdb.com/name/nm0224616/"
+        data-card-title="Dustin Diamond"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRvFncs9Eux5kbC-rZ7fEk9DO9Ueupx1GCPTtwLM5jrwFXfCxXNmA6x-CQR&s=10"
+        target="_blank">Dustin Diamond</a></em>), la série mélange <strong>comédie, adolescence et moments cultes</strong> pendant <strong>quatre saisons</strong>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/1781787527908?video_ids=1781787527908,1784880827108,1757504342756,1757667461860,1764264643300,1764271786724,1764294265572,1764347546340,1764368386788,1764373301988,1764384967396,1765615536868,1765630085860,1765809851108,1765821909732,1765832329956,1765841177316,1765854939876,1766005672676,1766025464548,1766057904868,1766086609636,1771079011044,1771091987172,1771119708900,1771191732964,1771236887268,1771243834084,1771249928932,1772138203876,1772159961828,1772213766884,1772309777124,1772319279844,1772329962212,1772537121508,1772552588004,1772563073764,1772618058468,1772636474084,1772656134884,1772665375460,1772672584420,1772699912932,1772708825828,1772720884452,1772727831268,1772743166692,1778686888676,1778706680548,1778719984356,1778730273508,1778740038372,1778751441636,1778774117092,1778789649124,1779431377636,1779622546148,1779638471396,1779647580900,1779677137636,1779685853924,1779694701284,1779701451492,1779787434724,1779807423204,1779817122532,1779838356196,1779852905188,1779898976996,1779944721124,1780002720484,1780014648036,1780029917924,1782714993380,1783088941796,1783202056932,1783212935908,1783224994532,1783364061924,1783372319460,1783424158436,1783438052068,1783446309604,1783464004324,1783468329700,1783473638116,1783479077604,1783488776932,1783504046820,1784394353380,1784570186468,1784863525604&labels=Sauv%C3%A9s%20par%20le%20Gong%20-%20L'Aventure%20Hawaienne,Sauv%C3%A9s%20par%20le%20Gong%20-%20Mariage%20%C3%A0%20Las%20Vegas,Sauv%C3%A9s%20par%20le%20Gong%20-%20S1%20Ep%201,Sauv%C3%A9s%20par%20le%20Gong%20-%20S1%20Ep%206,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%201,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%202,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%203,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%204,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%205,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%206,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%207,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%208,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%209,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2010,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2011,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2012,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2013,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2014,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2015,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2016,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2017,Sauv%C3%A9s%20par%20le%20Gong%20-%20S2%20Ep%2018%20-%20Fin,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%201,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%202,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%203,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%204,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%205,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%206,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%207,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%208,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%209,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2010,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2011,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2012,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2013,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2014,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2015,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2016,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2017,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2018,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2019,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2020,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2021,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2022,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2023,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2024,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2025,Sauv%C3%A9s%20par%20le%20Gong%20-%20S3%20Ep%2026,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%201,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%202,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%203,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%204,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%205,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%206,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%207,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%208,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%209,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2010,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2011,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2012,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2013,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2014,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2015,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2016,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2017,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2018,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2019,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2020,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2021,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2022,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2023,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2024,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2025,Sauv%C3%A9s%20par%20le%20Gong%20-%20S4%20Ep%2026%20-%20Fin,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%201,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%202,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%203,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%204,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%205,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%206,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%207,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%208,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%209,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2010,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2011,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2012,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2013,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2014,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2015,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2016,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2017,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2018,Sauv%C3%A9s%20par%20le%20Gong%20%3A%20Les%20Annees%20Lycee%20-%20Ep%2019%20Fin"
+                        }
+                    ]
+                },
+                {
+                    title: "Les Contes de Grimm",
+                    desc: `<p>Diffusés notamment sur <strong>M6</strong> et sur différentes chaînes de la TNT, cette collection revisite des histoires intemporelles mêlant <em>magie, aventure, mystère et leçons de vie</em>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://www.youtube.com/watch?v=AxxfI7Fpyzo&list=PL4OWKNKQMwtmGp6qYzxLEDMciezR1RncF&index=1"
+                        }
+                    ]
+                },
+                {
+                    title: "Alerte à Malibu (Baywatch)",
+                    desc: `<p><strong>🏖️🌊🚨 Alerte à Malibu</strong> (Baywatch) est une série télévisée américaine de <strong>242 épisodes</strong>, créée par <strong>Michael Berk, Gregory J. Bonann et Douglas Schwartz</strong>, et diffusée de <strong>1989 à 2001</strong> sur <strong>11 saisons</strong>.</p>
+    
+    <p>Portée par <strong>David Hasselhoff</strong> (Mitch Buchannon), la série doit une grande partie de son succès à ses stars iconiques : <strong>Pamela Anderson</strong> (C.J. Parker, <strong>S3E1</strong>), <strong>David Charvet</strong> (Matt Brody, <strong>S3</strong>), <strong>Yasmine Bleeth</strong> (Caroline Holden, <strong>S4</strong>),  <strong>Carmen Electra</strong> (Lani McKenzie, <strong>S4</strong>), <strong>Erika Eleniak</strong> (Shauni McClain, <strong>S1</strong>) et <strong>Billy Warlock</strong> (Eddie Kramer, <strong>S1</strong>).</p>
+    
+    <p>Entre sauvetages spectaculaires, drames personnels, romances et courses au ralenti sur la plage, <strong>Alerte à Malibu</strong> est devenue un véritable phénomène culturel des années 90.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/2208053856996?video_ids=2208053856996,2208053922532,2208053988068,2210648951524,2210649410276,2210649672420,2210649803492,2210649869028,2210650065636,2210877475556,2210877541092,2210877737700,2212226140900,2212226271972,2212226403044,2213186243300,2213186308836,2213186570980,2213186898660,2213187160804,2213187291876,2213187357412,2223960689380,2223960951524,2223961017060,2223961213668,2226813405924,2226813930212,2226814192356,2226814257892,2226814323428,2229555563236,2229555694308,2229555759844,2229555825380,2229555890916,2229556153060,2229556677348,2229557070564,2237048163044,2237048883940,2237049342692,2237049735908,2237049998052,2241556515556,2241556581092,2241557105380,2243769273060,2243769993956,2243770059492,2243770190564,2243770321636,2243770387172,2243770649316,2243770714852,2243770780388,2243770845924,2243771370212,2243771632356,2243771828964,2243772222180,2243774515940,2243774647012,2243774778084,2250105096932,2250105228004,2256587983588,2256588114660,2260997573348,2260997638884,2260997704420,2260997835492,2260997901028,2260997966564,2260998032100,2260998294244,2260998425316,2260998556388,2260998752996,2260998884068,2260998949604,2260999015140,2260999080676,2260999211748,2263336815332,2263336880868,2263336946404,2263337011940,2267208813284,2267208878820,2267209075428,2267209140964,2267209272036,2271713823460,2271713954532,2271714020068,2271767038692,2271767104228,2271767300836,2271767497444,2271767562980,2271767694052,2271767825124,2271767956196,2271768021732,2271768152804,2273041189604,2273041255140,2273041386212,2273041451748,2279974636260,2279974701796,2279974898404,2279974963940,2279975029476,2279975160548,2279975226084,2279975291620,2279975422692,2279975488228,2279975553764,2279975619300,2285565774564,2285565840100,2285566036708,2285604702948,2285604834020,2285604899556,2285605030628,2285605096164,2285605227236,2301623470820,2301623667428,2301623995108,2301624322788,2301624388324,2301624716004,2301625109220,2301625240292,2301625830116,2301626092260,2301626551012,2301626616548,2301626747620,2301627075300,2301627206372,2304061541092,2304061672164,2304061737700,2304061803236,2304061934308,2304062720740,2309865933540,2309866195684,2309866326756,2309866457828,2309866588900,2310128208612,2310128339684,2310128536292,2310128601828,2310128667364,2310128732900,2310128798436,2310128863972,2310128995044,2310129060580,2310129126116,2310129191652,2311107578596,2311107971812,2311108561636,2311108889316,2311109348068,2311777159908,2311777225444,2311777422052,2311777553124,2311777618660,2311777815268,2311777749732,2311777880804,2311777946340,2311778142948,2311778208484,2311778339556,2311778470628,2311778601700,2311778732772,2315646077668,2315646274276,2315646536420,2315646929636,2315647191780,2315647322852,2315647519460,2304061999844&labels=Alerte%20a%20Malibu%20-%20S1%20Ep%201%2B2,Alerte%20a%20Malibu%20-%20S1%20Ep%203,Alerte%20a%20Malibu%20-%20S1%20Ep%204,Alerte%20a%20Malibu%20-%20S1%20Ep%205,Alerte%20a%20Malibu%20-%20S1%20Ep%206,Alerte%20a%20Malibu%20-%20S1%20Ep%207,Alerte%20a%20Malibu%20-%20S1%20Ep%208,Alerte%20a%20Malibu%20-%20S1%20Ep%209,Alerte%20a%20Malibu%20-%20S1%20Ep%2010,Alerte%20a%20Malibu%20-%20S1%20Ep%2011,Alerte%20a%20Malibu%20-%20S1%20Ep%2012,Alerte%20a%20Malibu%20-%20S1%20Ep%2013,Alerte%20a%20Malibu%20-%20S1%20Ep%2014,Alerte%20a%20Malibu%20-%20S1%20Ep%2015,Alerte%20a%20Malibu%20-%20S1%20Ep%2016,Alerte%20a%20Malibu%20-%20S1%20Ep%2017,Alerte%20a%20Malibu%20-%20S1%20Ep%2018,Alerte%20a%20Malibu%20-%20S1%20Ep%2019,Alerte%20a%20Malibu%20-%20S1%20Ep%2020,Alerte%20a%20Malibu%20-%20S1%20Ep%2021,Alerte%20a%20Malibu%20-%20S1%20Ep%2022,Alerte%20a%20Malibu%20-%20S1%20Ep%2023%20-%20Fin,Alerte%20a%20Malibu%20-%20S2%20Ep%201,Alerte%20a%20Malibu%20-%20S2%20Ep%202,Alerte%20a%20Malibu%20-%20S2%20Ep%203,Alerte%20a%20Malibu%20-%20S2%20Ep%204,Alerte%20a%20Malibu%20-%20S2%20Ep%205,Alerte%20a%20Malibu%20-%20S2%20Ep%206,Alerte%20a%20Malibu%20-%20S2%20Ep%207,Alerte%20a%20Malibu%20-%20S2%20Ep%208,Alerte%20a%20Malibu%20-%20S2%20Ep%209,Alerte%20a%20Malibu%20-%20S2%20Ep%2010,Alerte%20a%20Malibu%20-%20S2%20Ep%2011,Alerte%20a%20Malibu%20-%20S2%20Ep%2012,Alerte%20a%20Malibu%20-%20S2%20Ep%2013,Alerte%20a%20Malibu%20-%20S2%20Ep%2014,Alerte%20a%20Malibu%20-%20S2%20Ep%2015,Alerte%20a%20Malibu%20-%20S2%20Ep%2016,Alerte%20a%20Malibu%20-%20S2%20Ep%2017,Alerte%20a%20Malibu%20-%20S2%20Ep%2018,Alerte%20a%20Malibu%20-%20S2%20Ep%2019,Alerte%20a%20Malibu%20-%20S2%20Ep%2020,Alerte%20a%20Malibu%20-%20S2%20Ep%2021,Alerte%20a%20Malibu%20-%20S2%20Ep%2022,Alerte%20a%20Malibu%20-%20S3%20Ep%201,Alerte%20a%20Malibu%20-%20S3%20Ep%202,Alerte%20a%20Malibu%20-%20S3%20Ep%203,Alerte%20a%20Malibu%20-%20S3%20Ep%204,Alerte%20a%20Malibu%20-%20S3%20Ep%205,Alerte%20a%20Malibu%20-%20S3%20Ep%206,Alerte%20a%20Malibu%20-%20S3%20Ep%207,Alerte%20a%20Malibu%20-%20S3%20Ep%208,Alerte%20a%20Malibu%20-%20S3%20Ep%209,Alerte%20a%20Malibu%20-%20S3%20Ep%2010,Alerte%20a%20Malibu%20-%20S3%20Ep%2011,Alerte%20a%20Malibu%20-%20S3%20Ep%2012,Alerte%20a%20Malibu%20-%20S3%20Ep%2013,Alerte%20a%20Malibu%20-%20S3%20Ep%2014,Alerte%20a%20Malibu%20-%20S3%20Ep%2015,Alerte%20a%20Malibu%20-%20S3%20Ep%2016,Alerte%20a%20Malibu%20-%20S3%20Ep%2017,Alerte%20a%20Malibu%20-%20S3%20Ep%2018,Alerte%20a%20Malibu%20-%20S3%20Ep%2019,Alerte%20a%20Malibu%20-%20S3%20Ep%2020,Alerte%20a%20Malibu%20-%20S3%20Ep%2021,Alerte%20a%20Malibu%20-%20S3%20Ep%2022%20-%20Fin,Alerte%20a%20Malibu%20-%20S4%20Ep%201,Alerte%20a%20Malibu%20-%20S4%20Ep%202,Alerte%20a%20Malibu%20-%20S4%20Ep%203,Alerte%20a%20Malibu%20-%20S4%20Ep%204,Alerte%20a%20Malibu%20-%20S4%20Ep%205,Alerte%20a%20Malibu%20-%20S4%20Ep%206,Alerte%20a%20Malibu%20-%20S4%20Ep%207,Alerte%20a%20Malibu%20-%20S4%20Ep%208,Alerte%20a%20Malibu%20-%20S4%20Ep%209,Alerte%20a%20Malibu%20-%20S4%20Ep%2010,Alerte%20a%20Malibu%20-%20S4%20Ep%2011,Alerte%20a%20Malibu%20-%20S4%20Ep%2012,Alerte%20a%20Malibu%20-%20S4%20Ep%2013,Alerte%20a%20Malibu%20-%20S4%20Ep%2014,Alerte%20a%20Malibu%20-%20S4%20Ep%2015,Alerte%20a%20Malibu%20-%20S4%20Ep%2016,Alerte%20a%20Malibu%20-%20S4%20Ep%2017,Alerte%20a%20Malibu%20-%20S4%20Ep%2018,Alerte%20a%20Malibu%20-%20S4%20Ep%2019,Alerte%20a%20Malibu%20-%20S4%20Ep%2020,Alerte%20a%20Malibu%20-%20S4%20Ep%2021,Alerte%20a%20Malibu%20-%20S4%20Ep%2022%20-%20Fin,Alerte%20a%20Malibu%20-%20S5%20Ep%201,Alerte%20a%20Malibu%20-%20S5%20Ep%202,Alerte%20a%20Malibu%20-%20S5%20Ep%203,Alerte%20a%20Malibu%20-%20S5%20Ep%204,Alerte%20a%20Malibu%20-%20S5%20Ep%205,Alerte%20a%20Malibu%20-%20S5%20Ep%206,Alerte%20a%20Malibu%20-%20S5%20Ep%207,Alerte%20a%20Malibu%20-%20S5%20Ep%208,Alerte%20a%20Malibu%20-%20S5%20Ep%209,Alerte%20a%20Malibu%20-%20S5%20Ep%2010,Alerte%20a%20Malibu%20-%20S5%20Ep%2011,Alerte%20a%20Malibu%20-%20S5%20Ep%2012,Alerte%20a%20Malibu%20-%20S5%20Ep%2013,Alerte%20a%20Malibu%20-%20S5%20Ep%2014,Alerte%20a%20Malibu%20-%20S5%20Ep%2015,Alerte%20a%20Malibu%20-%20S5%20Ep%2016,Alerte%20a%20Malibu%20-%20S5%20Ep%2017,Alerte%20a%20Malibu%20-%20S5%20Ep%2018,Alerte%20a%20Malibu%20-%20S5%20Ep%2019,Alerte%20a%20Malibu%20-%20S5%20Ep%2020,Alerte%20a%20Malibu%20-%20S5%20Ep%2021,Alerte%20a%20Malibu%20-%20S5%20Ep%2022%20-%20Fin,Alerte%20a%20Malibu%20-%20S6%20Ep%201,Alerte%20a%20Malibu%20-%20S6%20Ep%202,Alerte%20a%20Malibu%20-%20S6%20Ep%203,Alerte%20a%20Malibu%20-%20S6%20Ep%204,Alerte%20a%20Malibu%20-%20S6%20Ep%205,Alerte%20a%20Malibu%20-%20S6%20Ep%206,Alerte%20a%20Malibu%20-%20S6%20Ep%207,Alerte%20a%20Malibu%20-%20S6%20Ep%208,Alerte%20a%20Malibu%20-%20S6%20Ep%209,Alerte%20a%20Malibu%20-%20S6%20Ep%2010,Alerte%20a%20Malibu%20-%20S6%20Ep%2011,Alerte%20a%20Malibu%20-%20S6%20Ep%2012,Alerte%20a%20Malibu%20-%20S6%20Ep%2013,Alerte%20a%20Malibu%20-%20S6%20Ep%2014,Alerte%20a%20Malibu%20-%20S6%20Ep%2015,Alerte%20a%20Malibu%20-%20S6%20Ep%2016,Alerte%20a%20Malibu%20-%20S6%20Ep%2017,Alerte%20a%20Malibu%20-%20S6%20Ep%2018,Alerte%20a%20Malibu%20-%20S6%20Ep%2020,Alerte%20a%20Malibu%20-%20S6%20Ep%2021,Alerte%20a%20Malibu%20-%20S6%20Ep%2022%20-%20Fin,Alerte%20a%20Malibu%20-%20S7%20Ep%201,Alerte%20a%20Malibu%20-%20S7%20Ep%202,Alerte%20a%20Malibu%20-%20S7%20Ep%203,Alerte%20a%20Malibu%20-%20S7%20Ep%204,Alerte%20a%20Malibu%20-%20S7%20Ep%205,Alerte%20a%20Malibu%20-%20S7%20Ep%206,Alerte%20a%20Malibu%20-%20S7%20Ep%207,Alerte%20a%20Malibu%20-%20S7%20Ep%208,Alerte%20a%20Malibu%20-%20S7%20Ep%209,Alerte%20a%20Malibu%20-%20S7%20Ep%2010,Alerte%20a%20Malibu%20-%20S7%20Ep%2011,Alerte%20a%20Malibu%20-%20S7%20Ep%2012,Alerte%20a%20Malibu%20-%20S7%20Ep%2013,Alerte%20a%20Malibu%20-%20S7%20Ep%2014,Alerte%20a%20Malibu%20-%20S7%20Ep%2015,Alerte%20a%20Malibu%20-%20S7%20Ep%2016,Alerte%20a%20Malibu%20-%20S7%20Ep%2017,Alerte%20a%20Malibu%20-%20S7%20Ep%2018,Alerte%20a%20Malibu%20-%20S7%20Ep%2019,Alerte%20a%20Malibu%20-%20S7%20Ep%2020,Alerte%20a%20Malibu%20-%20S7%20Ep%2022%20-%20Fin,Alerte%20a%20Malibu%20-%20S8%20Ep%201,Alerte%20a%20Malibu%20-%20S8%20Ep%202,Alerte%20a%20Malibu%20-%20S8%20Ep%203,Alerte%20a%20Malibu%20-%20S8%20Ep%204,Alerte%20a%20Malibu%20-%20S8%20Ep%205,Alerte%20a%20Malibu%20-%20S8%20Ep%206,Alerte%20a%20Malibu%20-%20S8%20Ep%207,Alerte%20a%20Malibu%20-%20S8%20Ep%208,Alerte%20a%20Malibu%20-%20S8%20Ep%209,Alerte%20a%20Malibu%20-%20S8%20Ep%2010,Alerte%20a%20Malibu%20-%20S8%20Ep%2011,Alerte%20a%20Malibu%20-%20S8%20Ep%2012,Alerte%20a%20Malibu%20-%20S8%20Ep%2013,Alerte%20a%20Malibu%20-%20S8%20Ep%2014,Alerte%20a%20Malibu%20-%20S8%20Ep%2015,Alerte%20a%20Malibu%20-%20S8%20Ep%2016,Alerte%20a%20Malibu%20-%20S8%20Ep%2017,Alerte%20a%20Malibu%20-%20S8%20Ep%2018,Alerte%20a%20Malibu%20-%20S8%20Ep%2019,Alerte%20a%20Malibu%20-%20S8%20Ep%2020,Alerte%20a%20Malibu%20-%20S8%20Ep%2021,Alerte%20a%20Malibu%20-%20S8%20Ep%2022,Alerte%20a%20Malibu%20-%20S9%20Ep%201,Alerte%20a%20Malibu%20-%20S9%20Ep%202,Alerte%20a%20Malibu%20-%20S9%20Ep%203,Alerte%20a%20Malibu%20-%20S9%20Ep%204,Alerte%20a%20Malibu%20-%20S9%20Ep%205,Alerte%20a%20Malibu%20-%20S9%20Ep%206,Alerte%20a%20Malibu%20-%20S9%20Ep%207,Alerte%20a%20Malibu%20-%20S9%20Ep%208,Alerte%20a%20Malibu%20-%20S9%20Ep%209,Alerte%20a%20Malibu%20-%20S9%20Ep%2010,Alerte%20a%20Malibu%20-%20S9%20Ep%2011,Alerte%20a%20Malibu%20-%20S9%20Ep%2012,Alerte%20a%20Malibu%20-%20S9%20Ep%2013,Alerte%20a%20Malibu%20-%20S9%20Ep%2014,Alerte%20a%20Malibu%20-%20S9%20Ep%2015,Alerte%20a%20Malibu%20-%20S9%20Ep%2016,Alerte%20a%20Malibu%20-%20S9%20Ep%2017,Alerte%20a%20Malibu%20-%20S9%20Ep%2018,Alerte%20a%20Malibu%20-%20S9%20Ep%2019,Alerte%20a%20Malibu%20-%20S9%20Ep%2020,Alerte%20a%20Malibu%20-%20S9%20Ep%2021,Alerte%20a%20Malibu%20-%20S9%20Ep%2022,Alerte%20a%20Malibu%20S07%20french.1080.h264.light%20(21)"
+                        }
+                    ]
+                },
+                {
+                    title: "Nash Bridges",
+                    desc: `<p><strong>Nash Bridges</strong> est une série policière américaine de <strong>122 épisodes</strong>, créée par <strong>Carlton Cuse</strong> et diffusée sur <strong>CBS (1996-2001)</strong>.</p>
+    
+    <p>Elle suit <strong>Nash Bridges</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0000467/"
+        data-card-title="Don Johnson"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BMTg4ODYwOTU0N15BMl5BanBnXkFtZTgwNjc5NDM2MTE@._V1_FMjpg_UX1000_.jpg"
+        target="_blank">Don Johnson</a></em>), inspecteur du <strong>SFPD</strong>, qui enquête à San Francisco au volant de sa célèbre <strong>Plymouth Barracuda jaune</strong>.
+    
+    Avec son partenaire <strong>Joe Dominguez</strong> (<em><a
+        href="https://www.imdb.com/name/nm0001507/"
+        data-card-title="Cheech Marin"
+        data-card-subtitle="IMDb"
+        data-card-image="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQSyQpZIGR14yLfAmiGX3K7MA6PS6475QGt5CIRZfejaYUCLn8HZfiAttUc&s=10"
+        target="_blank">Cheech Marin</a></em>), il mêle <strong>action, humour et charme</strong> pendant <strong>six saisons</strong>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/2364986034916?video_ids=2364986034916,2364986231524,2364986755812,2364986821348,2364987017956,2364987149028,2364987411172,2364987738852,2364987935460,2364988132068,2364988197604,2364988328676,2364988459748,2364988852964,2364988984036,2364989049572,2364989180644,2365028502244,2365028633316,2365028764388,2365028895460,2365028960996,2365029092068,2365029157604,2365029223140,2365029288676,2365029354212,2367199840996,2367199906532,2367200103140,2367200168676,2367200234212,2367200299748,2367200365284,2367200430820,2367200496356,2367200561892,2367200627428,2367200692964,2367200758500,2367200824036,2367200889572,2367201020644,2369299417828,2369299483364,2369299679972,2369299745508,2369299811044,2369300073188,2369300138724,2369300204260,2369300335332,2369300400868,2369300466404,2369300531940,2369300597476,2369300728548,2369300794084,2369300859620,2369301056228,2369301121764,2369301187300,2371216870116,2371217263332,2371217459940,2371217525476,2371217722084,2371217787620,2371217984228,2371218049764,2371218311908,2371218442980,2371218639588,2371218901732,2371219098340,2371219229412,2371219360484,2371219426020,2371219557092,2373412784868,2373412915940,2373412981476,2373413112548,2373413243620,2373413309156,2373413571300,2373413636836,2373413767908,2373413833444,2373413898980,2373413964516,2373414292196,2373414423268,2373414554340,2373414619876,2373414685412,2373414750948,2373414816484,2373415078628,2373415209700,2375478545124,2375478872804,2375479134948,2375479200484,2375479266020,2375479593700,2375479659236,2375479855844,2375479921380,2375479986916,2375480052452,2375480117988,2375480183524,2375480249060,2375480314596,2375480380132,2375480445668,2375480511204,2375480707812,2375480838884,2375481035492,2375481297636&amp;labels=Nash%20Bridges%20-%20S1%20Ep%201,Nash%20Bridges%20-%20S1%20Ep%202,Nash%20Bridges%20-%20S1%20Ep%203,Nash%20Bridges%20-%20S1%20Ep%204,Nash%20Bridges%20-%20S1%20Ep%205,Nash%20Bridges%20-%20S1%20Ep%206,Nash%20Bridges%20-%20S1%20Ep%207,Nash%20Bridges%20-%20S1%20Ep%208%20-%20Fin,Nash%20Bridges%20-%20S2%20Ep%201,Nash%20Bridges%20-%20S2%20Ep%202,Nash%20Bridges%20-%20S2%20Ep%203,Nash%20Bridges%20-%20S2%20Ep%204,Nash%20Bridges%20-%20S2%20Ep%205,Nash%20Bridges%20-%20S2%20Ep%206,Nash%20Bridges%20-%20S2%20Ep%207,Nash%20Bridges%20-%20S2%20Ep%208,Nash%20Bridges%20-%20S2%20Ep%209,Nash%20Bridges%20-%20S2%20Ep%2010,Nash%20Bridges%20-%20S2%20Ep%2011,Nash%20Bridges%20-%20S2%20Ep%2012,Nash%20Bridges%20-%20S2%20Ep%2013,Nash%20Bridges%20-%20S2%20Ep%2014,Nash%20Bridges%20-%20S2%20Ep%2015,Nash%20Bridges%20-%20S2%20Ep%2016,Nash%20Bridges%20-%20S2%20Ep%2017,Nash%20Bridges%20-%20S2%20Ep%2018,Nash%20Bridges%20-%20S2%20Ep%2019,Nash%20Bridges%20-%20S2%20Ep%2020,Nash%20Bridges%20-%20S2%20Ep%2021,Nash%20Bridges%20-%20S2%20Ep%2022,Nash%20Bridges%20-%20S2%20Ep%2023%20-%20Fin,Nash%20Bridges%20-%20S3%20Ep%201,Nash%20Bridges%20-%20S3%20Ep%202,Nash%20Bridges%20-%20S3%20Ep%203,Nash%20Bridges%20-%20S3%20Ep%204,Nash%20Bridges%20-%20S3%20Ep%205,Nash%20Bridges%20-%20S3%20Ep%206,Nash%20Bridges%20-%20S3%20Ep%207,Nash%20Bridges%20-%20S3%20Ep%208,Nash%20Bridges%20-%20S3%20Ep%209,Nash%20Bridges%20-%20S3%20Ep%2010,Nash%20Bridges%20-%20S3%20Ep%2011,Nash%20Bridges%20-%20S3%20Ep%2012,Nash%20Bridges%20-%20S3%20Ep%2013,Nash%20Bridges%20-%20S3%20Ep%2014,Nash%20Bridges%20-%20S3%20Ep%2015,Nash%20Bridges%20-%20S3%20Ep%2016,Nash%20Bridges%20-%20S3%20Ep%2017,Nash%20Bridges%20-%20S3%20Ep%2018,Nash%20Bridges%20-%20S3%20Ep%2019,Nash%20Bridges%20-%20S3%20Ep%2020,Nash%20Bridges%20-%20S3%20Ep%2021,Nash%20Bridges%20-%20S3%20Ep%2022,Nash%20Bridges%20-%20S3%20Ep%2023,Nash%20Bridges%20-%20S4%20Ep%201,Nash%20Bridges%20-%20S4%20Ep%202,Nash%20Bridges%20-%20S4%20Ep%203,Nash%20Bridges%20-%20S4%20Ep%204,Nash%20Bridges%20-%20S4%20Ep%205,Nash%20Bridges%20-%20S4%20Ep%206,Nash%20Bridges%20-%20S4%20Ep%207,Nash%20Bridges%20-%20S4%20Ep%208,Nash%20Bridges%20-%20S4%20Ep%209,Nash%20Bridges%20-%20S4%20Ep%2010,Nash%20Bridges%20-%20S4%20Ep%2011,Nash%20Bridges%20-%20S4%20Ep%2012,Nash%20Bridges%20-%20S4%20Ep%2013,Nash%20Bridges%20-%20S4%20Ep%2014,Nash%20Bridges%20-%20S4%20Ep%2015,Nash%20Bridges%20-%20S4%20Ep%2016,Nash%20Bridges%20-%20S4%20Ep%2017,Nash%20Bridges%20-%20S4%20Ep%2018,Nash%20Bridges%20-%20S4%20Ep%2019,Nash%20Bridges%20-%20S4%20Ep%2020,Nash%20Bridges%20-%20S4%20Ep%2021,Nash%20Bridges%20-%20S4%20Ep%2022,Nash%20Bridges%20-%20S4%20Ep%2023,Nash%20Bridges%20-%20S4%20Ep%2024,Nash%20Bridges%20-%20S5%20Ep%201,Nash%20Bridges%20-%20S5%20Ep%202,Nash%20Bridges%20-%20S5%20Ep%203,Nash%20Bridges%20-%20S5%20Ep%204,Nash%20Bridges%20-%20S5%20Ep%205,Nash%20Bridges%20-%20S5%20Ep%206,Nash%20Bridges%20-%20S5%20Ep%207,Nash%20Bridges%20-%20S5%20Ep%208,Nash%20Bridges%20-%20S5%20Ep%209,Nash%20Bridges%20-%20S5%20Ep%2010,Nash%20Bridges%20-%20S5%20Ep%2011,Nash%20Bridges%20-%20S5%20Ep%2012,Nash%20Bridges%20-%20S5%20Ep%2013,Nash%20Bridges%20-%20S5%20Ep%2014,Nash%20Bridges%20-%20S5%20Ep%2015,Nash%20Bridges%20-%20S5%20Ep%2016,Nash%20Bridges%20-%20S5%20Ep%2017,Nash%20Bridges%20-%20S5%20Ep%2018,Nash%20Bridges%20-%20S5%20Ep%2019,Nash%20Bridges%20-%20S5%20Ep%2020,Nash%20Bridges%20-%20S5%20Ep%2021,Nash%20Bridges%20-%20S5%20Ep%2022,Nash%20Bridges%20-%20S6%20Ep%201,Nash%20Bridges%20-%20S6%20Ep%202,Nash%20Bridges%20-%20S6%20Ep%203,Nash%20Bridges%20-%20S6%20Ep%204,Nash%20Bridges%20-%20S6%20Ep%205,Nash%20Bridges%20-%20S6%20Ep%206,Nash%20Bridges%20-%20S6%20Ep%207,Nash%20Bridges%20-%20S6%20Ep%208,Nash%20Bridges%20-%20S6%20Ep%209,Nash%20Bridges%20-%20S6%20Ep%2010,Nash%20Bridges%20-%20S6%20Ep%2011,Nash%20Bridges%20-%20S6%20Ep%2012,Nash%20Bridges%20-%20S6%20Ep%2013,Nash%20Bridges%20-%20S6%20Ep%2014,Nash%20Bridges%20-%20S6%20Ep%2015,Nash%20Bridges%20-%20S6%20Ep%2016,Nash%20Bridges%20-%20S6%20Ep%2017,Nash%20Bridges%20-%20S6%20Ep%2018,Nash%20Bridges%20-%20S6%20Ep%2019,Nash%20Bridges%20-%20S6%20Ep%2020,Nash%20Bridges%20-%20S6%20Ep%2021,Nash%20Bridges%20-%20S6%20Ep%2022"
+                        }
+                    ]
+                },
+                {
+                    title: "Los Angeles Heat",
+                    desc: `<p><strong>Los Angeles Heat</strong> (<em>L.A. Heat</em>) est une série policière américaine de <strong>44 épisodes</strong>, diffusée sur <strong>TNT puis USA Network (1996-1999)</strong>.</p><p>Elle suit <strong>Jack Hatch</strong> (<em><a
+        href="https://www.imdb.com/name/nm0489112/"
+        data-card-title="Wolf Larson"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BNzgzZDUyNjItNmU4NC00Mjc0LTg2OTgtYTJlMzg2YjYzZjMwXkEyXkFqcGc@._V1_FMjpg_UY3000_.jpg"
+        target="_blank">Wolf Larson</a></em>), un inspecteur du <strong>LAPD</strong>, qui enquête dans les rues de Los Angeles.
+    
+    Avec son partenaire <strong>Nick Sinclair</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0931736/"
+        data-card-title="Steven Williams"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BNzM4ODY0MTAtNGUzMy00NTIxLWIxMTctNjdlYmRjMjFkZmYyXkEyXkFqcGc@._V1_FMjpg_UX768_.jpg"
+        target="_blank">Steven Williams</a></em>), il mêle <strong>action, enquêtes et humour</strong> au fil de <strong>deux saisons</strong>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://www.youtube.com/watch?v=k3tolU1KUhs&list=PLLYPBWedjaHU"
+                        }
+                    ]
+                },
+                {
+                    title: "La Caverne de la rose d'or (Fantaghirò)",
+                    desc: `<p><strong>La Caverne de la rose d'or</strong> est une mini-série <strong>italienne</strong> de <strong>5 téléfilms</strong>, réalisée par <strong>Lamberto Bava</strong> et diffusée sur <strong>Canale 5 (1991-1996)</strong>, puis sur <strong>M6</strong> en France.</p>
+    
+    <p>Elle suit <strong>Fantaghirò</strong> (<em>
+        <a href="https://www.imdb.com/name/nm0553402/"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BY2E3YTE1MDktYjFlZS00YmIyLTkxNzUtYzA5YjRhZGMyN2YzXkEyXkFqcGc@._V1_FMjpg_UX750_.jpg"
+        data-card-title="Alessandra Martines"
+        data-card-subtitle="IMDb"
+        target="_blank">Alessandra Martines</a></em>), princesse rebelle déguisée en homme pour partir guerroyer et sauver son royaume, entre quêtes fantastiques, sortilèges et amour contrarié.
+    
+    Avec <strong>Romualdo</strong> (<em>
+        <a href="https://www.imdb.com/name/nm0744107/"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BNDcyMjAxMzAzM15BMl5BanBnXkFtZTcwOTUwOTgwNA@@._V1_QL75_UX144_CR0,1,144,213_.jpg"
+        data-card-title="Kim Rossi Stuart"
+        data-card-subtitle="IMDb"
+        target="_blank">Kim Rossi Stuart</a></em>),
+    
+    <strong>la Sorcière noire</strong> (<em>
+        <a href="https://www.imdb.com/name/nm0000557/"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BYjk0NmU5YzQtZWYwOS00ZmZmLWE3ZDMtMDQ0YWQ1NmMzOWE0XkEyXkFqcGc@._V1_QL75_UX280_CR0,3,280,414_.jpg"
+        data-card-title="Brigitte Nielsen"
+        data-card-subtitle="IMDb"
+        target="_blank">Brigitte Nielsen</a></em>) et
+    
+    <strong>le Roi</strong> (<em>
+        <a href="https://www.imdb.com/name/nm0000728/"
+        data-card-title="Mario Adorf"
+        data-card-subtitle="IMDb"
+        target="_blank">Mario Adorf</a></em>), la série mélange <strong>conte de fées, aventure médiévale et romance</strong> pendant <strong>cinq téléfilms</strong>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660,3953768860340,3953768991412,3953769188020,3953769384628,3953769712308,3953770105524&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.05%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.06%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.07%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.08%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.09%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.010%20-%20BluRay%20720p%20VF"
+                        }
+                    ]
+                },
+                {
+                    title: "La Planète des Singes (série télévisée de 1974)",
+                    desc: `<p><strong>La Planète des Singes</strong> est une série télévisée américaine de <strong>14 épisodes</strong>, diffusée sur <strong>CBS en 1974</strong>.</p>
+    
+    <p>Créée pour capitaliser sur le succès des films originaux, elle se déroule plusieurs années après les événements du premier long-métrage de 1968. La série suit deux astronautes, <strong>Alan Virdon</strong> (<em>Ron Harper</em>) et <strong>Peter Burke</strong> (<em>James Naughton</em>), échoués sur une Terre futuriste où les singes règnent en maîtres.</p>
+    
+    <p>Accompagnés du chimpanzé <strong>Galen</strong> (<em>Roddy McDowall</em>, déjà présent dans les films), ils tentent de survivre et de trouver un moyen de rentrer chez eux, tout en étant pourchassés par le général <strong>Urko</strong>.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/2536269023808?video_ids=2536269023808,2536268892736,2536268958272,2536269220416,2536269548096,2536269810240,2536269351488,2536269679168,2536269482560,2536269417024,2536269154880,2536269613632,2536269744704,2536269285952&labels=01%20L'%C3%89vasion%20Est%20Pour%20Demain%20VF,02%20Les%20Gladiateurs%20VF,03%20Le%20Pi%C3%A8ge%20VF,04%20La%20Bonne%20Graine%20VF,05%20Le%20Testament%20VF,06%20Les%20P%C3%AAcheurs%20VF,07%20Le%20Chirurgien%20VF,08%20D%C3%A9ception%20VF,09%20L'%C3%89talon%20VF,10%20L'Interrogato!re%20VF,11%20Le%20Tyran%20VF,12%20Le%20Rem%C3%A8de%20VF,13%20Lib%C3%A9ration%20VF,14%20Au-Del%C3%A0%20Des%20Sommets%20VF"
+                        }
+                    ]
+                },
+                {
+                    title: 'V (Les Visiteurs) <span class="sa-new">New</span>',
+                    desc: `<p><strong>V</strong> est une franchise de science-fiction américaine créée par <strong>Kenneth Johnson</strong> et diffusée sur <strong>NBC</strong> entre <strong>1983 et 1985</strong>.</p>
+    
+    <p>Elle se compose de <strong>trois parties</strong> :</p>
+    <ul>
+      <li><strong>V : The Original Miniseries</strong> (1983) – 2 épisodes</li>
+      <li><strong>V : The Final Battle</strong> (1984) – 3 épisodes</li>
+      <li><strong>V : The Series</strong> (1984-1985) – 19 épisodes</li>
+    </ul>
+    
+    <p>Des extraterrestres appelés <strong>les Visiteurs</strong> arrivent sur Terre en se faisant passer pour des alliés. Derrière leur apparence humaine se cachent en réalité des reptiles carnivores venus piller les ressources de la planète et transformer l’humanité en nourriture. Une résistance se forme pour les combattre.</p>
+    
+    <p>Avec <strong>Mike Donovan</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0001743/"
+        data-card-title="Marc Singer"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BMTcxNjUyNTg2NF5BMl5BanBnXkFtZTYwNjc2MDM0._V1_FMjpg_UX267_.jpg"
+        target="_blank">Marc Singer</a></em>),
+    
+    <strong>Julie Parrish</strong> (<em><a
+        href="https://www.imdb.com/fr/name/nm0002109/"
+        data-card-title="Faye Grant"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BODY5NTQwMTc2Nl5BMl5BanBnXkFtZTgwMTg3OTMyNTE@._V1_FMjpg_UX2160_.jpg"
+        target="_blank">Faye Grant</a></em>),
+    
+    <strong>Diana</strong> (<em><a
+        href="https://www.imdb.com/name/nm0000826/"
+        data-card-title="Jane Badler"
+        data-card-subtitle="IMDb"
+        data-card-image="https://m.media-amazon.com/images/M/MV5BY2Q0Njk3NWMtYmQ4My00MmIxLWExYjctN2E0ZDU0NGExYmI5XkEyXkFqcGc@._V1_FMjpg_UX1133_.jpg"
+        target="_blank">Jane Badler</a></em>),
+    
+    <strong>Brian</strong> (<em><a
+        href="https://www.imdb.com/name/nm0625664/"
+        data-card-title="Peter Nelson"
+        data-card-subtitle="IMDb"
+        data-card-image="IMAGE_PETER_NELSON"
+        target="_blank">Peter Nelson</a></em>),
+    
+    <strong>Elias Taylor</strong> (<em><a
+        href="https://www.imdb.com/name/nm0942646/"
+        data-card-title="Michael Wright"
+        data-card-subtitle="IMDb"
+        data-card-image="IMAGE_MICHAEL_WRIGHT"
+        target="_blank">Michael Wright</a></em>) et
+    
+    <strong>Willie</strong> (<em><a
+        href="https://www.imdb.com/name/nm0000387/"
+        data-card-title="Robert Englund"
+        data-card-subtitle="IMDb"
+        data-card-image="IMAGE_ROBERT_ENGLUND"
+        target="_blank">Robert Englund</a></em>),
+    
+    la série mélange <strong>invasion extraterrestre, résistance, allégorie fasciste et moments cultes</strong> des années 80.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/4374866234018?video_ids=4374866234018,4374866561698,4383424318114,4383424842402,4383425170082,4413079358114,4413080079010,4415782455970,4415784159906,4418028702370,4418029095586,4418029423266,4420802775714,4420803168930,4420803889826,4423901645474,4423902104226,4432640019106,4432640871074,4432988474018,4436969196194,4442680068770,4442680527522,4442680789666&labels=V%20-%20La%20mini-s%C3%A9rie%20(Partie%201),V%20-%20La%20mini-s%C3%A9rrie%20(Partie%202),V%20-%20La%20bataille%20finale%20(Partie%201),V%20-%20La%20bataille%20finale%20(Partie%202),V%20-%20La%20bataille%20finale%20(Partie%203),V%20-%20%C3%89pisode%2001%20-%20Le%20jour%20de%20la%20lib%C3%A9ration,V%20-%20%C3%89pisode%2002%20-%20Triax,V%20-%20%C3%89pisode%2003%20-%20L'%C3%A9vasion,V%20-%20%C3%89pisode%2004%20-%20D%C3%A9ception,V%20-%20%C3%89pisode%2005%20-%20Sanction,V%20-%20%C3%89pisode%2006%20-%20Le%20choix%20du%20visiteur,V%20-%20%C3%89pisode%2007%20-%20Zoom,V%20-%20%C3%89pisode%2008%20-%20Dissident,V%20-%20%C3%89pisode%2009%20-%20Joyeux%20No%C3%ABl,V%20-%20%C3%89pisode%2010%20-%20L'%C3%A9change,V%20-%20%C3%89pisode%2011%20-%20Le%20h%C3%A9ros,V%20-%20%C3%89pisode%2012%20-%20Tra%C3%AEtre,V%20-%20%C3%89pisode%2013%20-%20Le%20mariage,V%20-%20%C3%89pisode%2014%20-%20Le%20champion,V%20-%20%C3%89pisode%2015%20-%20Les%20couguars,V%20-%20%C3%89pisode%2016%20-%20Le%20parrain,V%20-%20%C3%89pisode%2017%20-%20Dure%20bataille,V%20-%20%C3%89pisode%2018%20-%20Le%20volcan,V%20-%20%C3%89pisode%2019%20-%20Le%20retour"
+                        }]
+                },
+                {
+                    title: "Invasion planète Terre (Earth: Final Conflict)",
+                    desc: `<p><strong>Invasion planète Terre</strong> (Earth: Final Conflict) est une série de science-fiction canadienne créée à partir des notes de Gene Roddenberry et diffusée de 1997 à 2002. Elle raconte l’arrivée sur Terre d’extraterrestres appelés les Taelons, qui promettent paix et technologies avancées, tandis qu’une résistance humaine tente de percer leurs véritables intentions. Diffusée notamment sur Canal+ autour de l’an 2000, souvent en début d’après-midi, la série mêle intrigue politique, action et mystère autour de personnages comme Liam Kincaid, pris entre les deux camps.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://www.youtube.com/watch?v=_3as9H1ss4U&list=PLUtjgnQcpKaTbO0LKvWJDr7vOKz9JckN9"
+                        }
+                    ]
+                },
+                {
+                    title: "Automan",
+                    desc: `<p>Créée par <strong>Glen A. Larson</strong> dans le sillage de <em>TRON</em>, la série télévisée d'action et de science-fiction <strong>Automan</strong> (1983-1984) suit les aventures de Walter Nebicher, un policier informaticien qui conçoit un hologramme autonome doté d'une intelligence artificielle pour combattre le crime la nuit, épaulé par « Curseur », un être lumineux capable de matérialiser instantanément des véhicules rétro-futuristes.</p><p>Avec <strong>Desi Arnaz Jr.</strong> dans le rôle de Walter Nebicher, <strong>Chuck Wagner</strong> dans celui d'Automan / Otto J. Mann, et <strong>Heather McNair</strong> dans le rôle de Roxanne Caldwell.
+    </p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/2730015918656?video_ids=2730015918656,2730015590976,2730015722048,2730015984192,2730015787584,2730015853120,2730015459904,2730015394368,2730015328832,2730015656512,2730015263296,2730016049728,2730015525440&amp;labels=01%20-%20Automan,02%20-%20Le%20complot,03%20-%20Le%20ma%C3%AEtre%20du%20jeu,04%20-%20Premier%20baiser,05%20-%20Un%20amour%20de%20puce,06%20-%20Un%20flic%20extralucide,07%20-%20La%20guerre%20des%20ordinateurs,08%20-%20Les%20ren%C3%A9gats,09%20-%20Un%20nouveau%20d%C3%A9part,10%20-%20Silence%2C%20on%20tue,11%20-%20La%20bague,12%20-%20Le%20vengeur%20masqu%C3%A9,13%20-%20Club%20Dix"
+                        }
+                    ]
+                },
+                {
+                    title: "Le Juge et le pilote (Hardcastle and McCormick)",
+                    desc: `<p>
+      Créée par <strong>Stephen J. Cannell</strong> et <strong>Patrick Hasburgh</strong>, la série télévisée d'action <strong>Le Juge et le pilote</strong> (1983-1986) suit les aventures du juge à la retraite Milton Hardcastle, qui traque les criminels ayant échappé à la justice avec l'aide de Mark McCormick, un ex-pilote de course en liberté surveillée au volant de la célèbre <em>Coyote X</em>.
+    </p>
+    <p>
+      Avec <strong>Brian Keith</strong> dans le rôle du juge Milton C. Hardcastle et <strong>Daniel Hugh Kelly</strong> dans celui de Mark « Skid » McCormick.
+    </p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/1916240333376?video_ids=1916240333376,1916240529984,1916240398912,1916240464448,1916339161664,1916338899520,1916339096128,1916338965056,1916339030592,1916770388544,1916770126400,1916770323008,1916770191936,1916770257472,1917187525184,1917187394112,1917187590720,1917187459648,1917187656256,1917685467712,1917685205568,1917685336640,1917685402176,1917685271104&labels=Hardcastle.%26.McCormick.1x01%2602.Le.Monstre.D'Acier.VF,Hardcastle.%26.McCormick.1x04.Le.Canard.De.Cristal.VF,Hardcastle.%26.McCormick.1x05.Je.Ne.Sais.Pas.O%C3%B9.Je.Vais.Mais.J'Y.Vais.VF,Hardcastle.%26.McCormick.1x06.La.Veuve.Noire.VF,Hardcastle.%26.McCormick.1x07.Le.Boxeur.VF,Hardcastle.%26.McCormick.1x08.Le.Convoi.De.Tous.Les.Dangers.VF,Hardcastle.%26.McCormick.1x09.Silence.On.Tourne.VF,Hardcastle.%26.McCormick.1x10.Chef.De.Gang.VF,Hardcastle.%26.McCormick.1x11.La.Course.Infernale.VF,Hardcastle.%26.McCormick.1x12.Vacances.%C3%80.San.Rio.Blanco.VF,Hardcastle.%26.McCormick.1x13.La.Chasse.Au.Tr%C3%A9sor.VF,Hardcastle.%26.McCormick.1x14.R%C3%A9vision.D'1.Proc%C3%A9s.VF,Hardcastle.%26.McCormick.1x15.La.Course.Truqu%C3%A9e.VF,Hardcastle.%26.McCormick.1x16.Monsieur.Le.Juge.Va.%C3%80.Washington.VF,Hardcastle.%26.McCormick.1x17.L'%C3%89cole.Du.Crime.VF,Hardcastle.%26.McCormick.1x18.Les.Motards.Justiciers.VF,Hardcastle.%26.McCormick.1x19.Les.Vieux.Copains.VF,Hardcastle.%26.McCormick.1x20.La.Chasse.%C3%80.L'Homme.VF,Hardcastle.%26.McCormick.1x21.Celui.Qui.N'Existait.Pas.VF,Hardcastle.%26.McCormick.1x22.1.Histoire.De.Voiture.VF,Hardcastle.%26.McCormick.1x23.Traitement.De.Choc.VF,Hardcastle.%26.McCormick.2x01.Le.Champion.Hors.La.Loi.VF,Hardcastle.%26.McCormick.2x02.On.Ne.Choisit.Pas.Son.P%C3%A8re.VF,Hardcastle.%26.McCormick.2x03.1.F%C3%AAte.Qui.D%C3%A9m%C3%A9nage.VF"
+                        }
+                    ]
+                },
+                {
+                    title: "Hilda Furacão (Hilda Hurricane)",
+                    desc: `<p><strong>Hilda Furacão</strong> (Hilda Ouragan) est une minisérie brésilienne culte (32 épisodes d'environ 40-50 minutes) diffusée en <strong>1998</strong> sur TV Globo. Adaptée du roman de Roberto Drummond, elle raconte l’histoire d’une jeune femme de la haute société qui, le jour de son mariage, abandonne tout pour devenir la prostituée la plus célèbre du quartier chaud de Belo Horizonte dans les années 1950-60.</p>
+    
+    <p>Sous le nom de <strong><em>Hilda Furacão</em></strong>, elle vit une <em>passion interdite</em> avec le prêtre <strong>Frei Malthus</strong>, interprété par <strong>Rodrigo Santoro</strong>. Portée par l’interprétation magnifique d’<strong>Ana Paula Arósio</strong>, cette série mêle drame, sensualité et critique sociale.</p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/15587848030879?video_ids=15587848030879,15587847113375,15587846851231,15587846654623,15587846458015,15587846130335,15587845933727,15587845802655,15587845737119,15587845278367,15587845212831,15587845081759,15587844885151,15587844688543,15587844360863,15587843902111,15587843705503,15587843050143,15587842787999,15587842525855,15587842263711,15587842067103,15587841870495,15587841739423&labels=01%20Hilda%20Furac%C3%A3o%20-%2001%20%5BWeb-Dl%20720P%5D,02%20Hilda%20Furac%C3%A3o%20-%2002%20%5BWeb-Dl%201080P%5D,03%20Hilda%20Furac%C3%A3o%20-%2003%20%5BWeb-Dl%201080P%5D,04%20Hilda%20Furac%C3%A3o%20-%2004%20%5BWeb-Dl%201080P%5D,05%20Hilda%20Furac%C3%A3o%20-%2005%20%5BWeb-Dl%201080P%5D,06%20Hilda%20Furac%C3%A3o%20-%2006%20%5BWeb-Dl%201080P%5D,07%20Hilda%20Furac%C3%A3o%20-%2007%20%5BWeb-Dl%201080P%5D,08%20Hilda%20Furac%C3%A3o%20-%2008%20%5BWeb-Dl%201080P%5D,09%20Hilda%20Furac%C3%A3o%20-%2009%20%5BWeb-Dl%201080P%5D,10%20Hilda%20Furac%C3%A3o%20-%2010%20%5BWeb-Dl%201080P%5D,11%20Hilda%20Furac%C3%A3o%20-%2011%20%5BWeb-Dl%201080P%5D,12%20Hilda%20Furac%C3%A3o%20-%2012%20%5BWeb-Dl%201080P%5D,13%20Hilda%20Furac%C3%A3o%20-%2013%20%5BWeb-Dl%201080P%5D,14%20Hilda%20Furac%C3%A3o%20-%2014%20%5BWeb-Dl%201080P%5D,15%20Hilda%20Furac%C3%A3o%20-%2015%20%5BWeb-Dl%201080P%5D,16%20Hilda%20Furac%C3%A3o%20-%2016%20%5BWeb-Dl%201080P%5D,17%20Hilda%20Furac%C3%A3o%20-%2017%20%5BWeb-Dl%201080P%5D,18%20Hilda%20Furac%C3%A3o%20-%2018%20%5BWeb-Dl%201080P%5D,19%20Hilda%20Furac%C3%A3o%20-%2019%20%5BWeb-Dl%201080P%5D,20%20Hilda%20Furac%C3%A3o%20-%2020%20%5BWeb-Dl%201080P%5D,21%20Hilda%20Furac%C3%A3o%20-%2021%20%5BWeb-Dl%201080P%5D,22%20Hilda%20Furac%C3%A3o%20-%2022%20%5BWeb-Dl%201080P%5D,23%20Hilda%20Furac%C3%A3o%20-%2023%20%5BWeb-Dl%201080P%5D,24%20Hilda%20Furac%C3%A3o%20-%2024%20%5BWeb-Dl%201080P%5D"
+                        }
+                    ]
+                },
+                {
+                    title: "Shōgun (1980)",
+                    desc: `<p><em>Shōgun</em> (1980), une minisérie captivante en cinq épisodes (ou quatre selon les pays), transporte les spectateurs dans le <strong>Japon du XVIIe siècle</strong>, un pays isolé et déchiré par des luttes féodales. L’histoire s’ouvre sur le naufrage d’un navire hollandais, dont <strong>John Blackthorne</strong>, navigateur anglais, échoue sur les côtes japonaises. Plongé dans une société inconnue, il est capturé et mêlé aux intrigues politiques, croisant <strong>Toranaga</strong>, inspiré de Tokugawa Ieyasu, et <strong>Mariko</strong>, une noble érudite liant leurs mondes.</p>
+                <p>Avec une lenteur savoureuse, la série explore les <strong>chocs culturels</strong>, les tensions religieuses et les jeux de pouvoir, de loyauté et d’honneur. Tournée au Japon, avec des dialogues partiellement non traduits et une esthétique soignée, <em>Shōgun</em> offre une immersion rare pour une œuvre occidentale de l’époque. Plus qu’une aventure exotique, c’est une fresque humaine et politique où chaque regard, mot et silence pèse. <strong>Richard Chamberlain</strong> et <strong>Yoko Shimada</strong> brillent dans ce récit de fascination entre Orient et Occident.<span></span>
+            </p>`,
+                    links: [
+                        {
+                            label: "Épisodes",
+                            icon: "fa-solid fa-play",
+                            url: "https://ok.ru/video/10366332570256?video_ids=10366332570256,10366333225616,10366333422224,10366333749904&labels=Shogun%20Part.01.FRENCH,Shogun%20Part.02.FRENCH,Shogun%20Part.03.FRENCH,Shogun%20Part.04.FRENCH"
+                        }
+                    ]
+                },
+            ];
+
+
+            const shelf = document.getElementById('sa-shelf');
+
+            // --- Sauvegarde / restauration de la série en cours ---
+            const STORAGE_KEY = 'series-article:last-watched';
+
+            function plainTitle(serie) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = serie.title;
+                return tmp.textContent.replace(/\s+/g, ' ').trim();
+            }
+
+            function saveSelection(linkEl) {
+                try {
+                    const tape = linkEl.closest('.sa-tape');
+                    if (!tape) return;
+                    const serie = SERIES[Number(tape.dataset.index)];
+                    const linkIndex = Array.from(tape.querySelectorAll('.sa-link-btn')).indexOf(linkEl);
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                        title: plainTitle(serie),
+                        linkIndex: Math.max(linkIndex, 0)
+                    }));
+                } catch (e) {
+                    console.warn('Sauvegarde impossible', e);
+                }
+            }
+
+            function restoreSelection() {
+                try {
+                    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+                    if (!saved || !saved.title) return null;
+                    const i = SERIES.findIndex(s => plainTitle(s) === saved.title);
+                    if (i === -1) return null;
+                    const tape = shelf.querySelector(`.sa-tape[data-index="${i}"]`);
+                    if (!tape) return null;
+                    const links = tape.querySelectorAll('.sa-link-btn');
+                    return links[saved.linkIndex] || links[0] || null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function renderShelf() {
+                shelf.innerHTML = SERIES.map((serie, i) => `
+          <article class="sa-tape" data-index="${i}">
+            <button class="sa-tape-spine" type="button" aria-expanded="false" aria-controls="sa-desc-${i}">
+              <span class="sa-tape-title">${serie.title}</span>
+              <span class="sa-tape-chevron" aria-hidden="true">▾</span>
+            </button>
+            <div class="sa-tape-body" id="sa-desc-${i}" hidden>
+              <div class="sa-tape-desc">${serie.desc}</div>
+              <div class="sa-tape-links">
+                ${serie.links.map(link => `
+                  <a class="sa-link-btn" data-link data-target="series-gp1" href="${link.url}"${link.showOnInit ? ' data-show-on-init' : ''}>
+                    <i class="${link.icon}" aria-hidden="true"></i>
+                    <span>${link.label}</span>
+                  </a>
+                `).join('')}
+              </div>
+            </div>
+          </article>
+        `).join('');
+            }
+
+            renderShelf();
+
+            // --- Accordéon + état "actif", indépendant des plugins de lecture ---
+            function openTape(tape, {exclusive = false} = {}) {
+                if (exclusive) {
+                    shelf.querySelectorAll('.sa-tape.is-open').forEach(other => {
+                        if (other !== tape) closeTape(other);
+                    });
+                }
+                tape.classList.add('is-open');
+                tape.querySelector('.sa-tape-spine').setAttribute('aria-expanded', 'true');
+                tape.querySelector('.sa-tape-body').hidden = false;
+            }
+
+            function closeTape(tape) {
+                tape.classList.remove('is-open');
+                tape.querySelector('.sa-tape-spine').setAttribute('aria-expanded', 'false');
+                tape.querySelector('.sa-tape-body').hidden = true;
+            }
+
+            function setActiveLink(linkEl) {
+                shelf.querySelectorAll('.sa-link-btn.is-active').forEach(el => el.classList.remove('is-active'));
+                linkEl.classList.add('is-active');
+                const tape = linkEl.closest('.sa-tape');
+                if (tape) openTape(tape, {exclusive: true});
+                saveSelection(linkEl); // <-- ajout
+            }
+
+            shelf.addEventListener('click', (e) => {
+                const spineBtn = e.target.closest('.sa-tape-spine');
+                if (spineBtn) {
+                    const tape = spineBtn.closest('.sa-tape');
+                    tape.classList.contains('is-open') ? closeTape(tape) : openTape(tape);
+                    return;
+                }
+                const link = e.target.closest('.sa-link-btn');
+                if (link) setActiveLink(link);
+            });
+
+            // Restaure la dernière série regardée, sinon garde celle marquée data-show-on-init
+            const restoredLink = restoreSelection();
+            if (restoredLink) {
+                // transfère le marqueur d'init pour que le lecteur démarre sur la bonne série
+                shelf.querySelectorAll('[data-show-on-init]').forEach(el => el.removeAttribute('data-show-on-init'));
+                restoredLink.setAttribute('data-show-on-init', '');
+            }
+            const initLink = shelf.querySelector('[data-show-on-init]');
+            if (initLink) setActiveLink(initLink);
+
+            /* const pSeries = new YTPlaylist({
+               apiKey: window.__YTP_API_KEY__,
+               scope: "#series-article",
+               onError: (err, iframe) => console.warn("Iframe ignored", iframe, err),
+               onVideosFound: (videos) => console.log(videos),
+             });*/
+
+            new LinkPlayer({
+                scope: "#series-article",
+                youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
+                okruEmbedBaseUrl: "https://okru-embed.vercel.app/",
+                onChange: (target, entry) => {
+                    const link = entry.info.link;
+                    if (link) setActiveLink(link);
+                },
+                onError: (error, link) => console.log(error),
+            });
+        })();
+
+
+        const createDestination = ({title, videoId, description, link}) => ({
+            key: title.toLowerCase(),
+            title,
+            videoId,
+            provider: "youtube",
+            target: "footage-gp1",
+            data: {
+                description: description || LOREM,
+                link: link || {
+                    href: `https://example.com/${title}`,
+                    text: `Guide de ${title}`
+                }
+            }
+        });
+
+        const DESTINATIONS = [
+            createDestination({
+                title: "Bahamas",
+                videoId: "YCfcg9gzCYc",
+                description:
+                    "Un archipel de plus de 700 îles : eaux turquoise, bancs de sable à perte de vue...",
+                }
+            }),
+            createDestination({
+                title: "Maldives",
+                videoId: "69iUWLA0oVc"
+            }),
+            createDestination({
+                title: "Tahiti",
+                videoId: "5drmgVauSMg"
+            }),
+            createDestination({
+                title: "Vietnam",
+                videoId: "k8m0SaGQ_1c"
+            })
+        ];
+    </script>
+</div>
+    
+    

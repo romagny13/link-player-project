@@ -8,8 +8,17 @@ export class VideoListInfo {
   #index;
   #showOnInit;
   #videos = [];
+  #extra;
 
-  constructor(provider, target, videoIds, index, showOnInit, key = null) {
+  constructor(
+    provider,
+    target,
+    videoIds,
+    index,
+    showOnInit,
+    key = null,
+    extra = null
+  ) {
     ValueChecks.requireNotNullOrEmpty(provider, "provider");
     ValueChecks.requireNotNullOrEmpty(target, "target");
 
@@ -19,6 +28,7 @@ export class VideoListInfo {
     this.#index = index;
     this.#showOnInit = showOnInit;
     this.#videoIds = [...videoIds];
+    this.#extra = extra;
 
     this.#key = key ?? `${this.#provider}:list:${this.#videoIds.join(",")}`;
   }
@@ -53,6 +63,10 @@ export class VideoListInfo {
 
   get videos() {
     return Object.freeze([...this.#videos]);
+  }
+
+  get extra() {
+    return this.#extra;
   }
 
   addVideo(video) {

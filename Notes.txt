@@ -22,7 +22,19 @@ provider
 
 global
 
+creer une ou plusieurs pages d'exemples pour cette lib. pour montrer pour youtube :
+1. link only : infos definies sur les data-link
+2. code-only: utilisation des definitions , et binding de buttons pour utiliser les methodes de navigation de la region
+3. mixed: data-link servant juste a la navigation (typiquement des liens avec juste data-link, même pas data-target) , definitions servant a definir les infos
 
+ce que ca doit montrer pour youtube :
+- video simple puis avec autoplay et start
+- liste de videos avec un index et start
+- playlist avec videoId (video de depart differente de la premiere) ou non
+pour okru
+- video simple
+- ancienne version (avec videos_ids et labels dans l'url)
+-
 
 il faudrait generer une page d'exemples (ou plusieurs si c'est mieux) pour : 
 1. avec links , definition des infos avec les attributs data et dans l'url pour video youtube, pour liste de videos youtube, pour playlist youtube, pour une video okru. 
@@ -60,3 +72,8 @@ Les urls et infos suivantes peuvent servir
         data-link>Old okru version</a>
 
 
+todo 
+merge (link info), 
+duration (video info, parse), 
+button "next auto" dans header panel
+dependent view , data

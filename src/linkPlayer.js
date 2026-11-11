@@ -1,16 +1,16 @@
-import {YouTubeProvider} from "./providers/youtube/YouTubeProvider.js";
-import {OkruProvider} from "./providers/okru/OkruProvider.js";
-import {ProviderRegistry} from "./providers/ProviderRegistry.js";
-import {YouTubeDataApi} from "./providers/youtube/YouTubeDataApi.js";
-import {YouTubeMetaResolver} from "./providers/youtube/YouTubeMetaResolver.js";
 import {resolveScope} from "./utils/dom.js";
 import {defaultStore, MemoryStore} from "./storage.js";
 import {AUTOPLAY_MODES, isTouch} from "./utils/helpers.js";
 import {Emitter} from "./utils/Emitter.js";
-import {Tooltip} from "./ui/Tooltip.js";
-import {ThumbnailService} from "./ThumbnailService.js";
 import {Region} from "./Region.js";
-import {applyDefinition, applyItems, resolveDefinition} from "./metaMerge.js";
+import {ProviderRegistry} from "./providers/ProviderRegistry.js";
+import {YouTubeProvider} from "./providers/youtube/YouTubeProvider.js";
+import {OkruProvider} from "./providers/okru/OkruProvider.js";
+import {YouTubeDataApi} from "./providers/youtube/YouTubeDataApi.js";
+import {YouTubeMetaResolver} from "./providers/youtube/YouTubeMetaResolver.js";
+import {applyItems} from "./metaMerge.js";
+import {Tooltip} from "./ui/Tooltip.js";
+import {ThumbnailService} from "./ui/ThumbnailService.js";
 
 const noop = () => {
 };
@@ -27,6 +27,7 @@ export class LinkPlayer {
     #id;
     #scopeEl;
     #isGlobal;
+    #currentBehavior;
     #useStorage;
     #scanEmbeds;
     #regions = new Map();
@@ -43,13 +44,14 @@ export class LinkPlayer {
 
     constructor({
                     scope = null,
+                    definitions = null,
                     autoScan = true,
                     useStorage = true,
                     tooltip = true,
+                    currentBehavior = "toggle",
                     scanEmbeds = true,
                     youtubeApiKey = null,
                     youtubeMeta = null,
-                    definitions = null,
                     fallbackTitle = undefined,
                     okruEmbedBaseUrl = null,
                     store = null,
@@ -59,6 +61,7 @@ export class LinkPlayer {
                     headerRenderer = null,
                     toggleRenderer = null,
                     groupRenderer = null,
+                    tooltipRenderer = null,
                     thumbnails = null,
                     onChange = noop,
                     onState = noop,
@@ -79,6 +82,7 @@ export class LinkPlayer {
         this.#useStorage = useStorage;
         this.#scanEmbeds = scanEmbeds;
         this.#definitions = definitions;
+        this.#currentBehavior = currentBehavior;
 
         this.#store = store ?? (useStorage ? defaultStore() : new MemoryStore());
         this.#registry = registry ??
@@ -87,7 +91,7 @@ export class LinkPlayer {
                 new OkruProvider({embedBaseUrl: okruEmbedBaseUrl})
             ]);
         this.#thumbnails = thumbnails ?? new ThumbnailService();
-        this.#tooltip = tooltip && !isTouch() ? new Tooltip() : null;
+        this.#tooltip = tooltip && !isTouch() ? new Tooltip(tooltipRenderer) : null;
         this.#youtubeMeta = youtubeMeta ?? new YouTubeMetaResolver({
             api: youtubeApiKey ? new YouTubeDataApi({apiKey: youtubeApiKey}) : null,
             cache: this.#store,
@@ -135,6 +139,7 @@ export class LinkPlayer {
         region = new Region({
             target,
             registry: this.#registry,
+            currentBehavior: this.#currentBehavior,
             resolveMeta: (info) => this.#enrich(info),
             thumbnails: this.#thumbnails,
             ...this.#panelOptions
@@ -205,7 +210,7 @@ export class LinkPlayer {
     // ───────── internals ─────────
 
     #registerDefs(definitions) {
-        if(!definitions)
+        if(!Array.isArray(definitions))
             return;
 
         for (const def of definitions) {
@@ -258,7 +263,7 @@ export class LinkPlayer {
         const onClick = (e) => {
             e.preventDefault();
             const target = current();
-            region.navigate(target, {
+            region.navigate(target.key, {
                 autoplay: target.autoplay === AUTOPLAY_MODES.INIT || target.autoplay === AUTOPLAY_MODES.CLICK,
                 index: target.index
             });
@@ -275,6 +280,8 @@ export class LinkPlayer {
 
     /** Completes the items of a playlist; called by the region the first time the playlist is shown. */
     async #enrich(info) {
+        if(info.provider !== "youtube")
+            return false;
         const items = await this.#youtubeMeta.resolve(info);
         if (!items?.length) return false;
         applyItems(info, items);
@@ -298,11 +305,11 @@ export class LinkPlayer {
 
         const saved = this.getSavedState(region);
         const restored = saved && region.get(saved.key);
-        if (restored) return region.navigate(restored, {index: saved.index ?? 0});
+        if (restored) return region.navigate(restored.key, {index: saved.index ?? 0});
 
         const first = region.infos.find((info) => info.showOnInit);
         if (first) {
-            region.navigate(first, {
+            region.navigate(first.key, {
                 autoplay: first.autoplay === AUTOPLAY_MODES.INIT,
                 index: first.index
             });
@@ -317,7 +324,6 @@ export class LinkPlayer {
         return {title: first?.title ?? "", thumbnail: first?.thumbnail || null};
     }
 
-    /** @param {() => object} getInfo Current info of the link (it may have been replaced). */
     #attachTooltip(element, getInfo, provider) {
         if (!this.#tooltip) return noop;
         return this.#tooltip.attach(

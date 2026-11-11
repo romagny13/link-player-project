@@ -1,4 +1,4 @@
-import {ThumbnailService} from "../ThumbnailService.js";
+import {ThumbnailService} from "./ThumbnailService.js";
 import {injectStyles} from "../utils/dom.js";
 
 export const PANEL_CSS = `

@@ -70,8 +70,9 @@
 
 <div id="t-1" class="video-container"></div>
 
-<script kind="module">
+<script type="module">
     import {LinkPlayer} from "../src/LinkPlayer.js";
+
 
     const lp = new LinkPlayer({okruEmbedBaseUrl: "https://okru-embed.vercel.app/"});
     const region = lp.getRegion("t-1");

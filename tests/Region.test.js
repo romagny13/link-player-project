@@ -1,605 +1,1088 @@
 // @vitest-environment jsdom
-import {afterEach, describe, expect, it, vi} from "vitest";
-import {makeInfo, makePanel, makePlayer} from "./fixtures.js";
-import {Region} from "../src/Region.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./ui/PanelRenderer.js", () => ({
+  PanelRenderer: class {
+    render = vi.fn();
+    clear = vi.fn();
+    setCurrent = vi.fn();
+    destroy = vi.fn();
+  }
+}));
+
+import { Region } from "../src/Region.js";
+
+// ───────── helpers ─────────
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-/** A region on a #t container, with fake providers / players / panel. Nothing real is created. */
-function setup({listen = true, resolveMeta = null} = {}) {
-    document.body.innerHTML = '<div id="t"></div>';
-    const host = document.getElementById("t");
-    const players = [];
-    const providers = {};
-    const provider = (id) =>
-        (providers[id] ??= {
-            id,
-            createPlayer: vi.fn((options = {}) => {
-                const player = makePlayer({kind: id, iframe: options.iframe});
-                players.push(player);
-                return player;
-            })
-        });
-    const registry = {get: (id) => provider(id)};
-    const panel = makePanel();
-    const region = new Region({target: "t", registry, panelRenderer: panel, resolveMeta});
-    const events = [];
-    if (listen) region.on("*", (event) => events.push(event));
-    return {region, host, players, panel, provider, events};
+function makeInfo(
+  key,
+  { provider = "yt", isPlaylist = false, videoIds, videos = [] } = {}
+) {
+  return { key, provider, isPlaylist, videoIds, videos };
 }
 
-const single = (key, props = {}) => makeInfo({key, ...props});
-const playlist = (key, props = {}) => makeInfo({key, isPlaylist: true, ...props});
+const video = (key, provider) => makeInfo(key, { provider });
+const playlist = (key, nb = 3, provider) =>
+  makeInfo(key, {
+    provider,
+    isPlaylist: true,
+    videoIds: Array.from({ length: nb }, (_, i) => `v${i}`)
+  });
 
-afterEach(() => {
+function makePlayer(kind, iframe) {
+  const listeners = new Set();
+  const unsubscribe = vi.fn();
+  return {
+    kind,
+    iframe: iframe ?? document.createElement("iframe"),
+    load: vi.fn(),
+    next: vi.fn(),
+    previous: vi.fn(),
+    playAt: vi.fn(),
+    pause: vi.fn(),
+    dispose: vi.fn(),
+    unsubscribe,
+    subscribe: vi.fn((cb) => {
+      listeners.add(cb);
+      return unsubscribe;
+    }),
+    emit: (event) => listeners.forEach((cb) => cb(event))
+  };
+}
+
+function createEnv(options = {}) {
+  document.body.innerHTML = `<div id="zone"></div>`;
+  const host = document.getElementById("zone");
+  const players = [];
+  const providers = {};
+  for (const id of ["yt", "dm"]) {
+    providers[id] = {
+      id,
+      createPlayer: vi.fn((opts) => {
+        const p = makePlayer(id, opts?.iframe);
+        players.push(p);
+        return p;
+      })
+    };
+  }
+  const registry = { get: vi.fn((id) => providers[id]) };
+  const panel = {
+    render: vi.fn(),
+    clear: vi.fn(),
+    setCurrent: vi.fn(),
+    destroy: vi.fn()
+  };
+  const region = new Region({
+    target: "zone",
+    registry,
+    panelRenderer: panel,
+    ...options
+  });
+  const lastPlayer = () => players[players.length - 1];
+  return { region, host, registry, providers, players, panel, lastPlayer };
+}
+
+function listen(region, type = "change") {
+  const handler = vi.fn();
+  region.on(type, handler);
+  return handler;
+}
+
+// ───────── tests ─────────
+
+describe("Region", () => {
+  afterEach(() => {
     vi.restoreAllMocks();
-    document.body.innerHTML = "";
-});
+  });
 
-describe("construction", () => {
-    it("throws when the target element does not exist", () => {
-        document.body.innerHTML = "";
-        expect(() => new Region({target: "nope", registry: {}, panelRenderer: makePanel()})).toThrow("Target #nope not found");
+  describe("constructeur", () => {
+    it("lève une erreur quand la cible est introuvable", () => {
+      document.body.innerHTML = "";
+      expect(() => new Region({ target: "absent", registry: {} })).toThrow(
+        "Target #absent not found"
+      );
     });
 
-    it("starts empty and visible", () => {
-        const {region} = setup();
-        expect(region.target).toBe("t");
-        expect(region.infos).toEqual([]);
-        expect(region.current).toBeNull();
-        expect(region.currentIndex).toBe(0);
-        expect(region.isVisible).toBe(true);
-    });
-});
-
-describe("infos", () => {
-    it("add returns true, then false for a key already known (the first one is kept)", () => {
-        const {region} = setup();
-        const first = single("a");
-        expect(region.add(first)).toBe(true);
-        expect(region.add(single("a"))).toBe(false);
-        expect(region.get("a")).toBe(first);
-        expect(region.infos).toHaveLength(1);
+    it("expose la cible", () => {
+      const { region } = createEnv();
+      expect(region.target).toBe("zone");
     });
 
-    it("has / get", () => {
-        const {region} = setup();
-        region.add(single("a"));
-        expect(region.has("a")).toBe(true);
-        expect(region.has("b")).toBe(false);
-        expect(region.get("b")).toBeUndefined();
+    it("démarre dans un état vide", () => {
+      const { region } = createEnv();
+      expect(region.current).toBeNull();
+      expect(region.currentIndex).toBe(0);
+      expect(region.itemCount).toBe(0);
+      expect(region.isVisible).toBe(true);
+      expect(region.infos).toEqual([]);
     });
 
-    it("infos keeps the order and is frozen", () => {
-        const {region} = setup();
-        region.add(single("b"));
-        region.add(single("a"));
-        expect(region.infos.map((i) => i.key)).toEqual(["b", "a"]);
-        expect(() => region.infos.push(single("c"))).toThrow();
+    it("désactive tous les contrôles au départ", () => {
+      const { region } = createEnv();
+      expect(region.canGoBack).toBe(false);
+      expect(region.canGoForward).toBe(false);
+      expect(region.canGoPreviousInfo).toBe(false);
+      expect(region.canGoNextInfo).toBe(false);
+      expect(region.canGoPreviousItem).toBe(false);
+      expect(region.canGoNextItem).toBe(false);
     });
-});
+  });
 
-describe("navigate", () => {
-    it("loads the info in a player, puts its iframe in the target and announces it", () => {
-        const {region, host, players, events, provider} = setup();
-        const a = single("a");
-        region.add(a);
-
-        region.navigate(a, {autoplay: true, index: 2, params: {from: "grid"}});
-
-        expect(provider("fake").createPlayer).toHaveBeenCalledTimes(1);
-        expect(players[0].load).toHaveBeenCalledWith(a, {autoplay: true, index: 2});
-        expect(host.firstChild).toBe(players[0].iframe);
-        expect(host.hidden).toBe(false);
-        expect(region.current).toBe(a);
-        expect(region.currentIndex).toBe(2);
-
-        const change = events.at(-1);
-        expect(change).toMatchObject({type: "change", reason: "navigate", info: a, index: 2, params: {from: "grid"}, visible: true});
-        expect(change.region).toBe(region);
+  describe("infos", () => {
+    it("ajoute une info et renvoie true", () => {
+      const { region } = createEnv();
+      const a = video("A");
+      expect(region.add(a)).toBe(true);
+      expect(region.has("A")).toBe(true);
+      expect(region.get("A")).toBe(a);
     });
 
-    it("defaults: no autoplay, index 0, no params", () => {
-        const {region, players, events} = setup();
-        const a = single("a");
-        region.navigate(a);
-        expect(players[0].load).toHaveBeenCalledWith(a, {autoplay: false, index: 0});
-        expect(events.at(-1).params).toBeNull();
+    it("refuse une clé déjà connue et renvoie false", () => {
+      const { region } = createEnv();
+      region.add(video("A"));
+      expect(region.add(video("A"))).toBe(false);
+      expect(region.infos).toHaveLength(1);
     });
 
-    it("reuses the same player (one iframe per region) for the same provider", () => {
-        const {region, players, provider} = setup();
-        const a = single("a");
-        const b = single("b");
-        region.navigate(a);
-        region.navigate(b);
-        expect(provider("fake").createPlayer).toHaveBeenCalledTimes(1);
-        expect(players[0].load).toHaveBeenCalledTimes(2);
-        expect(players[0].dispose).not.toHaveBeenCalled();
+    it("conserve l'ordre d'ajout", () => {
+      const { region } = createEnv();
+      region.add(video("B"));
+      region.add(video("A"));
+      expect(region.infos.map((i) => i.key)).toEqual(["B", "A"]);
     });
 
-    it("replaces the player when the provider changes, and removes the old iframe", () => {
-        const {region, host, players} = setup();
-        region.navigate(single("a"));
-        region.navigate(single("x", {provider: "other"}));
-
-        expect(players).toHaveLength(2);
-        expect(players[0].dispose).toHaveBeenCalled();
-        expect(players[0].iframe.isConnected).toBe(false);
-        expect(host.children).toHaveLength(1);
-        expect(host.firstChild).toBe(players[1].iframe);
+    it("expose une liste gelée", () => {
+      const { region } = createEnv();
+      region.add(video("A"));
+      expect(Object.isFrozen(region.infos)).toBe(true);
     });
 
-    it("navigating to the info that is already current toggles the view instead", () => {
-        const {region, host, players, events} = setup();
-        const a = single("a");
+    it("renvoie undefined pour une clé inconnue", () => {
+      const { region } = createEnv();
+      expect(region.get("nope")).toBeUndefined();
+      expect(region.has("nope")).toBe(false);
+    });
+  });
 
-        region.navigate(a);
-        region.navigate(a);
+  describe("événements", () => {
+    it("on() renvoie une fonction qui désabonne le handler", () => {
+      const { region } = createEnv();
+      region.add(video("A"));
+      const handler = vi.fn();
+      const off = region.on("change", handler);
+      off();
+      region.navigate("A");
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("off() retire le handler", () => {
+      const { region } = createEnv();
+      region.add(video("A"));
+      const handler = vi.fn();
+      region.on("change", handler);
+      region.off("change", handler);
+      region.navigate("A");
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("navigate()", () => {
+    it("lève une erreur pour une clé inconnue", () => {
+      const { region } = createEnv();
+      expect(() => region.navigate("nope")).toThrow(
+        "No info found for key 'nope'"
+      );
+    });
+
+    it("crée un lecteur via le fournisseur de l'info et charge l'info", () => {
+      const { region, providers, lastPlayer } = createEnv();
+      const a = video("A");
+      region.add(a);
+      region.navigate("A");
+
+      expect(providers.yt.createPlayer).toHaveBeenCalledTimes(1);
+      expect(lastPlayer().load).toHaveBeenCalledWith(a, {
+        autoplay: false,
+        index: 0
+      });
+    });
+
+    it("rend l'info courante", () => {
+      const { region } = createEnv();
+      const a = video("A");
+      region.add(a);
+      region.navigate("A");
+      expect(region.current).toBe(a);
+      expect(region.isCurrent("A")).toBe(true);
+    });
+
+    it("insère l'iframe avant le panneau dans l'hôte", () => {
+      const { region, host, lastPlayer } = createEnv();
+      const panelEl = document.createElement("aside");
+      host.append(panelEl);
+      region.add(video("A"));
+      region.navigate("A");
+      expect(host.firstChild).toBe(lastPlayer().iframe);
+      expect(host.lastChild).toBe(panelEl);
+    });
+
+    it("affiche l'hôte s'il était caché", () => {
+      const { region, host } = createEnv();
+      region.add(video("A"));
+      host.hidden = true;
+      region.navigate("A");
+      expect(host.hidden).toBe(false);
+    });
+
+    it("émet « change » avec la raison « navigate »", () => {
+      const { region } = createEnv();
+      const a = video("A");
+      region.add(a);
+      const handler = listen(region);
+      region.navigate("A");
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        type: "change",
+        region,
+        reason: "navigate",
+        info: a,
+        index: 0,
+        params: null,
+        visible: true
+      });
+    });
+
+    it("transmet autoplay, index et params (options de navigate)", () => {
+      const { region, lastPlayer } = createEnv();
+      const p = playlist("P", 5);
+      region.add(p);
+      const handler = listen(region);
+      region.navigate("P", { autoplay: true, index: 2, params: { t: 30 } });
+
+      expect(lastPlayer().load).toHaveBeenCalledWith(p, {
+        autoplay: true,
+        index: 2
+      });
+      expect(region.currentIndex).toBe(2);
+      expect(handler.mock.calls[0][0].params).toEqual({ t: 30 });
+    });
+
+    it("réutilise le même lecteur quand le fournisseur ne change pas", () => {
+      const { region, providers } = createEnv();
+      region.add(video("A"));
+      region.add(video("B"));
+      region.navigate("A");
+      region.navigate("B");
+      expect(providers.yt.createPlayer).toHaveBeenCalledTimes(1);
+    });
+
+    it("remplace le lecteur et l'iframe quand le fournisseur change", () => {
+      const { region, host, providers, players } = createEnv();
+      region.add(video("A", "yt"));
+      region.add(video("B", "dm"));
+      region.navigate("A");
+      const ancien = players[0];
+      region.navigate("B");
+
+      expect(ancien.dispose).toHaveBeenCalled();
+      expect(ancien.unsubscribe).toHaveBeenCalled();
+      expect(host.contains(ancien.iframe)).toBe(false);
+      expect(providers.dm.createPlayer).toHaveBeenCalledTimes(1);
+      expect(host.contains(players[1].iframe)).toBe(true);
+    });
+
+    it("planifie la résolution des métadonnées d'une playlist", async () => {
+      const resolveMeta = vi.fn().mockResolvedValue(false);
+      const { region } = createEnv({ resolveMeta });
+      const p = playlist("P");
+      region.add(p);
+      region.navigate("P");
+      expect(resolveMeta).toHaveBeenCalledWith(p);
+    });
+
+    describe("quand l'info est déjà courante", () => {
+      it("bascule la visibilité par défaut (toggle) sans nouvelle entrée de journal", () => {
+        const { region, host } = createEnv();
+        region.add(video("A"));
+        region.navigate("A");
+        const handler = listen(region);
+        region.navigate("A");
+
         expect(host.hidden).toBe(true);
-        expect(players[0].pause).toHaveBeenCalled();
-        expect(players[0].load).toHaveBeenCalledTimes(1);
-        expect(events.at(-1)).toMatchObject({reason: "visibility", visible: false});
-        expect(region.canGoBack).toBe(false); // no new journal entry
+        expect(handler.mock.calls[0][0].reason).toBe("visibility");
+        expect(region.canGoBack).toBe(false);
+      });
 
-        region.navigate(a);
+      it("réaffiche l'hôte au second toggle", () => {
+        const { region, host } = createEnv();
+        region.add(video("A"));
+        region.navigate("A");
+        region.navigate("A");
+        region.navigate("A");
         expect(host.hidden).toBe(false);
-    });
+      });
 
-    it("show / hide / toggle announce the visibility", () => {
-        const {region, host, players, events} = setup();
-        region.navigate(single("a"));
+      it("ne fait rien avec le comportement « skip »", () => {
+        const { region, host, providers } = createEnv({
+          currentBehavior: "skip"
+        });
+        region.add(video("A"));
+        region.navigate("A");
+        const handler = listen(region);
+        region.navigate("A");
 
-        region.hide();
-        expect(host.hidden).toBe(true);
-        expect(players[0].pause).toHaveBeenCalled();
-        expect(events.at(-1)).toMatchObject({reason: "visibility", visible: false});
-
-        region.show();
-        expect(events.at(-1)).toMatchObject({reason: "visibility", visible: true});
-
-        region.toggle();
-        expect(host.hidden).toBe(true);
-    });
-});
-
-describe("navigateByKey / replaceByKey", () => {
-    it("navigateByKey navigates to the info with this key", () => {
-        const {region, players} = setup();
-        const a = single("a");
-        region.add(a);
-        region.navigateByKey("a", {autoplay: true});
-        expect(region.current).toBe(a);
-        expect(players[0].load).toHaveBeenCalledWith(a, {autoplay: true, index: 0});
-    });
-
-    it("replaceByKey replaces the current entry with the info of this key", () => {
-        const {region} = setup();
-        region.add(single("a"));
-        region.add(single("b"));
-        region.navigateByKey("a");
-        region.replaceByKey("b");
-        expect(region.current.key).toBe("b");
-        expect(region.canGoBack).toBe(false);
-    });
-
-    it.each(["navigateByKey", "replaceByKey"])("%s throws for an unknown key", (method) => {
-        const {region} = setup();
-        expect(() => region[method]("nope")).toThrow("No info found for key 'nope'");
-    });
-});
-
-describe("journal: back / forward / replace", () => {
-    function threeSteps() {
-        const ctx = setup();
-        const [a, b, c] = ["a", "b", "c"].map((key) => single(key));
-        ctx.region.navigate(a, {index: 1, params: {from: "first"}});
-        ctx.region.navigate(b);
-        ctx.region.navigate(c);
-        return {...ctx, a, b, c};
-    }
-
-    it("goBack restores the previous state without playing, goForward goes back to it", () => {
-        const {region, players, a, b, c} = threeSteps();
-
-        expect(region.goBack()).toBe(true);
-        expect(region.current).toBe(b);
-        expect(players[0].load).toHaveBeenLastCalledWith(b, {autoplay: false, index: 0});
-        expect(region.canGoForward).toBe(true);
-
-        expect(region.goBack()).toBe(true);
-        expect(region.current).toBe(a);
-        expect(players[0].load).toHaveBeenLastCalledWith(a, {autoplay: false, index: 1}); // the index comes back too
-        expect(region.goBack()).toBe(false);
-        expect(region.canGoBack).toBe(false);
-
-        expect(region.goForward()).toBe(true);
-        expect(region.current).toBe(b);
-        expect(region.goForward()).toBe(true);
-        expect(region.goForward()).toBe(false);
-        expect(region.current).toBe(c);
-    });
-
-    it("going back announces the state, with the params of that entry", () => {
-        const {region, events} = threeSteps();
-        region.goBack();
-        region.goBack();
-        expect(events.at(-1)).toMatchObject({reason: "back", params: {from: "first"}});
-        region.goForward();
-        expect(events.at(-1)).toMatchObject({reason: "forward", params: null});
-    });
-
-    it("navigating from the middle drops the forward history", () => {
-        const {region, b} = threeSteps();
-        region.goBack(); // on b
-        region.navigate(single("d"));
-        expect(region.canGoForward).toBe(false);
-        expect(region.goBack()).toBe(true);
-        expect(region.current).toBe(b);
-    });
-
-    it("replace shows another info in place of the current entry (no new entry)", () => {
-        const {region, players, events} = setup();
-        const a = single("a");
-        const b = single("b");
-        region.navigate(a);
-        region.replace(b, {autoplay: true, params: {why: "redirect"}});
-
-        expect(region.current).toBe(b);
-        expect(region.canGoBack).toBe(false);
-        expect(players[0].load).toHaveBeenLastCalledWith(b, {autoplay: true, index: 0});
-        expect(events.at(-1)).toMatchObject({reason: "replace", info: b, params: {why: "redirect"}});
-    });
-
-    it("replace on an empty journal simply starts it", () => {
-        const {region} = setup();
-        region.replace(single("a"));
-        expect(region.current.key).toBe("a");
-        expect(region.canGoBack).toBe(false);
-    });
-
-    it("replace never toggles, even for the info that is already current", () => {
-        const {region, host} = setup();
-        const a = single("a");
-        region.navigate(a);
-        region.replace(a);
+        expect(handler).not.toHaveBeenCalled();
         expect(host.hidden).toBe(false);
+        expect(providers.yt.createPlayer).toHaveBeenCalledTimes(1);
+      });
+
+      it("navigue normalement avec un autre comportement", () => {
+        const { region } = createEnv({ currentBehavior: "navigate" });
+        region.add(video("A"));
+        region.navigate("A");
+        const handler = listen(region);
+        region.navigate("A");
+
+        expect(handler.mock.calls[0][0].reason).toBe("navigate");
+        expect(region.canGoBack).toBe(true);
+      });
     });
-});
+  });
 
-describe("navigation between infos", () => {
-    function withThree() {
-        const ctx = setup();
-        const infos = ["a", "b", "c"].map((key) => single(key));
-        infos.forEach((info) => ctx.region.add(info));
-        return {...ctx, infos};
-    }
-
-    it("tells what can be done, from the first to the last info", () => {
-        const {region, infos} = withThree();
-        expect([region.canGoPreviousInfo, region.canGoNextInfo]).toEqual([false, true]); // nothing shown yet
-
-        region.navigate(infos[0]);
-        expect([region.canGoPreviousInfo, region.canGoNextInfo]).toEqual([false, true]);
-        region.navigate(infos[1]);
-        expect([region.canGoPreviousInfo, region.canGoNextInfo]).toEqual([true, true]);
-        region.navigate(infos[2]);
-        expect([region.canGoPreviousInfo, region.canGoNextInfo]).toEqual([true, false]);
-    });
-
-    it("nextInfo / previousInfo navigate with autoplay, and return false at the ends", () => {
-        const {region, players, infos} = withThree();
-        region.navigate(infos[2]);
-        expect(region.nextInfo()).toBe(false);
-
-        expect(region.previousInfo()).toBe(true);
-        expect(region.current).toBe(infos[1]);
-        expect(players[0].load).toHaveBeenLastCalledWith(infos[1], {autoplay: true, index: 0});
-
-        region.previousInfo();
-        expect(region.previousInfo()).toBe(false);
+  describe("replace()", () => {
+    it("lève une erreur pour une clé inconnue", () => {
+      const { region } = createEnv();
+      expect(() => region.replace("nope")).toThrow(
+        "No info found for key 'nope'"
+      );
     });
 
-    it("nextInfo starts with the first info when nothing is shown", () => {
-        const {region, infos} = withThree();
-        expect(region.nextInfo()).toBe(true);
-        expect(region.current).toBe(infos[0]);
+    it("remplace l'entrée courante sans ajouter d'historique", () => {
+      const { region } = createEnv();
+      const b = video("B");
+      region.add(video("A"));
+      region.add(b);
+      region.navigate("A");
+      region.replace("B");
+
+      expect(region.current).toBe(b);
+      expect(region.canGoBack).toBe(false);
     });
 
-    it("nothing to do without infos", () => {
-        const {region} = setup();
-        expect(region.canGoNextInfo).toBe(false);
-        expect(region.nextInfo()).toBe(false);
+    it("transmet autoplay, index et params", () => {
+      const { region, lastPlayer } = createEnv();
+      const p = playlist("P", 4);
+      region.add(p);
+      const handler = listen(region);
+      region.replace("P", { autoplay: true, index: 1, params: { a: 1 } });
+
+      expect(lastPlayer().load).toHaveBeenCalledWith(p, {
+        autoplay: true,
+        index: 1
+      });
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reason: "replace",
+        index: 1,
+        params: { a: 1 }
+      });
     });
-});
+  });
 
-describe("items of a playlist", () => {
-    it("a single video has no items", () => {
-        const {region} = setup();
-        region.navigate(single("a"));
-        expect(region.itemCount).toBe(0);
-        expect([region.canGoPreviousItem, region.canGoNextItem]).toEqual([false, false]);
-    });
+  describe("journal : goBack() / goForward()", () => {
+    let env;
 
-    it("a list of videos knows its length", () => {
-        const {region} = setup();
-        const list = playlist("l", {videoIds: ["a", "b", "c"]});
-
-        region.navigate(list);
-        expect(region.itemCount).toBe(3);
-        expect([region.canGoPreviousItem, region.canGoNextItem]).toEqual([false, true]);
-
-        region.replace(list, {index: 1});
-        expect([region.canGoPreviousItem, region.canGoNextItem]).toEqual([true, true]);
-
-        region.replace(list, {index: 2});
-        expect([region.canGoPreviousItem, region.canGoNextItem]).toEqual([true, false]);
-    });
-
-    it("a playlist counts its known videos, and does not know its length when it has none", () => {
-        const {region} = setup();
-        region.navigate(playlist("p", {videos: [1, 2]}));
-        expect(region.itemCount).toBe(2);
-
-        region.navigate(playlist("q"));
-        expect(region.itemCount).toBeNull();
-        expect(region.canGoNextItem).toBe(true); // unknown: not disabled
+    beforeEach(() => {
+      env = createEnv();
+      env.region.add(video("A"));
+      env.region.add(playlist("P", 5));
+      env.region.add(video("C"));
+      env.region.navigate("A");
+      env.region.navigate("P", { index: 3 });
+      env.region.navigate("C");
     });
 
-    it("nextItem / previousItem / playAt are the player's business", () => {
-        const {region, players} = setup();
-        region.navigate(playlist("l", {videoIds: ["a", "b"]}));
+    it("renvoie false quand il n'y a rien à restaurer", () => {
+      const { region } = createEnv();
+      expect(region.goBack()).toBe(false);
+      expect(region.goForward()).toBe(false);
+    });
 
+    it("recule d'une entrée et renvoie true", () => {
+      expect(env.region.goBack()).toBe(true);
+      expect(env.region.current.key).toBe("P");
+    });
+
+    it("restaure l'index de l'item sans lancer la lecture", () => {
+      env.region.goBack();
+      expect(env.region.currentIndex).toBe(3);
+      expect(env.lastPlayer().load).toHaveBeenLastCalledWith(
+        env.region.get("P"),
+        { autoplay: false, index: 3 }
+      );
+    });
+
+    it("émet « change » avec les raisons « back » et « forward »", () => {
+      const handler = listen(env.region);
+      env.region.goBack();
+      env.region.goForward();
+      expect(handler.mock.calls.map(([e]) => e.reason)).toEqual([
+        "back",
+        "forward"
+      ]);
+    });
+
+    it("met à jour canGoBack / canGoForward", () => {
+      expect(env.region.canGoBack).toBe(true);
+      expect(env.region.canGoForward).toBe(false);
+      env.region.goBack();
+      env.region.goBack();
+      expect(env.region.canGoBack).toBe(false);
+      expect(env.region.canGoForward).toBe(true);
+    });
+
+    it("ne crée pas d'entrée de journal en navigant dans l'historique", () => {
+      env.region.goBack();
+      env.region.goForward();
+      env.region.goBack();
+      env.region.goBack();
+      expect(env.region.goBack()).toBe(false);
+      expect(env.region.goForward()).toBe(true);
+      expect(env.region.goForward()).toBe(true);
+      expect(env.region.goForward()).toBe(false);
+    });
+
+    it("supprime l'historique « avant » après une nouvelle navigation", () => {
+      env.region.goBack();
+      env.region.navigate("A");
+      expect(env.region.canGoForward).toBe(false);
+    });
+  });
+
+  describe("navigation entre les infos", () => {
+    let env;
+
+    beforeEach(() => {
+      env = createEnv();
+      env.region.add(video("A"));
+      env.region.add(video("B"));
+      env.region.add(video("C"));
+    });
+
+    it("autorise « suivant » dès qu'il existe des infos mais aucune courante", () => {
+      expect(env.region.canGoNextInfo).toBe(true);
+      expect(env.region.canGoPreviousInfo).toBe(false);
+    });
+
+    it("nextInfo() sans info courante va à la première, en lecture automatique", () => {
+      expect(env.region.nextInfo()).toBe(true);
+      expect(env.region.current.key).toBe("A");
+      expect(env.lastPlayer().load).toHaveBeenCalledWith(env.region.get("A"), {
+        autoplay: true,
+        index: 0
+      });
+    });
+
+    it("nextInfo() avance dans l'ordre des liens", () => {
+      env.region.navigate("A");
+      env.region.nextInfo();
+      expect(env.region.current.key).toBe("B");
+    });
+
+    it("previousInfo() recule dans l'ordre des liens", () => {
+      env.region.navigate("C");
+      env.region.previousInfo();
+      expect(env.region.current.key).toBe("B");
+    });
+
+    it("renvoie false aux extrémités", () => {
+      env.region.navigate("C");
+      expect(env.region.nextInfo()).toBe(false);
+      expect(env.region.canGoNextInfo).toBe(false);
+      env.region.navigate("A");
+      expect(env.region.previousInfo()).toBe(false);
+      expect(env.region.canGoPreviousInfo).toBe(false);
+    });
+
+    it("ajoute une entrée au journal", () => {
+      env.region.navigate("A");
+      env.region.nextInfo();
+      expect(env.region.canGoBack).toBe(true);
+      env.region.goBack();
+      expect(env.region.current.key).toBe("A");
+    });
+
+    it("émet « change » avec la raison « navigate »", () => {
+      env.region.navigate("A");
+      const handler = listen(env.region);
+      env.region.nextInfo();
+      expect(handler.mock.calls[0][0].reason).toBe("navigate");
+    });
+  });
+
+  describe("navigation entre les items", () => {
+    it("nextItem() / previousItem() délèguent au lecteur", () => {
+      const { region, lastPlayer } = createEnv();
+      region.add(playlist("P"));
+      region.navigate("P");
+      region.nextItem();
+      region.previousItem();
+      expect(lastPlayer().next).toHaveBeenCalledTimes(1);
+      expect(lastPlayer().previous).toHaveBeenCalledTimes(1);
+    });
+
+    it("ne plante pas sans lecteur", () => {
+      const { region } = createEnv();
+      expect(() => {
         region.nextItem();
         region.previousItem();
-        expect(players[0].next).toHaveBeenCalledTimes(1);
-        expect(players[0].previous).toHaveBeenCalledTimes(1);
+      }).not.toThrow();
     });
 
-    it("playAt plays the item, keeps it in the journal and announces it", () => {
-        const {region, players, panel, events} = setup();
-        region.navigate(playlist("l", {videoIds: ["a", "b", "c"]}));
+    it("playAt() délègue au lecteur, met à jour l'index, le panneau et émet « change »", () => {
+      const { region, lastPlayer, panel } = createEnv();
+      region.add(playlist("P", 5));
+      region.navigate("P");
+      const handler = listen(region);
+      region.playAt(3);
+
+      expect(lastPlayer().playAt).toHaveBeenCalledWith(3);
+      expect(region.currentIndex).toBe(3);
+      expect(panel.setCurrent).toHaveBeenCalledWith(3);
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reason: "item",
+        index: 3
+      });
+    });
+
+    it("playAt() est mémorisé dans le journal (restauré au retour)", () => {
+      const { region } = createEnv();
+      region.add(playlist("P", 5));
+      region.add(video("A"));
+      region.navigate("P");
+      region.playAt(2);
+      region.navigate("A");
+      region.goBack();
+      expect(region.currentIndex).toBe(2);
+    });
+
+    describe("getters can*Item", () => {
+      it("sont désactivés pour une vidéo seule", () => {
+        const { region } = createEnv();
+        region.add(video("A"));
+        region.navigate("A");
+        expect(region.canGoPreviousItem).toBe(false);
+        expect(region.canGoNextItem).toBe(false);
+        expect(region.itemCount).toBe(0);
+      });
+
+      it("tiennent compte de l'index dans une playlist", () => {
+        const { region } = createEnv();
+        region.add(playlist("P", 3));
+        region.navigate("P");
+        expect(region.canGoPreviousItem).toBe(false);
+        expect(region.canGoNextItem).toBe(true);
+        region.playAt(1);
+        expect(region.canGoPreviousItem).toBe(true);
+        expect(region.canGoNextItem).toBe(true);
         region.playAt(2);
+        expect(region.canGoNextItem).toBe(false);
+      });
 
-        expect(players[0].playAt).toHaveBeenCalledWith(2);
-        expect(region.currentIndex).toBe(2);
-        expect(panel.setCurrent).toHaveBeenCalledWith(2);
-        expect(events.at(-1)).toMatchObject({reason: "item", index: 2});
+      it("itemCount utilise videoIds en priorité", () => {
+        const { region } = createEnv();
+        region.add(playlist("P", 4));
+        region.navigate("P");
+        expect(region.itemCount).toBe(4);
+      });
+
+      it("itemCount se rabat sur videos quand videoIds est absent", () => {
+        const { region } = createEnv();
+        region.add(makeInfo("P", { isPlaylist: true, videos: [{}, {}] }));
+        region.navigate("P");
+        expect(region.itemCount).toBe(2);
+      });
+
+      it("itemCount vaut null quand le nombre est inconnu, et « suivant » reste possible", () => {
+        const { region } = createEnv();
+        region.add(makeInfo("P", { isPlaylist: true }));
+        region.navigate("P");
+        expect(region.itemCount).toBeNull();
+        expect(region.canGoNextItem).toBe(true);
+      });
     });
-});
+  });
 
-describe("events of the player", () => {
-    it("itemChange: the journal, the panel and the listeners follow", () => {
-        const {region, players, panel, events} = setup();
-        region.navigate(playlist("l", {videoIds: ["a", "b", "c"]}));
-
-        players[0].emit({type: "itemChange", index: 2});
-
-        expect(region.currentIndex).toBe(2);
-        expect(panel.setCurrent).toHaveBeenCalledWith(2);
-        expect(events.at(-1)).toMatchObject({type: "change", reason: "item", index: 2});
-    });
-
-    it("state is forwarded, with the index of the player or the current one", () => {
-        const {region, players, events} = setup();
-        region.navigate(single("a"));
-
-        players[0].emit({type: "state", state: "playing", index: 4});
-        expect(events.at(-1)).toMatchObject({type: "state", state: "playing", index: 4});
-
-        players[0].emit({type: "state", state: "paused"});
-        expect(events.at(-1)).toMatchObject({type: "state", state: "paused", index: 0});
-        expect(events.at(-1).region).toBe(region);
-    });
-
-    it("error: the failure is announced with the current info", () => {
-        const {region, players, events} = setup();
-        const a = single("a");
-        region.navigate(a);
-        const error = new Error("boom");
-
-        players[0].emit({type: "error", error});
-        expect(events.at(-1)).toMatchObject({type: "error", error, info: a});
-    });
-});
-
-describe("panel", () => {
-    it("a single video clears the panel", () => {
-        const {region, panel} = setup();
-        region.navigate(single("a"));
-        expect(panel.clear).toHaveBeenCalled();
-        expect(panel.render).not.toHaveBeenCalled();
+  describe("panneau", () => {
+    it("est vidé pour une vidéo seule", () => {
+      const { region, panel } = createEnv();
+      region.add(video("A"));
+      region.navigate("A");
+      expect(panel.clear).toHaveBeenCalled();
+      expect(panel.render).not.toHaveBeenCalled();
     });
 
-    it("a playlist draws the panel for this host, iframe and item", () => {
-        const {region, panel, host, players} = setup();
-        const list = playlist("l", {videoIds: ["a", "b"]});
-        region.navigate(list, {index: 1});
+    it("est dessiné pour une playlist avec l'index courant", () => {
+      const { region, panel, host, lastPlayer } = createEnv();
+      const p = playlist("P", 5);
+      region.add(p);
+      region.navigate("P", { index: 2 });
 
-        expect(panel.render).toHaveBeenCalledTimes(1);
-        expect(panel.render).toHaveBeenCalledWith(
-            expect.objectContaining({host, iframe: players[0].iframe, info: list, current: 1})
-        );
+      expect(panel.render).toHaveBeenCalledTimes(1);
+      expect(panel.render).toHaveBeenCalledWith(
+        expect.objectContaining({
+          host,
+          iframe: lastPlayer().iframe,
+          info: p,
+          current: 2
+        })
+      );
     });
 
-    it("choosing an item in the panel plays it", () => {
-        const {region, panel, players} = setup();
-        region.navigate(playlist("l", {videoIds: ["a", "b"]}));
-
-        panel.render.mock.calls[0][0].onSelectItem(1);
-        expect(players[0].playAt).toHaveBeenCalledWith(1);
+    it("onSelectItem lance playAt()", () => {
+      const { region, panel, lastPlayer } = createEnv();
+      region.add(playlist("P", 5));
+      region.navigate("P");
+      panel.render.mock.calls[0][0].onSelectItem(4);
+      expect(lastPlayer().playAt).toHaveBeenCalledWith(4);
+      expect(region.currentIndex).toBe(4);
     });
 
-    it("the panel is not drawn again for the playlist it already shows", () => {
-        const {region, panel} = setup();
-        const list = playlist("l", {videoIds: ["a", "b", "c"]});
-        region.navigate(list);
-        region.replace(list, {index: 2});
-
-        expect(panel.render).toHaveBeenCalledTimes(1);
-        expect(panel.setCurrent).toHaveBeenCalledWith(2);
+    it("n'est pas redessiné pour la même playlist (setCurrent seulement)", () => {
+      const { region, panel } = createEnv({ currentBehavior: "navigate" });
+      region.add(playlist("P", 5));
+      region.navigate("P");
+      region.navigate("P", { index: 3 });
+      expect(panel.render).toHaveBeenCalledTimes(1);
+      expect(panel.setCurrent).toHaveBeenCalledWith(3);
     });
 
-    it("it is drawn again when coming back to a playlist after another info", () => {
-        const {region, panel} = setup();
-        const list = playlist("l", {videoIds: ["a"]});
-        region.navigate(list);
-        region.navigate(single("s"));
-        region.navigate(list);
-        expect(panel.render).toHaveBeenCalledTimes(2);
+    it("est redessiné après être passé par une autre info", () => {
+      const { region, panel } = createEnv();
+      region.add(playlist("P", 5));
+      region.add(video("A"));
+      region.navigate("P");
+      region.navigate("A");
+      region.goBack();
+      expect(panel.render).toHaveBeenCalledTimes(2);
     });
-});
+  });
 
-describe("metadata of a playlist (resolveMeta)", () => {
-    it("is asked once per playlist, never for a single video", () => {
-        const resolveMeta = vi.fn().mockResolvedValue(false);
-        const {region} = setup({resolveMeta});
-        const list = playlist("l");
+  describe("événements du lecteur", () => {
+    let env;
 
-        region.navigate(single("s"));
-        expect(resolveMeta).not.toHaveBeenCalled();
-
-        region.navigate(list);
-        region.navigate(single("s2"));
-        region.navigate(list);
-        expect(resolveMeta).toHaveBeenCalledTimes(1);
-        expect(resolveMeta).toHaveBeenCalledWith(list);
+    beforeEach(() => {
+      env = createEnv();
+      env.region.add(playlist("P", 5));
+      env.region.navigate("P");
     });
 
-    it("draws the panel again when it completed something", async () => {
-        const resolveMeta = vi.fn().mockResolvedValue(true);
-        const {region, panel} = setup({resolveMeta});
-        region.navigate(playlist("l"));
+    it("« itemChange » met à jour l'index, le panneau et émet « change » (item)", () => {
+      const handler = listen(env.region);
+      env.lastPlayer().emit({ type: "itemChange", index: 2 });
 
-        await flush();
-        expect(panel.render).toHaveBeenCalledTimes(2);
+      expect(env.region.currentIndex).toBe(2);
+      expect(env.panel.setCurrent).toHaveBeenCalledWith(2);
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reason: "item",
+        index: 2
+      });
     });
 
-    it("does nothing more when it changed nothing", async () => {
-        const {region, panel} = setup({resolveMeta: vi.fn().mockResolvedValue(false)});
-        region.navigate(playlist("l"));
-
-        await flush();
-        expect(panel.render).toHaveBeenCalledTimes(1);
+    it("« itemChange » prévient les vues dépendantes", () => {
+      const fn = vi.fn();
+      env.region.registerDependentView("v", fn);
+      env.lastPlayer().emit({ type: "itemChange", index: 1 });
+      expect(fn).toHaveBeenCalledWith(env.region.current);
     });
 
-    it("does not draw the panel again when another info is shown by then", async () => {
-        let settle;
-        const resolveMeta = vi.fn(() => new Promise((resolve) => (settle = resolve)));
-        const {region, panel} = setup({resolveMeta});
-        region.navigate(playlist("l"));
-        region.navigate(single("s"));
-
-        settle(true);
-        await flush();
-        expect(panel.render).toHaveBeenCalledTimes(1);
+    it("« state » est relayé avec l'index fourni", () => {
+      const handler = listen(env.region, "state");
+      env.lastPlayer().emit({ type: "state", state: "playing", index: 3 });
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        type: "state",
+        region: env.region,
+        state: "playing",
+        index: 3
+      });
     });
 
-    it("announces the failure", async () => {
-        const error = new Error("api down");
-        const list = playlist("l");
-        const {region, events} = setup({resolveMeta: vi.fn().mockRejectedValue(error)});
-        region.navigate(list);
-
-        await flush();
-        expect(events.at(-1)).toMatchObject({type: "error", error, info: list});
+    it("« state » utilise l'index courant quand il n'est pas fourni", () => {
+      env.lastPlayer().emit({ type: "itemChange", index: 4 });
+      const handler = listen(env.region, "state");
+      env.lastPlayer().emit({ type: "state", state: "paused" });
+      expect(handler.mock.calls[0][0].index).toBe(4);
     });
-});
 
-describe("failures", () => {
-    it("a player that cannot be created is announced, not thrown", () => {
-        const {region, provider, events} = setup();
-        const a = single("a");
-        const error = new Error("boom");
-        provider("fake").createPlayer.mockImplementationOnce(() => {
-            throw error;
+    it("« error » est relayé avec l'info courante", () => {
+      const handler = listen(env.region, "error");
+      const erreur = new Error("boom");
+      env.lastPlayer().emit({ type: "error", error: erreur });
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        error: erreur,
+        info: env.region.current
+      });
+    });
+  });
+
+  describe("erreurs", () => {
+    it("émet « error » avec l'info quand la création du lecteur échoue, sans « change »", () => {
+      const { region, providers } = createEnv();
+      const erreur = new Error("création");
+      providers.yt.createPlayer.mockImplementationOnce(() => {
+        throw erreur;
+      });
+      const a = video("A");
+      region.add(a);
+      const onError = listen(region, "error");
+      const onChange = listen(region);
+      region.navigate("A");
+
+      expect(onError.mock.calls[0][0]).toMatchObject({
+        error: erreur,
+        info: a,
+        region
+      });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("émet « error » quand le chargement échoue", () => {
+      const { region, providers, players } = createEnv();
+      const erreur = new Error("load");
+      providers.yt.createPlayer.mockImplementationOnce(() => {
+        const p = makePlayer("yt");
+        p.load.mockImplementation(() => {
+          throw erreur;
         });
-
-        expect(() => region.navigate(a)).not.toThrow();
-        expect(events.map((e) => e.type)).toEqual(["error"]);
-        expect(events[0]).toMatchObject({error, info: a});
+        players.push(p);
+        return p;
+      });
+      region.add(video("A"));
+      const onError = listen(region, "error");
+      region.navigate("A");
+      expect(onError.mock.calls[0][0].error).toBe(erreur);
     });
 
-    it("a load that fails is announced, and nothing is announced as changed", () => {
-        const {region, players, events} = setup();
-        region.navigate(single("a"));
-        const error = new Error("load failed");
-        players[0].load.mockImplementationOnce(() => {
-            throw error;
-        });
-
-        region.navigate(single("b"));
-        expect(events.at(-1)).toMatchObject({type: "error", error});
-        expect(events.filter((e) => e.type === "change")).toHaveLength(1);
+    it("journalise dans la console quand personne n'écoute « error »", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { region, providers } = createEnv();
+      const erreur = new Error("silencieuse");
+      providers.yt.createPlayer.mockImplementationOnce(() => {
+        throw erreur;
+      });
+      region.add(video("A"));
+      region.navigate("A");
+      expect(spy).toHaveBeenCalledWith("[Region]", erreur);
     });
 
-    it("without any listener the failure goes to the console", () => {
-        const {region, provider} = setup({listen: false});
-        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-        provider("fake").createPlayer.mockImplementationOnce(() => {
-            throw new Error("boom");
-        });
-
-        region.navigate(single("a"));
-        expect(spy).toHaveBeenCalled();
+    it("ne journalise pas quand un handler « error » existe", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { region, providers } = createEnv();
+      providers.yt.createPlayer.mockImplementationOnce(() => {
+        throw new Error("x");
+      });
+      region.add(video("A"));
+      listen(region, "error");
+      region.navigate("A");
+      expect(spy).not.toHaveBeenCalled();
     });
-});
+  });
 
-describe("adopt (an iframe already in the page)", () => {
-    function withIframe(ctx) {
-        const iframe = document.createElement("iframe");
-        ctx.host.append(iframe);
-        return iframe;
+  describe("résolution des métadonnées", () => {
+    it("redessine le panneau quand resolveMeta renvoie true", async () => {
+      const resolveMeta = vi.fn().mockResolvedValue(true);
+      const { region, panel } = createEnv({ resolveMeta });
+      region.add(playlist("P", 5));
+      region.navigate("P", { index: 1 });
+      await flush();
+
+      expect(panel.render).toHaveBeenCalledTimes(2);
+      expect(panel.render.mock.calls[1][0]).toMatchObject({ current: 1 });
+    });
+
+    it("ne redessine pas quand resolveMeta renvoie false", async () => {
+      const resolveMeta = vi.fn().mockResolvedValue(false);
+      const { region, panel } = createEnv({ resolveMeta });
+      region.add(playlist("P"));
+      region.navigate("P");
+      await flush();
+      expect(panel.render).toHaveBeenCalledTimes(1);
+    });
+
+    it("accepte un resolveMeta synchrone", async () => {
+      const { region, panel } = createEnv({ resolveMeta: () => true });
+      region.add(playlist("P"));
+      region.navigate("P");
+      await flush();
+      expect(panel.render).toHaveBeenCalledTimes(2);
+    });
+
+    it("ne redessine pas si l'info n'est plus courante", async () => {
+      let fin;
+      const resolveMeta = vi.fn(
+        () => new Promise((resolve) => (fin = resolve))
+      );
+      const { region, panel } = createEnv({ resolveMeta });
+      region.add(playlist("P"));
+      region.add(video("A"));
+      region.navigate("P");
+      region.navigate("A");
+      fin(true);
+      await flush();
+      expect(panel.render).toHaveBeenCalledTimes(1);
+    });
+
+    it("n'est appelé qu'une fois par playlist", () => {
+      const resolveMeta = vi.fn().mockResolvedValue(false);
+      const { region } = createEnv({
+        resolveMeta,
+        currentBehavior: "navigate"
+      });
+      region.add(playlist("P"));
+      region.navigate("P");
+      region.navigate("P");
+      expect(resolveMeta).toHaveBeenCalledTimes(1);
+    });
+
+    it("n'est pas appelé pour une vidéo seule", () => {
+      const resolveMeta = vi.fn();
+      const { region } = createEnv({ resolveMeta });
+      region.add(video("A"));
+      region.navigate("A");
+      expect(resolveMeta).not.toHaveBeenCalled();
+    });
+
+    it("émet « error » quand resolveMeta échoue", async () => {
+      const erreur = new Error("api");
+      const { region } = createEnv({
+        resolveMeta: vi.fn().mockRejectedValue(erreur)
+      });
+      const p = playlist("P");
+      region.add(p);
+      const onError = listen(region, "error");
+      region.navigate("P");
+      await flush();
+      expect(onError.mock.calls[0][0]).toMatchObject({
+        error: erreur,
+        info: p
+      });
+    });
+  });
+
+  describe("visibilité", () => {
+    it("hide() met le lecteur en pause, cache l'hôte et émet « change » (visibility)", () => {
+      const { region, host, lastPlayer } = createEnv();
+      region.add(video("A"));
+      region.navigate("A");
+      const handler = listen(region);
+      region.hide();
+
+      expect(lastPlayer().pause).toHaveBeenCalled();
+      expect(host.hidden).toBe(true);
+      expect(region.isVisible).toBe(false);
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reason: "visibility",
+        visible: false
+      });
+    });
+
+    it("hide() ne plante pas sans lecteur", () => {
+      const { region, host } = createEnv();
+      expect(() => region.hide()).not.toThrow();
+      expect(host.hidden).toBe(true);
+    });
+
+    it("show() affiche l'hôte et émet « change »", () => {
+      const { region, host } = createEnv();
+      host.hidden = true;
+      const handler = listen(region);
+      region.show();
+      expect(host.hidden).toBe(false);
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reason: "visibility",
+        visible: true
+      });
+    });
+
+    it("toggle() alterne entre caché et visible", () => {
+      const { region } = createEnv();
+      region.toggle();
+      expect(region.isVisible).toBe(false);
+      region.toggle();
+      expect(region.isVisible).toBe(true);
+    });
+  });
+
+  describe("adopt()", () => {
+    function withIframe(host) {
+      const iframe = document.createElement("iframe");
+      host.append(iframe);
+      return iframe;
     }
 
-    it("the player takes over the iframe, nothing is loaded", () => {
-        const ctx = setup();
-        const iframe = withIframe(ctx);
-        const a = single("a");
-
-        ctx.region.adopt(iframe, a);
-
-        expect(ctx.provider("fake").createPlayer).toHaveBeenCalledWith({iframe});
-        expect(ctx.players[0].iframe).toBe(iframe);
-        expect(ctx.players[0].load).not.toHaveBeenCalled();
-        expect(ctx.region.current).toBe(a);
-        expect(ctx.region.has("a")).toBe(true);
-        expect(ctx.events.at(-1)).toMatchObject({type: "change", reason: "adopt", info: a});
+    it("lève une erreur quand l'iframe est hors de la cible", () => {
+      const { region } = createEnv();
+      const dehors = document.createElement("iframe");
+      document.body.append(dehors);
+      expect(() => region.adopt(dehors, video("A"))).toThrow(
+        "The iframe is not inside #zone"
+      );
     });
 
-    it("a playlist gets its panel", () => {
-        const ctx = setup();
-        const iframe = withIframe(ctx);
-        const list = playlist("l", {videoIds: ["a", "b"]});
-
-        ctx.region.adopt(iframe, list);
-        expect(ctx.panel.render).toHaveBeenCalledWith(expect.objectContaining({host: ctx.host, iframe, info: list}));
+    it("ajoute l'info et la rend courante", () => {
+      const { region, host } = createEnv();
+      const a = video("A");
+      region.adopt(withIframe(host), a);
+      expect(region.has("A")).toBe(true);
+      expect(region.current).toBe(a);
     });
 
-    it("the iframe must be inside the target", () => {
-        const {region} = setup();
-        expect(() => region.adopt(document.createElement("iframe"), single("a"))).toThrow("The iframe is not inside #t");
+    it("crée le lecteur sur l'iframe existante", () => {
+      const { region, host, providers } = createEnv();
+      const iframe = withIframe(host);
+      region.adopt(iframe, video("A"));
+      expect(providers.yt.createPlayer).toHaveBeenCalledWith({ iframe });
     });
 
-    it("an info already added is not an error", () => {
-        const ctx = setup();
-        const a = single("a");
-        ctx.region.add(a);
-        expect(() => ctx.region.adopt(withIframe(ctx), a)).not.toThrow();
+    it("émet « change » avec la raison « adopt » et l'index donné", () => {
+      const { region, host } = createEnv();
+      const handler = listen(region);
+      region.adopt(withIframe(host), playlist("P", 5), { index: 2 });
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reason: "adopt",
+        index: 2
+      });
     });
-});
 
-describe("dispose", () => {
-    it("disposes the player and the panel, and stops announcing", () => {
-        const {region, players, panel, events} = setup();
-        region.navigate(single("a"));
-        const count = events.length;
-
-        region.dispose();
-        expect(players[0].dispose).toHaveBeenCalled();
-        expect(panel.destroy).toHaveBeenCalled();
-
-        region.show();
-        expect(events).toHaveLength(count);
+    it("dessine le panneau pour une playlist", () => {
+      const { region, host, panel } = createEnv();
+      const iframe = withIframe(host);
+      region.adopt(iframe, playlist("P", 5), { index: 1 });
+      expect(panel.render).toHaveBeenCalledWith(
+        expect.objectContaining({ iframe, current: 1 })
+      );
     });
+
+    it("remplace un lecteur existant", () => {
+      const { region, host, players } = createEnv();
+      region.adopt(withIframe(host), video("A"));
+      region.adopt(withIframe(host), video("B"));
+      expect(players[0].dispose).toHaveBeenCalled();
+    });
+
+    it("planifie la résolution des métadonnées", () => {
+      const resolveMeta = vi.fn().mockResolvedValue(false);
+      const { region, host } = createEnv({ resolveMeta });
+      const p = playlist("P");
+      region.adopt(withIframe(host), p);
+      expect(resolveMeta).toHaveBeenCalledWith(p);
+    });
+
+    it("ne supprime pas l'iframe adoptée quand le fournisseur change (elle est retirée explicitement)", () => {
+      const { region, host } = createEnv();
+      const iframe = withIframe(host);
+      region.adopt(iframe, video("A", "yt"));
+      region.add(video("B", "dm"));
+      region.navigate("B");
+      expect(host.contains(iframe)).toBe(false);
+    });
+  });
+
+  describe("vues dépendantes", () => {
+    it("enregistre une vue et la signale avec hasDependentView()", () => {
+      const { region } = createEnv();
+      region.registerDependentView("v", vi.fn());
+      expect(region.hasDependentView("v")).toBe(true);
+      expect(region.hasDependentView("autre")).toBe(false);
+    });
+
+    it("refuse un identifiant déjà enregistré", () => {
+      const { region } = createEnv();
+      region.registerDependentView("v", vi.fn());
+      expect(() => region.registerDependentView("v", vi.fn())).toThrow(
+        "Duplicate dependent view ID: 'v' is already registered."
+      );
+    });
+
+    it("désenregistre une vue existante et renvoie true", () => {
+      const { region } = createEnv();
+      region.registerDependentView("v", vi.fn());
+      expect(region.unregisterDependentView("v")).toBe(true);
+      expect(region.hasDependentView("v")).toBe(false);
+    });
+
+    it("renvoie false avec un avertissement pour une vue inexistante", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const { region } = createEnv();
+      expect(region.unregisterDependentView("nope")).toBe(false);
+      expect(warn).toHaveBeenCalled();
+    });
+
+    it("notifie toutes les vues avec l'info", () => {
+      const { region } = createEnv();
+      const f1 = vi.fn();
+      const f2 = vi.fn();
+      region.registerDependentView("a", f1);
+      region.registerDependentView("b", f2);
+      const info = video("A");
+      region.notifyDependentViews(info);
+      expect(f1).toHaveBeenCalledWith(info);
+      expect(f2).toHaveBeenCalledWith(info);
+    });
+
+    it("une vue qui échoue n'empêche pas les autres d'être notifiées", () => {
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { region } = createEnv();
+      const apres = vi.fn();
+      region.registerDependentView("ko", () => {
+        throw new Error("vue cassée");
+      });
+      region.registerDependentView("ok", apres);
+      region.notifyDependentViews(video("A"));
+
+      expect(apres).toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining("'ko'"),
+        expect.any(Error)
+      );
+    });
+
+    it("ne notifie plus une vue désenregistrée", () => {
+      const { region } = createEnv();
+      const fn = vi.fn();
+      region.registerDependentView("v", fn);
+      region.unregisterDependentView("v");
+      region.notifyDependentViews(video("A"));
+      expect(fn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("dispose()", () => {
+    it("libère le lecteur et détruit le panneau", () => {
+      const { region, panel, lastPlayer } = createEnv();
+      region.add(video("A"));
+      region.navigate("A");
+      const player = lastPlayer();
+      region.dispose();
+
+      expect(player.unsubscribe).toHaveBeenCalled();
+      expect(player.dispose).toHaveBeenCalled();
+      expect(panel.destroy).toHaveBeenCalled();
+    });
+
+    it("supprime tous les abonnements aux événements", () => {
+      const { region } = createEnv();
+      const handler = listen(region);
+      region.dispose();
+      region.show();
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("ne plante pas sans lecteur", () => {
+      const { region } = createEnv();
+      expect(() => region.dispose()).not.toThrow();
+    });
+  });
 });

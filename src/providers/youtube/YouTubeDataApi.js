@@ -13,11 +13,18 @@ export function parseIsoDuration(iso) {
     return m ? (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0) : null;
 }
 
-const snippetMeta = (s = {}) => ({
-    title: s.title ?? "",
-    channel: s.videoOwnerChannelTitle ?? s.channelTitle ?? "",
-    thumbnail: (s.thumbnails?.medium ?? s.thumbnails?.default)?.url ?? ""
-});
+const snippetMeta = (s = {}) => {
+    const channelId = s.videoOwnerChannelId ?? s.channelId ?? "";
+
+    return {
+        title: s.title ?? "",
+        description: s.description ?? "",
+        channel: s.videoOwnerChannelTitle ?? s.channelTitle ?? "",
+        channelId: channelId,
+        channelUrl: channelId ? `https://www.youtube.com/channel/${channelId}` : "",
+        thumbnail: (s.thumbnails?.medium ?? s.thumbnails?.default)?.url ?? ""
+    };
+};
 
 /** Reasons after which every call would fail too. A private playlist (403) must not disable the API for the other videos. */
 const DISABLING_REASONS = new Set(["keyInvalid", "quotaExceeded", "dailyLimitExceeded", "rateLimitExceeded", "accessNotConfigured", "ipRefererBlocked"]);
