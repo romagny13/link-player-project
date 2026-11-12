@@ -39,16 +39,27 @@ export class YouTubeEmbedSrcBuilder {
         return this.#url(encodeURIComponent(videoId), q);
     }
 
-    buildVideoListSrc(videoIds, { autoplay, index, startSeconds } = {}) {
+    buildVideoListSrc(videoIds, {autoplay, index, startSeconds} = {}) {
         if (!Array.isArray(videoIds) || !videoIds.length)
             throw new TypeError("buildVideoListSrc(): a non-empty array is required");
 
         const [first, ...rest] = videoIds;
-        const q = this.#params({ autoplay, startSeconds }); // ← ajouter startSeconds
+        const q = this.#params({autoplay, startSeconds});
         if (rest.length) q.set("playlist", rest.join(","));
-        if (index > 0) q.set("index", String(Math.floor(index)));
+        if (index >= 0) q.set("index", String(Math.floor(index + 1))); // 1-based
         return this.#url(encodeURIComponent(first), q);
     }
+
+    // buildVideoListSrc(videoIds, {autoplay, index, startSeconds} = {}) {
+    //     if (!Array.isArray(videoIds) || !videoIds.length)
+    //         throw new TypeError("buildVideoListSrc(): a non-empty array is required");
+    //
+    //     const [first, ...rest] = videoIds;
+    //     const q = this.#params({autoplay, startSeconds});
+    //     if (rest.length) q.set("playlist", rest.join(","));
+    //     if (index > 0) q.set("index", String(Math.floor(index + 1))); // 1-based
+    //     return this.#url(encodeURIComponent(first), q);
+    // }
 
     buildPlaylistSrc(playlistId, {autoplay, videoId} = {}) {
         if (!playlistId) throw new TypeError("buildPlaylistSrc(): playlistId is required");

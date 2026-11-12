@@ -841,8 +841,8 @@
 			const info = this.get(key);
 			return !!(info && this.#journal.current?.info === info);
 		}
-		/** Navigating to the info that is already current toggles the view instead (no new journal entry). */
 		navigate(key, options) {
+			console.log(key, this.#infos);
 			if (!this.has(key)) throw new Error(`No info found for key '${key}'`);
 			if (this.isCurrent(key)) {
 				if (this.#currentBehavior === "skip") return;
@@ -850,16 +850,6 @@
 			}
 			const info = this.get(key);
 			this.#navigate(info, options);
-		}
-		#navigate(info, { autoplay = false, index = 0 } = {}) {
-			this.#journal.push({
-				info,
-				index
-			});
-			this.#show(info, {
-				autoplay,
-				index
-			}, "navigate");
 		}
 		replace(key, { autoplay = false, index = 0 } = {}) {
 			if (!this.has(key)) throw new Error(`No info found for key '${key}'`);
@@ -957,6 +947,16 @@
 		#infoIndex() {
 			return this.infos.indexOf(this.current);
 		}
+		#navigate(info, { autoplay = false, index = 0 } = {}) {
+			this.#journal.push({
+				info,
+				index
+			});
+			this.#show(info, {
+				autoplay,
+				index
+			}, "navigate");
+		}
 		#restore(entry, reason) {
 			if (!entry) return false;
 			this.#show(entry.info, {
@@ -974,13 +974,11 @@
 		#show(info, { autoplay, index }, reason) {
 			try {
 				const provider = this.#registry.get(info.provider);
-				if (this.#player?.kind !== provider.id) {
-					const previous = this.#player?.iframe;
-					this.#disposePlayer();
-					previous?.remove();
-					this.#player = provider.createPlayer();
-					this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
-				}
+				const previous = this.#player?.iframe;
+				this.#disposePlayer();
+				previous?.remove();
+				this.#player = provider.createPlayer();
+				this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
 				this.#player.load(info, {
 					autoplay,
 					index
@@ -1583,6 +1581,207 @@
 		Error: "error",
 		Message: "message"
 	});
+	var YouTubeIframeBridge = class {
+		#iframe;
+		#window;
+		#listeners = /* @__PURE__ */ new Map();
+		#connected = false;
+		#ready = false;
+		#queue = [];
+		#lastIndex = null;
+		#known = {};
+		constructor(iframe, { window = globalThis } = {}) {
+			this.#iframe = iframe;
+			this.#window = window;
+		}
+		subscribe(onEvent, { types } = {}) {
+			const wanted = types ? new Set(types) : null;
+			this.#listeners.set(onEvent, wanted?.size ? wanted : null);
+			return () => this.#listeners.delete(onEvent);
+		}
+		connect() {
+			if (this.#connected) return;
+			this.#connected = true;
+			this.#window.addEventListener("message", this.#onMessage);
+			this.#iframe.addEventListener("load", this.#onIframeLoaded);
+			this.#handshake();
+		}
+		disconnect() {
+			if (!this.#connected) return;
+			this.#connected = false;
+			this.#window.removeEventListener("message", this.#onMessage);
+			this.#iframe.removeEventListener("load", this.#onIframeLoaded);
+			this.#queue.length = 0;
+			this.#listeners.clear();
+		}
+		command(func, args = []) {
+			const message = {
+				event: "command",
+				func,
+				args
+			};
+			if (this.#ready) this.send(message);
+			else this.#queue.push(message);
+		}
+		send(message) {
+			this.#iframe.contentWindow?.postMessage(JSON.stringify(message), this.#getTargetOrigin());
+		}
+		/** Tells the player to start sending messages to this page. */
+		#handshake() {
+			this.send({
+				event: "listening",
+				id: 1,
+				channel: "widget"
+			});
+		}
+		/** Arrow function: `this` must stay the bridge when used as an event listener. */
+		#onMessage = (e) => {
+			if (e.source !== this.#iframe.contentWindow) return;
+			const d = this.#parse(e.data);
+			if (!d?.event) return;
+			this.#emit({
+				type: YouTubeBridgeEvent.Message,
+				name: d.event,
+				info: d.info
+			});
+			switch (d.event) {
+				case "onReady":
+					this.#markReady();
+					break;
+				case "initialDelivery":
+					this.#markReady();
+					this.#handleDelivery(d.info);
+					break;
+				case "infoDelivery":
+					this.#handleDelivery(d.info);
+					break;
+				case "onStateChange":
+					this.#handleState(d.info);
+					break;
+				case "onError": this.#emit({
+					type: YouTubeBridgeEvent.Error,
+					code: d.info
+				});
+			}
+		};
+		#onIframeLoaded = () => {
+			this.#ready = false;
+			this.#handshake();
+		};
+		#handleState(state) {
+			this.#emit({
+				type: YouTubeBridgeEvent.StateChange,
+				state
+			});
+			switch (state) {
+				case 1:
+					this.#emit({ type: YouTubeBridgeEvent.VideoPlay });
+					break;
+				case 2:
+					this.#emit({ type: YouTubeBridgeEvent.VideoPause });
+					break;
+				case 3:
+					this.#emit({ type: YouTubeBridgeEvent.VideoBuffering });
+					break;
+				case 0: this.#emit({ type: YouTubeBridgeEvent.VideoEnded });
+			}
+		}
+		#handleDelivery(info = {}) {
+			if (info.playerState) this.#handleState(info.playerState);
+			if (info.currentTime) this.#emit({
+				type: YouTubeBridgeEvent.TimeUpdate,
+				time: info.currentTime,
+				duration: info.duration
+			});
+			if (info.duration) this.#emit({
+				type: YouTubeBridgeEvent.DurationChange,
+				duration: info.duration
+			});
+			if (info.playlistIndex != null) console.log("playlistIndexChanged => ", info?.playlistIndex);
+			if (info.playlistIndex != null && info.playlistIndex !== this.#lastIndex) {
+				this.#lastIndex = info.playlistIndex;
+				this.#emit({
+					type: YouTubeBridgeEvent.PlaylistIndexChange,
+					index: info.playlistIndex
+				});
+			}
+			if (info.videoData?.video_id && this.#remember("videoId", info.videoData.video_id)) this.#emit({
+				type: YouTubeBridgeEvent.VideoChange,
+				videoId: info.videoData.video_id,
+				title: info.videoData.title,
+				author: info.videoData.author
+			});
+			this.#handleSound(info);
+			this.#handleRate(info.playbackRate);
+			this.#handleQuality(info.playbackQuality);
+		}
+		/** Volume and mute come together in a delivery; each one is notified on its own change. */
+		#handleSound({ volume, muted } = {}) {
+			const volumeChanged = this.#remember("volume", volume);
+			const mutedChanged = this.#remember("muted", muted);
+			const sound = {
+				volume: this.#known.volume ?? null,
+				muted: this.#known.muted ?? null
+			};
+			if (volumeChanged) this.#emit({
+				type: YouTubeBridgeEvent.VolumeChange,
+				...sound
+			});
+			if (mutedChanged) this.#emit({
+				type: YouTubeBridgeEvent.MuteChange,
+				...sound
+			});
+		}
+		#handleRate(rate) {
+			if (this.#remember("rate", rate)) this.#emit({
+				type: YouTubeBridgeEvent.RateChange,
+				rate
+			});
+		}
+		#handleQuality(quality) {
+			if (this.#remember("quality", quality)) this.#emit({
+				type: YouTubeBridgeEvent.QualityChange,
+				quality
+			});
+		}
+		/** Marks the player as ready, sends the queued commands, then notifies `ready`. */
+		#markReady() {
+			if (this.#ready) return;
+			this.#ready = true;
+			this.#queue.splice(0).forEach((m) => this.send(m));
+			this.#emit({ type: YouTubeBridgeEvent.Ready });
+		}
+		#remember(name, value) {
+			if (value == null || this.#known[name] === value) return false;
+			this.#known[name] = value;
+			return true;
+		}
+		#emit(event) {
+			for (const [onEvent, types] of [...this.#listeners]) {
+				if (!(types ? types.has(event.type) : event.type !== YouTubeBridgeEvent.Message)) continue;
+				try {
+					onEvent(event);
+				} catch (error) {
+					console.error("[YouTubeIframeBridge] subscriber failed", error);
+				}
+			}
+		}
+		#parse(data) {
+			if (typeof data !== "string") return null;
+			try {
+				return JSON.parse(data);
+			} catch {
+				return null;
+			}
+		}
+		#getTargetOrigin() {
+			try {
+				return new URL(this.#iframe.src).origin;
+			} catch {
+				return "*";
+			}
+		}
+	};
 	/**
 	* @typedef {(
 	*   | { type: "ready" }
@@ -1645,277 +1844,7 @@
 	*
 	* Commands for custom controls: playVideo, pauseVideo, seekTo [seconds, true], setVolume [0-100],
 	* mute, unMute, setPlaybackRate [rate], nextVideo, previousVideo, playVideoAt [index].
-	*/
-	var YouTubeIframeBridge = class {
-		#iframe;
-		#window;
-		#listeners = /* @__PURE__ */ new Map();
-		#connected = false;
-		#ready = false;
-		#queue = [];
-		#lastIndex = null;
-		#lastState = null;
-		#known = {};
-		/**
-		* @param {HTMLIFrameElement} iframe The YouTube iframe to bridge.
-		* @param {{ window?: Window }} [options] `window` receives the messages (injectable for tests).
-		*/
-		constructor(iframe, { window = globalThis } = {}) {
-			this.#iframe = iframe;
-			this.#window = window;
-		}
-		/**
-		* Adds a subscriber. The same function is never added twice: subscribing it again replaces its filter.
-		* @param {(event: YouTubeBridgeEventData) => void} onEvent
-		* @param {object} [options]
-		* @param {Iterable<string>} [options.types] YouTubeBridgeEvent values to receive. Omitted or empty:
-		*   every typed event except `message`, which must be asked for explicitly.
-		* @returns {() => void} Function that removes this subscriber.
-		*/
-		subscribe(onEvent, { types } = {}) {
-			const wanted = types ? new Set(types) : null;
-			this.#listeners.set(onEvent, wanted?.size ? wanted : null);
-			return () => this.#listeners.delete(onEvent);
-		}
-		/**
-		* Starts listening to the iframe and sends the handshake the player needs
-		* before it delivers messages. Does nothing if already connected.
-		*/
-		connect() {
-			if (this.#connected) return;
-			this.#connected = true;
-			this.#window.addEventListener("message", this.#onMessage);
-			this.#iframe.addEventListener("load", this.#onIframeLoaded);
-			this.#handshake();
-		}
-		/**
-		* Stops listening, drops pending commands and removes all subscribers.
-		* The bridge can be connected again afterwards.
-		*/
-		disconnect() {
-			if (!this.#connected) return;
-			this.#connected = false;
-			this.#window.removeEventListener("message", this.#onMessage);
-			this.#iframe.removeEventListener("load", this.#onIframeLoaded);
-			this.#queue.length = 0;
-			this.#listeners.clear();
-		}
-		/**
-		* Sends a player API command. Queued until the player is ready.
-		* @param {string} func Command name (playVideo, pauseVideo, playVideoAt, loadVideoById...).
-		* @param {Array} [args] Command arguments.
-		*/
-		command(func, args = []) {
-			const message = {
-				event: "command",
-				func,
-				args
-			};
-			if (this.#ready) this.send(message);
-			else this.#queue.push(message);
-		}
-		/**
-		* Sends a raw message to the iframe.
-		* @param {object} message Serialized to JSON.
-		*/
-		send(message) {
-			this.#iframe.contentWindow?.postMessage(JSON.stringify(message), this.#getTargetOrigin());
-		}
-		resetState() {
-			this.#lastIndex = null;
-			this.#lastState = null;
-			this.#known = {};
-		}
-		/** Tells the player to start sending messages to this page. */
-		#handshake() {
-			this.send({
-				event: "listening",
-				id: 1,
-				channel: "widget"
-			});
-		}
-		/** Arrow function: `this` must stay the bridge when used as an event listener. */
-		#onMessage = (e) => {
-			if (e.source !== this.#iframe.contentWindow) return;
-			const d = this.#parse(e.data);
-			if (!d?.event) return;
-			this.#emit({
-				type: YouTubeBridgeEvent.Message,
-				name: d.event,
-				info: d.info
-			});
-			switch (d.event) {
-				case "onReady":
-					this.#markReady();
-					break;
-				case "initialDelivery":
-					this.#markReady();
-					this.#handleDelivery(d.info);
-					break;
-				case "infoDelivery":
-					this.#handleDelivery(d.info);
-					break;
-				case "onStateChange":
-					this.#handleState(d.info);
-					break;
-				case "onError": this.#emit({
-					type: YouTubeBridgeEvent.Error,
-					code: d.info
-				});
-			}
-		};
-		/** Every (re)load of the iframe starts from scratch. */
-		#onIframeLoaded = () => {
-			this.#ready = false;
-			this.#lastIndex = null;
-			this.#lastState = null;
-			this.#known = {};
-			this.#handshake();
-		};
-		/**
-		* Notifies a player state. The state can come from `onStateChange` or from
-		* `infoDelivery`: an unchanged state is notified only once.
-		* @param {number} state
-		*/
-		#handleState(state) {
-			if (state === this.#lastState) return;
-			this.#lastState = state;
-			this.#emit({
-				type: YouTubeBridgeEvent.StateChange,
-				state
-			});
-			switch (state) {
-				case 1:
-					this.#emit({ type: YouTubeBridgeEvent.VideoPlay });
-					break;
-				case 2:
-					this.#emit({ type: YouTubeBridgeEvent.VideoPause });
-					break;
-				case 3:
-					this.#emit({ type: YouTubeBridgeEvent.VideoBuffering });
-					break;
-				case 0: this.#emit({
-					type: YouTubeBridgeEvent.VideoEnded,
-					index: this.#lastIndex
-				});
-			}
-		}
-		/**
-		* Handles the player info. A delivery only holds what changed (plus the time, sent regularly), so a field
-		* that is absent means "unchanged". Each value is notified only when it differs from the last one.
-		* @param {object} [info]
-		*/
-		#handleDelivery(info = {}) {
-			if (info.playerState != null) this.#handleState(info.playerState);
-			if (info.currentTime != null) this.#emit({
-				type: YouTubeBridgeEvent.TimeUpdate,
-				time: info.currentTime,
-				duration: info.duration
-			});
-			if (this.#remember("duration", info.duration)) this.#emit({
-				type: YouTubeBridgeEvent.DurationChange,
-				duration: info.duration
-			});
-			if (info.playlistIndex != null && info.playlistIndex !== this.#lastIndex) {
-				this.#lastIndex = info.playlistIndex;
-				this.#emit({
-					type: YouTubeBridgeEvent.PlaylistIndexChange,
-					index: info.playlistIndex
-				});
-			}
-			if (info.videoData?.video_id && this.#remember("videoId", info.videoData.video_id)) this.#emit({
-				type: YouTubeBridgeEvent.VideoChange,
-				videoId: info.videoData.video_id,
-				title: info.videoData.title,
-				author: info.videoData.author
-			});
-			this.#handleSound(info);
-			this.#handleRate(info.playbackRate);
-			this.#handleQuality(info.playbackQuality);
-		}
-		/** Volume and mute come together in a delivery; each one is notified on its own change. */
-		#handleSound({ volume, muted } = {}) {
-			const volumeChanged = this.#remember("volume", volume);
-			const mutedChanged = this.#remember("muted", muted);
-			const sound = {
-				volume: this.#known.volume ?? null,
-				muted: this.#known.muted ?? null
-			};
-			if (volumeChanged) this.#emit({
-				type: YouTubeBridgeEvent.VolumeChange,
-				...sound
-			});
-			if (mutedChanged) this.#emit({
-				type: YouTubeBridgeEvent.MuteChange,
-				...sound
-			});
-		}
-		#handleRate(rate) {
-			if (this.#remember("rate", rate)) this.#emit({
-				type: YouTubeBridgeEvent.RateChange,
-				rate
-			});
-		}
-		#handleQuality(quality) {
-			if (this.#remember("quality", quality)) this.#emit({
-				type: YouTubeBridgeEvent.QualityChange,
-				quality
-			});
-		}
-		/** @returns {boolean} true when `value` is present and differs from the last one stored under `name`. */
-		#remember(name, value) {
-			if (value == null || this.#known[name] === value) return false;
-			this.#known[name] = value;
-			return true;
-		}
-		/** Marks the player as ready, sends the queued commands, then notifies `ready`. */
-		#markReady() {
-			if (this.#ready) return;
-			this.#ready = true;
-			this.#queue.splice(0).forEach((m) => this.send(m));
-			this.#emit({ type: YouTubeBridgeEvent.Ready });
-		}
-		/**
-		* Sends an event to the subscribers that want it. Iterates over a copy, so a subscriber can
-		* unsubscribe while being notified; a failing subscriber does not break the others.
-		* @param {YouTubeBridgeEventData} event
-		*/
-		#emit(event) {
-			for (const [onEvent, types] of [...this.#listeners]) {
-				if (!(types ? types.has(event.type) : event.type !== YouTubeBridgeEvent.Message)) continue;
-				try {
-					onEvent(event);
-				} catch (error) {
-					console.error("[YouTubeIframeBridge] subscriber failed", error);
-				}
-			}
-		}
-		/**
-		* Parses a message payload.
-		* @param {unknown} data
-		* @returns {object|null} null when the payload is not a JSON string.
-		*/
-		#parse(data) {
-			if (typeof data !== "string") return null;
-			try {
-				return JSON.parse(data);
-			} catch {
-				return null;
-			}
-		}
-		/**
-		* Origin of the iframe, used as the postMessage target (https://www.youtube.com).
-		* Falls back to "*" when the iframe has no valid src.
-		* @returns {string}
-		*/
-		#getTargetOrigin() {
-			try {
-				return new URL(this.#iframe.src).origin;
-			} catch {
-				return "*";
-			}
-		}
-	};
+	//  */
 	// src/providers/youtube/YouTubePlayer.js
 	/**
 	* One YouTube iframe + its bridge. The iframe is created once (src), then driven with API
@@ -1969,20 +1898,31 @@
 				if (changed) iframe.src = url.href;
 			} catch {}
 		}
+		#loading = false;
 		/**
 		* @param {VideoInfo|VideoListInfo|PlaylistInfo} info
 		* @param {{autoplay?: boolean, index?: number}} [options] `index`: starting item of a list / playlist.
 		*/
 		load(info, { autoplay = false, index = 0 } = {}) {
+			this.#loading = true;
+			const verb = autoplay ? "load" : "cue";
 			if (!this.#iframe) {
 				this.#attach(this.#createIframe(this.#src(info, {
 					autoplay,
 					index
 				})), true);
+				if (index > 0) {
+					if (info instanceof PlaylistInfo) this.#bridge.command(`${verb}Playlist`, [{
+						list: info.playlistId,
+						listType: "playlist",
+						index,
+						startSeconds: 0
+					}]);
+				}
+				this.#loading = false;
 				return;
 			}
 			this.#bridge.resetState();
-			const verb = autoplay ? "load" : "cue";
 			if (info instanceof VideoInfo) this.#bridge.command(`${verb}VideoById`, [info.videoId, info.startSeconds ?? 0]);
 			else if (info instanceof VideoListInfo) this.#bridge.command(`${verb}Playlist`, [
 				info.videoIds,
@@ -2033,6 +1973,7 @@
 			this.#bridge.connect();
 		}
 		#onBridgeEvent(e) {
+			if (this.#loading) return;
 			switch (e.type) {
 				case YouTubeBridgeEvent.PlaylistIndexChange: return this.#emit({
 					type: "itemChange",
@@ -2128,7 +2069,7 @@
 				startSeconds
 			});
 			if (rest.length) q.set("playlist", rest.join(","));
-			if (index > 0) q.set("index", String(Math.floor(index)));
+			if (index >= 0) q.set("index", String(Math.floor(index + 1)));
 			return this.#url(encodeURIComponent(first), q);
 		}
 		buildPlaylistSrc(playlistId, { autoplay, videoId } = {}) {
@@ -3015,7 +2956,7 @@
 	var YOUTUBE_MISSING_WIDTH = 120;
 	/** Default Renderer mis à jour avec le nouveau design */
 	var TooltipRenderer = class {
-		createElement() {
+		render() {
 			const tip = document.createElement("div");
 			tip.className = "lp-tip";
 			const loader = document.createElement("div");
@@ -3097,7 +3038,7 @@
 			};
 		}
 		#build() {
-			const tip = this.#tooltipRenderer.createElement();
+			const tip = this.#tooltipRenderer.render();
 			tip.classList.add("lp-tip");
 			document.body.append(tip);
 			return this.#el = tip;
@@ -3174,12 +3115,6 @@
 	};
 	// src/LinkPlayer.js
 	var noop = () => {};
-	var nextId = 0;
-	/**
-	* Who handles which element. A WeakMap, not an attribute: cloneNode() copies attributes but not listeners,
-	* so an attribute would make a cloned link look handled when it is not. data-lp stays as a debugging aid only.
-	*/
-	var owners = /* @__PURE__ */ new WeakMap();
 	var LinkPlayer = class {
 		#id;
 		#scopeEl;
@@ -3201,12 +3136,7 @@
 		constructor({ scope = null, definitions = null, autoScan = true, useStorage = true, tooltip = true, currentBehavior = "toggle", scanEmbeds = true, youtubeApiKey = null, youtubeMeta = null, fallbackTitle = void 0, okruEmbedBaseUrl = null, store = null, registry = null, panelRenderer = null, itemRenderer = null, headerRenderer = null, toggleRenderer = null, groupRenderer = null, tooltipRenderer = null, thumbnails = null, onChange = noop, onState = noop, onError = (e) => console.warn("[LinkPlayer]", e.error ?? e) } = {}) {
 			this.#scopeEl = resolveScope(scope);
 			this.#isGlobal = this.#scopeEl === null;
-			this.#id = `lp-${++nextId}`;
-			if (this.#scopeEl) {
-				const taken = this.#scopeEl.dataset.lpScope;
-				if (taken && taken !== this.#id) throw new Error("This scope already has a LinkPlayer");
-				this.#scopeEl.dataset.lpScope = this.#id;
-			}
+			this.#id = this.#isGlobal ? `lp-global` : `lp-${scope}`;
 			this.#useStorage = useStorage;
 			this.#scanEmbeds = scanEmbeds;
 			this.#definitions = definitions;
@@ -3266,39 +3196,47 @@
 			this.#regions.set(target, region);
 			return region;
 		}
-		/**
-		* Can be called again after the page changed: links and iframes already handled are skipped.
-		* Also initializes (saved state / showOnInit) the regions that were not yet: call it after define() calls
-		* made once the first scan is done.
-		*/
 		scan() {
-			let taken = 0;
-			for (const element of this.getLinks()) {
-				const owner = owners.get(element);
-				if (owner === this) continue;
-				if (owner) {
-					taken++;
-					continue;
-				}
-				try {
-					this.#register(element);
-				} catch (error) {
-					this.#events.emit("error", {
-						error,
-						element
+			const elements = this.getLinks();
+			for (const element of elements) {
+				if (element.dataset.lp) continue;
+				const target = element.dataset.target;
+				if (!target) throw new Error(`Target not provided on '${element}'`);
+				const url = element.tagName === "A" ? element.href : element.dataset.url;
+				if (!url) throw new Error(`Unable to resolve URL on element '${element}'`);
+				const provider = this.#registry.resolve(url);
+				const region = this.getRegion(target);
+				const parsed = provider.getInfoFromElement(element);
+				const key = parsed.key;
+				const info = region.has(key) ? region.get(key) : region.add(parsed);
+				const onClick = (e) => {
+					e.preventDefault();
+					region.navigate(key, {
+						autoplay: info.autoplay === AUTOPLAY_MODES.INIT || info.autoplay === AUTOPLAY_MODES.CLICK,
+						index: info.index
 					});
-				}
+				};
+				element.addEventListener("click", onClick);
+				element.dataset.lp = this.#id;
+				const release = () => {
+					delete element.dataset.lp;
+				};
+				const current = () => region.get(key) ?? info;
+				const detachTip = this.#attachTooltip(element, current, provider);
+				this.#detachers.add(() => {
+					element.removeEventListener("click", onClick);
+					detachTip();
+					release();
+				});
 			}
-			if (taken) this.#events.emit("error", { error: /* @__PURE__ */ new Error(`${taken} element(s) already handled by another LinkPlayer: create the scoped player first, or declare the scope in the HTML (data-lp-scope)`) });
 			for (const region of this.#regions.values()) {
 				if (this.#initialized.has(region)) continue;
 				this.#initialized.add(region);
 				this.#init(region);
 			}
 		}
-		/** The links this player is responsible for: those whose innermost scope boundary is its own (none for the global one). */
 		getLinks() {
-			return [...this.getRoot().querySelectorAll("[data-link]")].filter((element) => element.closest("[data-lp-scope]") === this.#scopeEl);
+			return this.getRoot().querySelectorAll("[data-link]");
 		}
 		getRoot() {
 			return this.#scopeEl ?? document;
@@ -3316,53 +3254,14 @@
 			this.#events.clear();
 		}
 		#registerDefs(definitions) {
-			if (!Array.isArray(definitions)) return;
+			if (!definitions) return;
+			if (!Array.isArray(definitions)) throw new TypeError(`Invalid definitions: expected an Array, but received type '${typeof definitions}' (${JSON.stringify(definitions)}).`);
 			for (const def of definitions) {
 				const info = (def.url ? this.#registry.resolve(def.url) : this.#registry.get(def.provider)).getInfoFromDefinition(def);
 				const target = def.target;
-				if (!target) throw new Error("Target required");
+				if (!target) throw new Error(`Target is required for definition at index ${index} (definition: ${JSON.stringify(def)}).`);
 				this.getRegion(target).add(info);
 			}
-		}
-		#register(element) {
-			const isIframe = element.tagName === "IFRAME";
-			if (isIframe && !this.#scanEmbeds) return;
-			const target = element.dataset.target || (isIframe ? element.parentElement?.id : null);
-			if (!target) throw new Error("Target required");
-			const url = isIframe ? element.src : element.tagName === "A" ? element.href : element.dataset.url;
-			if (!url) throw new Error("No URL provided");
-			const provider = this.#registry.resolve(url);
-			const region = this.getRegion(target);
-			const parsed = provider.getInfoFromElement(element);
-			const info = region.add(parsed) ? parsed : region.get(parsed.key);
-			owners.set(element, this);
-			element.dataset.lp = this.#id;
-			const release = () => {
-				owners.delete(element);
-				delete element.dataset.lp;
-			};
-			if (isIframe) {
-				region.adopt(element, info);
-				this.#detachers.add(release);
-				return;
-			}
-			const key = info.key;
-			const current = () => region.get(key) ?? info;
-			const onClick = (e) => {
-				e.preventDefault();
-				const target = current();
-				region.navigate(target.key, {
-					autoplay: target.autoplay === AUTOPLAY_MODES.INIT || target.autoplay === AUTOPLAY_MODES.CLICK,
-					index: target.index
-				});
-			};
-			element.addEventListener("click", onClick);
-			const detachTip = this.#attachTooltip(element, current, provider);
-			this.#detachers.add(() => {
-				element.removeEventListener("click", onClick);
-				detachTip();
-				release();
-			});
 		}
 		/** Completes the items of a playlist; called by the region the first time the playlist is shown. */
 		async #enrich(info) {
@@ -3386,7 +3285,6 @@
 			});
 		}
 		#init(region) {
-			if (region.current) return;
 			const saved = this.getSavedState(region);
 			const restored = saved && region.get(saved.key);
 			if (restored) return region.navigate(restored.key, { index: saved.index ?? 0 });

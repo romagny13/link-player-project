@@ -39,7 +39,7 @@ const YOUTUBE_MISSING_WIDTH = 120;
 
 /** Default Renderer mis à jour avec le nouveau design */
 export class TooltipRenderer {
-    createElement() {
+    render() {
         const tip = document.createElement("div");
         tip.className = "lp-tip";
 
@@ -137,7 +137,7 @@ export class Tooltip {
     }
 
     #build() {
-        const tip = this.#tooltipRenderer.createElement();
+        const tip = this.#tooltipRenderer.render();
         tip.classList.add("lp-tip");
         document.body.append(tip);
         return (this.#el = tip);

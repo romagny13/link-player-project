@@ -31,7 +31,10 @@ export class YouTubePlayer {
     constructor({builder, createIframe = null, iframe = null}) {
         this.#builder = builder;
         this.#createIframe = createIframe;
-        if (iframe) { this.#prepareAdopted(iframe); this.#attach(iframe, false); }
+        if (iframe) {
+            this.#prepareAdopted(iframe);
+            this.#attach(iframe, false);
+        }
     }
 
     get iframe() {
@@ -50,23 +53,48 @@ export class YouTubePlayer {
             const origin = this.#builder.origin;
             let changed = url.searchParams.get("enablejsapi") !== "1";
             url.searchParams.set("enablejsapi", "1");
-            if (origin && url.searchParams.get("origin") !== origin) { url.searchParams.set("origin", origin); changed = true; }
+            if (origin && url.searchParams.get("origin") !== origin) {
+                url.searchParams.set("origin", origin);
+                changed = true;
+            }
             if (changed) iframe.src = url.href;
-        } catch { /* invalid src: left as is */ }
+        } catch { /* invalid src: left as is */
+        }
     }
+
+    #loading = false;
 
     /**
      * @param {VideoInfo|VideoListInfo|PlaylistInfo} info
      * @param {{autoplay?: boolean, index?: number}} [options] `index`: starting item of a list / playlist.
      */
     load(info, {autoplay = false, index = 0} = {}) {
+        this.#loading = true;
+        const verb = autoplay ? "load" : "cue"; // load* starts playing, cue* does not
+        // 1. create iframe
         if (!this.#iframe) {
             this.#attach(this.#createIframe(this.#src(info, {autoplay, index})), true);
+            // index applied only for videoList
+            if (index > 0) {
+                // if (info instanceof VideoListInfo) {
+                //     this.#bridge.command(`${verb}Playlist`, [info.videoIds, index, 0]);
+                // } else
+                //
+                if (info instanceof PlaylistInfo) {
+                    this.#bridge.command(`${verb}Playlist`, [{
+                        list: info.playlistId,
+                        listType: "playlist",
+                        index: index,
+                        startSeconds: 0
+                    }]);
+                }
+            }
+            this.#loading = false;
             return;
         }
 
+        // 2. existing iframe
         this.#bridge.resetState(); // the first values after a load are notified again
-        const verb = autoplay ? "load" : "cue"; // load* starts playing, cue* does not
 
         if (info instanceof VideoInfo) {
             this.#bridge.command(`${verb}VideoById`, [info.videoId, info.startSeconds ?? 0]);
@@ -131,12 +159,20 @@ export class YouTubePlayer {
     }
 
     #onBridgeEvent(e) {
+        if(this.#loading)
+            return ;
+
         switch (e.type) {
-            case YouTubeBridgeEvent.PlaylistIndexChange: return this.#emit({type: "itemChange", index: e.index});
-            case YouTubeBridgeEvent.VideoPlay: return this.#emit({type: "state", state: "playing"});
-            case YouTubeBridgeEvent.VideoPause: return this.#emit({type: "state", state: "paused"});
-            case YouTubeBridgeEvent.VideoEnded: return this.#emit({type: "state", state: "ended", index: e.index});
-            case YouTubeBridgeEvent.Error: return this.#emit({type: "error", error: new Error(`YouTube player error ${e.code}`)});
+            case YouTubeBridgeEvent.PlaylistIndexChange:
+                return this.#emit({type: "itemChange", index: e.index});
+            case YouTubeBridgeEvent.VideoPlay:
+                return this.#emit({type: "state", state: "playing"});
+            case YouTubeBridgeEvent.VideoPause:
+                return this.#emit({type: "state", state: "paused"});
+            case YouTubeBridgeEvent.VideoEnded:
+                return this.#emit({type: "state", state: "ended", index: e.index});
+            case YouTubeBridgeEvent.Error:
+                return this.#emit({type: "error", error: new Error(`YouTube player error ${e.code}`)});
         }
     }
 

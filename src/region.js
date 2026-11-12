@@ -141,8 +141,8 @@ export class Region {
         return !!(info && this.#journal.current?.info === info);
     }
 
-    /** Navigating to the info that is already current toggles the view instead (no new journal entry). */
     navigate(key, options) {
+        console.log(key, this.#infos)
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
         if (this.isCurrent(key)) {
@@ -150,12 +150,7 @@ export class Region {
             if (this.#currentBehavior === "toggle") return this.toggle();
         }
         const info = this.get(key);
-        this.#navigate(info,options);
-    }
-
-    #navigate(info, {autoplay = false, index = 0} = {}) {
-        this.#journal.push({info, index}); 
-        this.#show(info, {autoplay, index}, "navigate");
+        this.#navigate(info, options);
     }
 
     replace(key, {autoplay = false, index = 0} = {}) {
@@ -274,6 +269,11 @@ export class Region {
         return this.infos.indexOf(this.current);
     }
 
+    #navigate(info, {autoplay = false, index = 0} = {}) {
+        this.#journal.push({info, index});
+        this.#show(info, {autoplay, index}, "navigate");
+    }
+
     #restore(entry, reason) {
         if (!entry) return false;
         this.#show(entry.info, {autoplay: false, index: entry.index}, reason); // restore the state, do not start playing
@@ -292,13 +292,13 @@ export class Region {
             const provider = this.#registry.get(info.provider);
 
             // one iframe per region: replaced only when the provider changes
-            if (this.#player?.kind !== provider.id) {
-                const previous = this.#player?.iframe; // an adopted iframe is not removed by the player
-                this.#disposePlayer();
-                previous?.remove();
-                this.#player = provider.createPlayer();
-                this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
-            }
+            //if (this.#player?.kind !== provider.id) {
+            const previous = this.#player?.iframe; // an adopted iframe is not removed by the player
+            this.#disposePlayer();
+            previous?.remove();
+            this.#player = provider.createPlayer();
+            this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
+            //}
 
             this.#player.load(info, {autoplay, index});
             const iframe = this.#player.iframe;

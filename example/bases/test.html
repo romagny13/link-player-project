@@ -774,42 +774,6 @@
         })();
 
 
-        const createDestination = ({title, videoId, description, link}) => ({
-            key: title.toLowerCase(),
-            title,
-            videoId,
-            provider: "youtube",
-            target: "footage-gp1",
-            data: {
-                description: description || LOREM,
-                link: link || {
-                    href: `https://example.com/${title}`,
-                    text: `Guide de ${title}`
-                }
-            }
-        });
-
-        const DESTINATIONS = [
-            createDestination({
-                title: "Bahamas",
-                videoId: "YCfcg9gzCYc",
-                description:
-                    "Un archipel de plus de 700 îles : eaux turquoise, bancs de sable à perte de vue...",
-                }
-            }),
-            createDestination({
-                title: "Maldives",
-                videoId: "69iUWLA0oVc"
-            }),
-            createDestination({
-                title: "Tahiti",
-                videoId: "5drmgVauSMg"
-            }),
-            createDestination({
-                title: "Vietnam",
-                videoId: "k8m0SaGQ_1c"
-            })
-        ];
     </script>
 </div>
     

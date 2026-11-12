@@ -50,16 +50,32 @@
         </div>
     </section>
 
-    <section id="scoped-zone" data-lp-scope>
-        <h2>Scoped LinkPlayer (sans tooltip)</h2>
-        <div id="scoped-player" class="video-container"></div>
-        <div class="links">
-            <a data-link href="https://www.youtube.com/watch?v=YCfcg9gzCYc"
-               data-target="scoped-player" data-title="Scoped only" data-show-on-init="true">
-                Scoped video
-            </a>
-        </div>
-    </section>
+<!--    <section id="scoped-zone" data-lp-scope>-->
+<!--        <h2>Scoped LinkPlayer (sans tooltip)</h2>-->
+<!--        <div id="scoped-player" class="video-container"></div>-->
+<!--        <div class="links">-->
+<!--            <a data-link href="https://www.youtube.com/watch?v=YCfcg9gzCYc"-->
+<!--               data-target="scoped-player" data-title="Scoped only" data-show-on-init="true">-->
+<!--                Scoped video-->
+<!--            </a>-->
+<!--        </div>-->
+<!--    </section>-->
+
+<!--    <section>-->
+<!--        <h2>Existing iframe with playlist</h2>-->
+<!--        <div class="video-container">-->
+<!--            <iframe width="560" height="315"-->
+<!--                    src="https://www.youtube.com/embed/videoseries?list=PLfO5yE9Cc3wo"-->
+<!--                    title="YouTube video player" frameborder="0"-->
+<!--                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"-->
+<!--                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>-->
+<!--            <iframe width="560" height="315"-->
+<!--                    src="https://www.youtube.com/embed/?playlist=z2sv_RsNwM4,-xiF9YIIUk4&index=2&start=120"-->
+<!--                    title="YouTube video player" frameborder="0"-->
+<!--                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"-->
+<!--                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>-->
+<!--        </div>-->
+<!--    </section>-->
 </div>
 
 <script type="module">
@@ -86,7 +102,7 @@
 
     // ── Custom Tooltip Renderer (minimal) ──
     class SimpleTipRenderer {
-        createElement() {
+        render() {
             const tip = document.createElement("div");
             tip.className = "lp-tip";
             tip.innerHTML = `<div class="lp-tip-loader"></div><img alt=""><div class="lp-tip-play"></div><span class="lp-tip-title"></span>`;
@@ -122,12 +138,12 @@
     });
 
     // Scoped player (dans #scoped-zone) – pas de tooltip
-    const scopedLp = new LinkPlayer({
-        scope: "scoped-zone",
-        tooltip: false,
-        useStorage: true,
-        currentBehavior: "skip",
-    });
+    // const scopedLp = new LinkPlayer({
+    //     scope: "scoped-zone",
+    //     tooltip: false,
+    //     useStorage: true,
+    //     currentBehavior: "skip",
+    // });
 </script>
 </body>
 </html>

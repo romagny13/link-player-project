@@ -43,7 +43,12 @@ custom panel, custom tooltip renderers, styles "overrides"
 
 dependent views
 
->> PLUS: adoption iframes existantes dans la page (youtube avec playlist/liste de videos), autoplay "click"
+>> PLUS: autoplay "click"
+PROBLEMES:
+- chargement depuis le storage, semble outrepasser ou repasser a la premiere video
+- iframe video list / playlist non adoptée
+- mixed, les liens semblent pas decouverts
+
 
 un link player global et un linkplayer scoped sans tooltip par exemple
 
@@ -77,3 +82,61 @@ merge (link info),
 duration (video info, parse), 
 button "next auto" dans header panel
 dependent view , data
+
+
+
+// #register(element) {
+//     const isIframe = element.tagName === "IFRAME";
+//     if (isIframe && !this.#scanEmbeds) return;
+//
+//     const target =
+//         element.dataset.target || (isIframe ? element.parentElement?.id : null);
+//     if (!target) throw new Error("Target required");
+//
+//     const url = isIframe
+//         ? element.src
+//         : element.tagName === "A"
+//             ? element.href
+//             : element.dataset.url;
+//     if (!url) throw new Error("No URL provided");
+//
+//     const provider = this.#registry.resolve(url);
+//     const region = this.getRegion(target);
+//
+//     const parsed = provider.getInfoFromElement(element); // data-key is injected in the model (info.key)
+//     const info = region.add(parsed) ? parsed : region.get(parsed.key); // same key twice: keep the first object
+//     // if (info === parsed) this.#applyDefinition(info);
+//
+//     owners.set(element, this);
+//     element.dataset.lp = this.#id; // debugging aid: the source of truth is `owners`
+//     const release = () => {
+//         owners.delete(element);
+//         delete element.dataset.lp;
+//     };
+//
+//     if (isIframe) {
+//         region.adopt(element, info);
+//         this.#detachers.add(release);
+//         return;
+//     }
+//
+//     const key = info.key;
+//     const onClick = (e) => {
+//         e.preventDefault();
+//         region.navigate(key, {
+//             autoplay:
+//                 info.autoplay === AUTOPLAY_MODES.INIT ||
+//                 info.autoplay === AUTOPLAY_MODES.CLICK,
+//             index: info.index
+//         });
+//     };
+//     element.addEventListener("click", onClick);
+//
+//     const current = () => region.get(key) ?? info;
+//     const detachTip = this.#attachTooltip(element, current, provider);
+//     this.#detachers.add(() => {
+//         element.removeEventListener("click", onClick);
+//         detachTip();
+//         release();
+//     });
+// }
