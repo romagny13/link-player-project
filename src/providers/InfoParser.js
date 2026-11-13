@@ -7,28 +7,6 @@ export class InfoParser {
         return element.dataset?.url;
     }
 
-    toInt(v) {
-        if (v == null || v === '') return null;
-        const n = parseInt(v, 10);
-        return Number.isNaN(n) ? null : n;
-    }
-
-    toBool01(v) {
-        if (v === '1' || v === 1 || v === true) return true;
-        if (v === '0' || v === 0 || v === false) return false;
-        return null;
-    }
-
-    timeToSeconds(v) {
-        if (v == null || v === '') return null;
-        if (/^\d+$/.test(v)) return parseInt(v, 10);
-
-        const m = String(v).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
-        if (!m || (!m[1] && !m[2] && !m[3])) return null;
-
-        return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
-    }
-
     parseJsonAttribute(value, name) {
         if (value === undefined) return undefined;
         let data;

@@ -1,5 +1,5 @@
 import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
-import {toAutoplayMode, toInt} from "../../utils/helpers.js";
+import {timeToSeconds, toAutoplayMode, toBool01, toInt} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {InfoParser} from "../InfoParser.js";
@@ -80,7 +80,7 @@ export class OkruInfoParser extends InfoParser {
         return new SrcInfo({
             kind: 'video',
             videoId: m[1],
-            autoplay: this.toBool01(u.searchParams.get('autoplay')),
+            autoplay: toBool01(u.searchParams.get('autoplay')),
             source: src
         });
     }
@@ -132,13 +132,13 @@ export class OkruInfoParser extends InfoParser {
                     target: def.target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(def.autoplay),
-                    startSeconds: this.timeToSeconds(def.start),
+                    startSeconds: timeToSeconds(def.start),
                     title: def.title ?? "",
                     description: def.description ?? "",
                     channel: def.channel ?? "",
                     channelUrl: def.channelUrl ?? "",
                     thumbnail: def.thumbnail ?? "",
-                    duration: this.timeToSeconds(def.duration),
+                    duration: timeToSeconds(def.duration),
                     showOnInit: def.showOnInit,
                     key: def.key,
                     extra: def.extra,
@@ -154,9 +154,16 @@ export class OkruInfoParser extends InfoParser {
                 }
 
                 const index = urlInfos.index ?? def.index;
-                const list = new VideoListInfo(
-                    "okru", def.target, videoIds, index, def.showOnInit, def.key, def.extra, def.url
-                );
+                const list = new VideoListInfo({
+                    provider: "okru",
+                    target: def.target,
+                    videoIds,
+                    index,
+                    showOnInit: def.showOnInit,
+                    key: def.key,
+                    extra: def.extra,
+                    source: def.url
+                });
 
                 videoIds.forEach((videoId, i) => {
                     // videos (data-videos or code) wins over labels= in the URL
@@ -167,13 +174,13 @@ export class OkruInfoParser extends InfoParser {
                         target: def.target,
                         videoId,
                         autoplay: toAutoplayMode(v?.autoplay ?? def.autoplay),
-                        startSeconds: this.timeToSeconds(v?.start),
+                        startSeconds: timeToSeconds(v?.start),
                         title: v?.title ?? "",
                         description: v?.description ?? "",
                         channel: v?.channel ?? "",
                         channelUrl: v?.channelUrl ?? "",
                         thumbnail: v?.thumbnail ?? "",
-                        duration: this.timeToSeconds(v?.duration),
+                        duration: timeToSeconds(v?.duration),
                         key: v?.key,
                         extra: v?.extra
                     }));

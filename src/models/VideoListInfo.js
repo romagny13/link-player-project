@@ -11,16 +11,16 @@ export class VideoListInfo {
     #extra;
     #source;
 
-    constructor(
-        provider,
-        target,
-        videoIds,
-        index,
-        showOnInit,
-        key,
-        extra,
-        source,
-    ) {
+    constructor({
+                    provider,
+                    target,
+                    videoIds,
+                    index,
+                    showOnInit,
+                    key,
+                    extra,
+                    source
+                }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
         ValueChecks.requireNotNullOrEmpty(target, "target");
 

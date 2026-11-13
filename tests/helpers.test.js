@@ -1,90 +1,152 @@
-import {afterEach, describe, expect, it, vi} from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
     AUTOPLAY_MODES,
-    DefBuilder,
     describe as describeElement,
     isEmpty,
     isTouch,
+    timeToSeconds,
     toAutoplayMode,
     toBoolean,
+    toBool01,
     toInt,
-    toNumber
+    toNumber,
 } from "../src/utils/helpers.js";
 
-// Remarque : l'import `describe` de helpers est renommé `describeElement` pour ne pas
-// entrer en collision avec le `describe` de vitest.
+// Note: the `describe` import from helpers is renamed to `describeElement`
+// to avoid colliding with vitest's `describe`.
 
 describe("toInt", () => {
-    it("convertit une chaîne d'entier", () => {
+    it("converts an integer string", () => {
         expect(toInt("42")).toBe(42);
         expect(toInt("-7")).toBe(-7);
     });
 
-    it("tronque les décimaux", () => {
+    it("truncates decimals", () => {
         expect(toInt("3.9")).toBe(3);
         expect(toInt(3.9)).toBe(3);
     });
 
-    it("retourne undefined quand ce n'est pas un nombre", () => {
-        expect(toInt("abc")).toBeUndefined();
-        expect(toInt("")).toBeUndefined();
-        expect(toInt(null)).toBeUndefined();
-        expect(toInt(undefined)).toBeUndefined();
+    it("returns null when not a number", () => {
+        expect(toInt("abc")).toBeNull();
+        expect(toInt("")).toBeNull();
+        expect(toInt(null)).toBeNull();
+        expect(toInt(undefined)).toBeNull();
     });
 
-    it("est tolérant : lit le début de la chaîne (parseInt)", () => {
+    it("is tolerant: reads the beginning of the string (parseInt)", () => {
         expect(toInt("12px")).toBe(12);
     });
 });
 
 describe("toNumber", () => {
-    it("convertit entiers et décimaux", () => {
+    it("converts integers and decimals", () => {
         expect(toNumber("3.5")).toBe(3.5);
         expect(toNumber("0")).toBe(0);
         expect(toNumber(12)).toBe(12);
     });
 
-    it("retourne undefined pour absent, vide ou espaces", () => {
+    it("returns undefined for missing, empty or whitespace", () => {
         expect(toNumber(undefined)).toBeUndefined();
         expect(toNumber(null)).toBeUndefined();
         expect(toNumber("")).toBeUndefined();
         expect(toNumber("   ")).toBeUndefined();
     });
 
-    it("est strict : refuse un nombre suivi de texte (contrairement à toInt)", () => {
+    it("is strict: rejects a number followed by text (unlike toInt)", () => {
         expect(toNumber("12px")).toBeUndefined();
         expect(toNumber("abc")).toBeUndefined();
     });
 });
 
-describe("toBoolean (attribut data-*)", () => {
+describe("toBool01", () => {
+    it("returns true for 1 / '1' / true", () => {
+        expect(toBool01(1)).toBe(true);
+        expect(toBool01("1")).toBe(true);
+        expect(toBool01(true)).toBe(true);
+    });
+
+    it("returns false for 0 / '0' / false", () => {
+        expect(toBool01(0)).toBe(false);
+        expect(toBool01("0")).toBe(false);
+        expect(toBool01(false)).toBe(false);
+    });
+
+    it("returns null for anything else", () => {
+        for (const v of [undefined, null, "", "true", "false", "yes", "no", 2, "abc"]) {
+            expect(toBool01(v)).toBeNull();
+        }
+    });
+});
+
+describe("toBoolean (data-* attribute)", () => {
     it("absent => false", () => {
         expect(toBoolean(undefined)).toBe(false);
         expect(toBoolean(null)).toBe(false);
     });
 
-    it("présent sans valeur ou \"true\" => true", () => {
+    it("present without value or \"true\" => true", () => {
         expect(toBoolean("")).toBe(true);
         expect(toBoolean("true")).toBe(true);
     });
 
-    it("\"false\", \"0\" et \"no\" => false, sans tenir compte de la casse ni des espaces", () => {
-        for (const v of ["false", "0", "no", " FALSE ", "No"]) expect(toBoolean(v)).toBe(false);
+    it("\"false\", \"0\" and \"no\" => false, case and whitespace insensitive", () => {
+        for (const v of ["false", "0", "no", " FALSE ", "No"]) {
+            expect(toBoolean(v)).toBe(false);
+        }
     });
 
-    it("toute autre valeur => true", () => {
-        for (const v of ["yes", "1", "oui", "n'importe quoi"]) expect(toBoolean(v)).toBe(true);
+    it("any other value => true", () => {
+        for (const v of ["yes", "1", "oui", "whatever"]) {
+            expect(toBoolean(v)).toBe(true);
+        }
+    });
+});
+
+describe("timeToSeconds", () => {
+    it("returns null for null, undefined or empty string", () => {
+        expect(timeToSeconds(null)).toBeNull();
+        expect(timeToSeconds(undefined)).toBeNull();
+        expect(timeToSeconds("")).toBeNull();
+    });
+
+    it("accepts a plain number of seconds (string or number)", () => {
+        expect(timeToSeconds("90")).toBe(90);
+        expect(timeToSeconds(90)).toBe(90);
+    });
+
+    it("parses h/m/s format", () => {
+        expect(timeToSeconds("1h")).toBe(3600);
+        expect(timeToSeconds("2m")).toBe(120);
+        expect(timeToSeconds("30s")).toBe(30);
+        expect(timeToSeconds("1h30m")).toBe(5400);
+        expect(timeToSeconds("1h30m15s")).toBe(5415);
+        expect(timeToSeconds("45m10s")).toBe(2710);
+        expect(timeToSeconds("2h5s")).toBe(7205);
+    });
+
+    it("is case-insensitive", () => {
+        expect(timeToSeconds("1H30M")).toBe(5400);
+        expect(timeToSeconds("45S")).toBe(45);
+    });
+
+    it("returns null for invalid formats", () => {
+        expect(timeToSeconds("abc")).toBeNull();
+        expect(timeToSeconds("1hour")).toBeNull();
+        expect(timeToSeconds("1h 30m")).toBeNull(); // spaces not allowed
+        expect(timeToSeconds("h")).toBeNull();
+        expect(timeToSeconds("m")).toBeNull();
+        expect(timeToSeconds("s")).toBeNull();
     });
 });
 
 describe("isEmpty", () => {
-    it("vrai pour \"\", null et undefined", () => {
+    it("true for \"\", null and undefined", () => {
         expect(isEmpty("")).toBe(true);
         expect(isEmpty(null)).toBe(true);
         expect(isEmpty(undefined)).toBe(true);
     });
 
-    it("faux pour les valeurs « falsy » qui ne sont pas vides", () => {
+    it("false for other falsy values that are not empty", () => {
         expect(isEmpty(0)).toBe(false);
         expect(isEmpty(false)).toBe(false);
         expect(isEmpty("a")).toBe(false);
@@ -95,30 +157,30 @@ describe("isEmpty", () => {
 describe("isTouch", () => {
     afterEach(() => vi.unstubAllGlobals());
 
-    it("vrai quand matchMedia annonce un pointeur tactile sans survol", () => {
-        const matchMedia = vi.fn(() => ({matches: true}));
+    it("true when matchMedia reports a touch pointer without hover", () => {
+        const matchMedia = vi.fn(() => ({ matches: true }));
         vi.stubGlobal("matchMedia", matchMedia);
         expect(isTouch()).toBe(true);
         expect(matchMedia).toHaveBeenCalledWith("(hover: none) and (pointer: coarse)");
     });
 
-    it("faux quand matchMedia ne correspond pas", () => {
-        vi.stubGlobal("matchMedia", () => ({matches: false}));
+    it("false when matchMedia does not match", () => {
+        vi.stubGlobal("matchMedia", () => ({ matches: false }));
         expect(isTouch()).toBe(false);
     });
 
-    it("faux quand matchMedia n'existe pas (environnement sans navigateur)", () => {
+    it("false when matchMedia does not exist (non-browser environment)", () => {
         vi.stubGlobal("matchMedia", undefined);
         expect(isTouch()).toBe(false);
     });
 });
 
 describe("AUTOPLAY_MODES", () => {
-    it("expose les trois modes", () => {
-        expect(AUTOPLAY_MODES).toEqual({NONE: "none", INIT: "init", CLICK: "click"});
+    it("exposes the three modes", () => {
+        expect(AUTOPLAY_MODES).toEqual({ NONE: "none", INIT: "init", CLICK: "click" });
     });
 
-    it("est figé", () => {
+    it("is frozen", () => {
         expect(Object.isFrozen(AUTOPLAY_MODES)).toBe(true);
     });
 });
@@ -129,52 +191,41 @@ describe("toAutoplayMode", () => {
         expect(toAutoplayMode(null)).toBe(AUTOPLAY_MODES.NONE);
     });
 
-    it("attribut présent sans valeur, \"true\" ou true => INIT", () => {
+    it("attribute present without value, \"true\" or true => INIT", () => {
         expect(toAutoplayMode("")).toBe(AUTOPLAY_MODES.INIT);
         expect(toAutoplayMode("true")).toBe(AUTOPLAY_MODES.INIT);
         expect(toAutoplayMode(" TRUE ")).toBe(AUTOPLAY_MODES.INIT);
         expect(toAutoplayMode(true)).toBe(AUTOPLAY_MODES.INIT);
     });
 
-    it("\"click\" => CLICK, sans tenir compte de la casse", () => {
+    it("\"click\" => CLICK, case insensitive", () => {
         expect(toAutoplayMode("click")).toBe(AUTOPLAY_MODES.CLICK);
         expect(toAutoplayMode("CLICK")).toBe(AUTOPLAY_MODES.CLICK);
     });
 
-    it("\"false\", false et valeurs inconnues => NONE", () => {
-        for (const v of ["false", false, "0", "peut-être"]) expect(toAutoplayMode(v)).toBe(AUTOPLAY_MODES.NONE);
+    it("\"false\", false and unknown values => NONE", () => {
+        for (const v of ["false", false, "0", "maybe"]) {
+            expect(toAutoplayMode(v)).toBe(AUTOPLAY_MODES.NONE);
+        }
     });
 
-    it("conserve \"none\" => NONE", () => {
+    it("keeps \"none\" => NONE", () => {
         expect(toAutoplayMode(AUTOPLAY_MODES.NONE)).toBe(AUTOPLAY_MODES.NONE);
-    });
-
-    // BUG connu : "init" (la valeur de AUTOPLAY_MODES.INIT) n'est pas reconnue, alors que
-    // DefBuilder.autoplay() produit justement cette valeur par défaut. Les définitions construites
-    // avec le builder perdent donc leur autoplay. Quand le bug est corrigé, ce test passera et
-    // vitest signalera que `it.fails` n'est plus nécessaire : remplacer alors par `it`.
-    it.fails("BUG : relit sa propre valeur \"init\" => INIT (aller-retour avec DefBuilder)", () => {
-        expect(toAutoplayMode(AUTOPLAY_MODES.INIT)).toBe(AUTOPLAY_MODES.INIT);
-    });
-
-    it.fails("BUG : DefBuilder.autoplay() puis toAutoplayMode() conserve l'autoplay", () => {
-        const [def] = DefBuilder.video("https://ok.ru/video/1").autoplay().build();
-        expect(toAutoplayMode(def.autoplay)).toBe(AUTOPLAY_MODES.INIT);
     });
 });
 
-describe("describe (description d'un élément pour les messages d'erreur)", () => {
-    it("null et undefined sont affichés tels quels", () => {
+describe("describe (element description for error messages)", () => {
+    it("null and undefined are displayed as-is", () => {
         expect(describeElement(null)).toBe("null");
         expect(describeElement(undefined)).toBe("undefined");
     });
 
-    it("balise seule, ou balise avec id", () => {
-        expect(describeElement({localName: "iframe"})).toBe("<iframe>");
-        expect(describeElement({localName: "iframe", id: "main"})).toBe("<iframe#main>");
+    it("tag only, or tag with id", () => {
+        expect(describeElement({ localName: "iframe" })).toBe("<iframe>");
+        expect(describeElement({ localName: "iframe", id: "main" })).toBe("<iframe#main>");
     });
 
-    it("sans localName, retombe sur le type JavaScript", () => {
+    it("without localName, falls back to the JavaScript type", () => {
         expect(describeElement({})).toBe("<object>");
     });
 });

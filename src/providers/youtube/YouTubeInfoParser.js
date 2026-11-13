@@ -1,5 +1,5 @@
 import {SrcInfo, UrlInfo} from "../../models/UrlInfo.js";
-import {toAutoplayMode, toInt} from "../../utils/helpers.js";
+import {timeToSeconds, toAutoplayMode, toInt} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {PlaylistInfo} from "../../models/PlaylistInfo.js";
@@ -40,7 +40,7 @@ export class YouTubeInfoParser extends InfoParser {
             }
 
             const playlistId = p.get('list') || null;
-            const startSeconds = this.timeToSeconds(p.get('t'));
+            const startSeconds = timeToSeconds(p.get('t'));
 
             return new UrlInfo({
                 kind: playlistId ? 'playlist' : 'video',
@@ -58,8 +58,8 @@ export class YouTubeInfoParser extends InfoParser {
             if (path === '/watch') {
                 const videoId = p.get('v');
                 const playlistId = p.get('list') || null;
-                const index = this.toInt(p.get('index'));
-                const startSeconds = this.timeToSeconds(p.get('t'));
+                const index = toInt(p.get('index'));
+                const startSeconds = timeToSeconds(p.get('t'));
 
                 if (videoId && !this.isValidVideoId(videoId)) {
                     throw new Error("Invalid video ID");
@@ -101,7 +101,7 @@ export class YouTubeInfoParser extends InfoParser {
                     throw new Error("No valid video IDs");
                 }
 
-                const index = this.toInt(p.get('index'));
+                const index = toInt(p.get('index'));
 
                 return new UrlInfo({
                     kind: 'videoList',
@@ -146,10 +146,10 @@ export class YouTubeInfoParser extends InfoParser {
             ? rawPlaylist.split(',').map(id => id.trim()).filter(id => this.isValidVideoId(id))
             : null;
 
-        const startSeconds = this.toInt(p.get('start'));
-        const index = this.toInt(p.get('index'));
-        const autoplay = this.toBool01(p.get('autoplay'));
-        const mute = this.toBool01(p.get('mute'));
+        const startSeconds = toInt(p.get('start'));
+        const index = toInt(p.get('index'));
+        const autoplay = toBool01(p.get('autoplay'));
+        const mute = toBool01(p.get('mute'));
 
         let kind = null;
         if (playlistId) kind = 'playlist';
@@ -210,12 +210,12 @@ export class YouTubeInfoParser extends InfoParser {
                     target: def.target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(def.autoplay),
-                    startSeconds: this.timeToSeconds(def.start) ?? urlInfos.startSeconds,
+                    startSeconds: timeToSeconds(def.start) ?? urlInfos.startSeconds,
                     title: def.title ?? "",
                     description: def.description ?? "",
                     channel: def.channel ?? "",
                     channelUrl: def.channelUrl ?? "",
-                    duration: this.timeToSeconds(def.duration),
+                    duration: timeToSeconds(def.duration),
                     thumbnail: def.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(urlInfos.videoId),
                     showOnInit: def.showOnInit,
                     key: def.key,
@@ -224,9 +224,16 @@ export class YouTubeInfoParser extends InfoParser {
                 });
             case "videoList": {
                 const index = urlInfos.index ?? def.index;
-                const list = new VideoListInfo(
-                    "youtube", def.target, urlInfos.videoIds, index, def.showOnInit, def.key, def.extra, urlInfos.source
-                );
+                const list = new VideoListInfo({
+                    provider: "youtube",
+                    target: def.target,
+                    videoIds: urlInfos.videoIds,
+                    index,
+                    showOnInit: def.showOnInit,
+                    key: def.key,
+                    extra: def.extra,
+                    source: urlInfos.source
+                });
                 urlInfos.videoIds.forEach((videoId, i) => {
                     const v = videos[i] ?? {};
                     list.addVideo(new VideoInfo({
@@ -234,12 +241,12 @@ export class YouTubeInfoParser extends InfoParser {
                         target: def.target,
                         videoId,
                         autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),   // repli sur l'autoplay du lien (comme Okru)
-                        startSeconds: this.timeToSeconds(v.start),       // plus de def.start sur toutes les vidéos
+                        startSeconds: timeToSeconds(v.start),       // plus de def.start sur toutes les vidéos
                         title: v.title ?? "",
                         description: v.description ?? "",
                         channel: v.channel ?? "",
                         channelUrl: v.channelUrl ?? "",
-                        duration: this.timeToSeconds(v.duration),
+                        duration: timeToSeconds(v.duration),
                         thumbnail: v.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId),
                         key: v.key,
                         extra: v.extra
@@ -259,13 +266,13 @@ export class YouTubeInfoParser extends InfoParser {
                         target: def.target,
                         videoId: v.videoId,
                         autoplay: toAutoplayMode(v.autoplay),
-                        startSeconds: this.timeToSeconds(v.start),
+                        startSeconds: timeToSeconds(v.start),
                         title: v.title ?? "",
                         description: v.description ?? "",
                         channel: v.channel ?? "",
                         channelUrl: v.channelUrl ?? "",
                         thumbnail: v.thumbnail ?? (v.videoId ? this.#thumbnailUrlBuilder.getThumbnailUrl(v.videoId) : ""),
-                        duration: this.timeToSeconds(v.duration),
+                        duration: timeToSeconds(v.duration),
                         key: v.key,
                         extra: v.extra
                     }));

@@ -131,32 +131,54 @@ describe("PlaylistInfo", () => {
 });
 
 describe("VideoListInfo", () => {
-    const creer = (ids = ["a", "b", "c"], ...args) => new VideoListInfo("youtube", "player", ids, ...args);
+    const creer = (overrides = {}) =>
+        new VideoListInfo({
+            provider: "youtube",
+            target: "player",
+            videoIds: ["a", "b", "c"],
+            ...overrides,
+        });
 
     it("exige provider et target", () => {
-        expect(() => new VideoListInfo("", "player", ["a"])).toThrow();
-        expect(() => new VideoListInfo("youtube", undefined, ["a"])).toThrow();
+        expect(() => new VideoListInfo({ provider: "", target: "player", videoIds: ["a"] })).toThrow();
+        expect(() => new VideoListInfo({ provider: "youtube", target: undefined, videoIds: ["a"] })).toThrow();
     });
 
     it("lève une erreur quand videoIds n'est pas fourni", () => {
-        expect(() => new VideoListInfo("youtube", "player", undefined)).toThrow();
+        // Currently throws because of [...videoIds] when videoIds is undefined
+        expect(() => new VideoListInfo({ provider: "youtube", target: "player" })).toThrow();
+        expect(() => new VideoListInfo({ provider: "youtube", target: "player", videoIds: undefined })).toThrow();
     });
 
-    it("est une playlist, avec les valeurs passées en position", () => {
-        const l = creer(["a", "b"], 1, true, "cle", "extra", "https://src");
+    it("est une playlist, avec les valeurs passées", () => {
+        const l = creer({
+            videoIds: ["a", "b"],
+            index: 1,
+            showOnInit: true,
+            key: "cle",
+            extra: "extra",
+            source: "https://src",
+        });
+
         expect(l).toMatchObject({
-            isPlaylist: true, provider: "youtube", target: "player", index: 1,
-            showOnInit: true, key: "cle", extra: "extra", source: "https://src"
+            isPlaylist: true,
+            provider: "youtube",
+            target: "player",
+            index: 1,
+            showOnInit: true,
+            key: "cle",
+            extra: "extra",
+            source: "https://src",
         });
     });
 
     it("clé par défaut = provider:list:id1,id2,...", () => {
-        expect(creer(["a", "b"]).key).toBe("youtube:list:a,b");
+        expect(creer({ videoIds: ["a", "b"] }).key).toBe("youtube:list:a,b");
     });
 
     it("copie les ids : modifier le tableau d'origine ne change pas la liste", () => {
         const ids = ["a", "b"];
-        const l = creer(ids);
+        const l = creer({ videoIds: ids });
         ids.push("c");
         expect(l.videoIds).toEqual(["a", "b"]);
     });
@@ -170,9 +192,9 @@ describe("VideoListInfo", () => {
 
     it("addVideo / setVideos fonctionnent comme pour PlaylistInfo", () => {
         const l = creer();
-        l.addVideo({videoId: "a"});
+        l.addVideo({ videoId: "a" });
         expect(l.videos).toHaveLength(1);
-        l.setVideos([{videoId: "b"}, {videoId: "c"}]);
+        l.setVideos([{ videoId: "b" }, { videoId: "c" }]);
         expect(l.videos.map((v) => v.videoId)).toEqual(["b", "c"]);
     });
 });
