@@ -1,5 +1,5 @@
 import {SrcInfo, UrlInfo} from "../../models/UrlInfo.js";
-import {timeToSeconds, toAutoplayMode, toInt} from "../../utils/helpers.js";
+import {timeToSeconds, toAutoplayMode, toInt,toBool01} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {PlaylistInfo} from "../../models/PlaylistInfo.js";

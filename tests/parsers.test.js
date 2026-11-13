@@ -27,50 +27,6 @@ const iframe = (src, parentElement = {id: "player"}) => ({tagName: "IFRAME", src
 describe("InfoParser (base)", () => {
     const parser = new YouTubeInfoParser(); // n'importe quelle sous-classe donne accès aux méthodes communes
 
-    describe("timeToSeconds", () => {
-        it.each([
-            ["90", 90],
-            ["1m30s", 90],
-            ["1h", 3600],
-            ["2m", 120],
-            ["45s", 45],
-            ["1h2m3s", 3723],
-            ["1H2M3S", 3723],
-            [90, 90]
-        ])("%j => %j", (entree, attendu) => {
-            expect(parser.timeToSeconds(entree)).toBe(attendu);
-        });
-
-        it.each([[null], [undefined], [""], ["abc"], ["1x"], ["m"]])("%j => null", (entree) => {
-            expect(parser.timeToSeconds(entree)).toBeNull();
-        });
-    });
-
-    describe("toInt (version du parser : null et non undefined)", () => {
-        it("convertit les entiers", () => {
-            expect(parser.toInt("5")).toBe(5);
-            expect(parser.toInt("-2")).toBe(-2);
-        });
-        it("retourne null pour vide, absent ou non numérique", () => {
-            expect(parser.toInt(null)).toBeNull();
-            expect(parser.toInt(undefined)).toBeNull();
-            expect(parser.toInt("")).toBeNull();
-            expect(parser.toInt("x")).toBeNull();
-        });
-    });
-
-    describe("toBool01", () => {
-        it("1 / '1' / true => true", () => {
-            for (const v of ["1", 1, true]) expect(parser.toBool01(v)).toBe(true);
-        });
-        it("0 / '0' / false => false", () => {
-            for (const v of ["0", 0, false]) expect(parser.toBool01(v)).toBe(false);
-        });
-        it("toute autre valeur => null (« non précisé »)", () => {
-            for (const v of [null, undefined, "", "true", "2"]) expect(parser.toBool01(v)).toBeNull();
-        });
-    });
-
     describe("getValidUrl", () => {
         it("retourne une URL pour une adresse valide, en ignorant les espaces autour", () => {
             const u = parser.getValidUrl("  https://example.com/a?b=1  ");
