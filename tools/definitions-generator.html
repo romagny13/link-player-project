@@ -392,7 +392,7 @@ ${withControls ? controlsHtml(groups) + "\n" : ""}    <div id="${esc(target)}" c
 
         ${indent(header, 8)}
 
-        // definitions: array of { provider, target, videoId, title, channel, thumbnail, duration }
+        // definitions: array of { providers, target, videoId, title, channel, thumbnail, duration }
         const definitions = ${indent(definitions, 8)};
 
         const lp = new LinkPlayer({ definitions });
@@ -513,7 +513,7 @@ ${withControls ? controlsJs(groups, target) : ""}    <\/script>
         status.className = "ok";
         status.textContent = `${provider === "youtube" ? "YouTube" : "Ok.ru"} · ${vids.length} video${vids.length > 1 ? "s" : ""}`;
         $("ytNote").hidden = provider !== "youtube";
-        $("sort").value = provider === "youtube" ? "source" : "alpha"; // default sort per provider
+        $("sort").value = provider === "youtube" ? "source" : "alpha"; // default sort per providers
         $("pid").value = r.playlistId;
         $("step2").hidden = $("step3").hidden = false;
         syncMode();

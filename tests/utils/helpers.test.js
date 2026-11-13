@@ -10,7 +10,7 @@ import {
     toBool01,
     toInt,
     toNumber,
-} from "../src/utils/helpers.js";
+} from "../../src/utils/helpers.js";
 
 // Note: the `describe` import from helpers is renamed to `describeElement`
 // to avoid colliding with vitest's `describe`.

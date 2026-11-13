@@ -1,9 +1,9 @@
+import {InfoParser} from "../InfoParser.js";
 import {SrcInfo, UrlInfo} from "../../models/UrlInfo.js";
-import {timeToSeconds, toAutoplayMode, toInt,toBool01} from "../../utils/helpers.js";
+import {timeToSeconds, toAutoplayMode, toInt, toBool01} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {PlaylistInfo} from "../../models/PlaylistInfo.js";
-import {InfoParser} from "../InfoParser.js";
 import {YouTubeThumbnailUrlBuilder} from "./YouTubeThumbnailUrlBuilder.js";
 
 export class YouTubeInfoParser extends InfoParser {
@@ -52,7 +52,7 @@ export class YouTubeInfoParser extends InfoParser {
         }
 
         // ---------- youtube.com family ----------
-        if (host.endsWith('youtube.com')) {
+        if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
 
             // /watch
             if (path === '/watch') {
@@ -123,7 +123,7 @@ export class YouTubeInfoParser extends InfoParser {
         let host = u.hostname.toLowerCase();
         if (host.startsWith('www.')) host = host.slice(4);
 
-        if (!host.endsWith('youtube.com') && host !== 'youtube-nocookie.com') {
+        if (host !== 'youtube.com' && !host.endsWith('.youtube.com') && host !== 'youtube-nocookie.com') {
             throw new Error("Invalid embed host");
         }
 
@@ -188,15 +188,29 @@ export class YouTubeInfoParser extends InfoParser {
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(urlInfos.autoplay),
                     startSeconds: urlInfos.startSeconds,
-                    // showOnInit: true, // ??
-                    source: urlInfos.source
+                    source: {url: urlInfos.source, element: frame}
+                });
+            case "videoList":
+                return new VideoListInfo({
+                    provider: "youtube",
+                    target,
+                    videoId: urlInfos.videoId,
+                    videoIds: urlInfos.videoIds,
+                    index: urlInfos.index,
+                    source: {url: urlInfos.source, element: frame}
                 });
             case "playlist":
-                return new PlaylistInfo("youtube", target, urlInfos.playlistId, urlInfos.videoId, null, null, null, urlInfos.source);
+                return new PlaylistInfo({
+                    provider: "youtube",
+                    target,
+                    playlistId: urlInfos.playlistId,
+                    videoId: urlInfos.videoId,
+                    source: {url: urlInfos.source, element: frame}
+                });
         }
     }
 
-    parseDefinition(def) {
+    parseDefinition(def, element) {
         const urlInfos = this.parseUrl(def.url);
         if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
 
@@ -220,7 +234,7 @@ export class YouTubeInfoParser extends InfoParser {
                     showOnInit: def.showOnInit,
                     key: def.key,
                     extra: def.extra,
-                    source: urlInfos.source
+                    source: {url: urlInfos.source, element}
                 });
             case "videoList": {
                 const index = urlInfos.index ?? def.index;
@@ -230,9 +244,10 @@ export class YouTubeInfoParser extends InfoParser {
                     videoIds: urlInfos.videoIds,
                     index,
                     showOnInit: def.showOnInit,
+                    autoplay: toAutoplayMode(def.autoplay),
                     key: def.key,
                     extra: def.extra,
-                    source: urlInfos.source
+                    source: {url: urlInfos.source, element}
                 });
                 urlInfos.videoIds.forEach((videoId, i) => {
                     const v = videos[i] ?? {};
@@ -255,9 +270,17 @@ export class YouTubeInfoParser extends InfoParser {
                 return list;
             }
             case "playlist": {
-                const playlist = new PlaylistInfo(
-                    "youtube", def.target, urlInfos.playlistId, urlInfos.videoId, def.showOnInit, def.key, def.extra, urlInfos.source
-                );
+                const playlist = new PlaylistInfo({
+                    provider: "youtube",
+                    target: def.target,
+                    playlistId: urlInfos.playlistId,
+                    videoId: urlInfos.videoId,
+                    showOnInit: def.showOnInit,
+                    autoplay: toAutoplayMode(def.autoplay),
+                    key: def.key,
+                    extra: def.extra,
+                    source: {url: urlInfos.source, element}
+                });
                 const items = videos.length ? videos : [];
 
                 items.forEach((v, i) => {

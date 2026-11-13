@@ -131,19 +131,20 @@
         useStorage: true,
         currentBehavior: "toggle",
         tooltip: true,
-        tooltipRenderer: new SimpleTipRenderer(),
-        itemRenderer: new GoldItemRenderer(),
+        // tooltipRenderer: new SimpleTipRenderer(),
+        // itemRenderer: new GoldItemRenderer(),
         youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
         fallbackTitle: (i) => `Épisode ${i + 1}`,
     });
 
     // Scoped player (dans #scoped-zone) – pas de tooltip
-    // const scopedLp = new LinkPlayer({
-    //     scope: "scoped-zone",
-    //     tooltip: false,
-    //     useStorage: true,
-    //     currentBehavior: "skip",
-    // });
+    const scopedLp = new LinkPlayer({
+        scope: "scoped-zone",
+        tooltip: false,
+        useStorage: true,
+        currentBehavior: "skip",
+        youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
+    });
 </script>
 </body>
 </html>

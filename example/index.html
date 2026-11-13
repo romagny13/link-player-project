@@ -416,7 +416,8 @@
         status.className = "status";
         host.append(status);
 
-        const refresh = () => {
+        const refresh = (p) => {
+            console.log("change", p);
             for (const b of buttons) b.disabled = b.dataset.can ? !region[b.dataset.can] : false;
             const cur = region.current;
             status.textContent = cur

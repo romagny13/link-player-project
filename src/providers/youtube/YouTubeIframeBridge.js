@@ -153,8 +153,6 @@ export class YouTubeIframeBridge {
             });
         }
 
-        if (info.playlistIndex != null)
-            console.log("playlistIndexChanged => ", info?.playlistIndex);
         if (info.playlistIndex != null && info.playlistIndex !== this.#lastIndex) {
             this.#lastIndex = info.playlistIndex;
             this.#emit({

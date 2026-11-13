@@ -7,6 +7,7 @@ export class VideoListInfo {
     #videoIds;
     #index;
     #showOnInit;
+    #autoplay;
     #videos = [];
     #extra;
     #source;
@@ -17,6 +18,7 @@ export class VideoListInfo {
                     videoIds,
                     index,
                     showOnInit,
+                    autoplay,
                     key,
                     extra,
                     source
@@ -29,6 +31,7 @@ export class VideoListInfo {
         this.#videoIds = videoIds;
         this.#index = index;
         this.#showOnInit = showOnInit;
+        this.#autoplay = autoplay;
         this.#videoIds = [...videoIds];
         this.#extra = extra;
         this.#source = source;
@@ -62,6 +65,10 @@ export class VideoListInfo {
 
     get showOnInit() {
         return this.#showOnInit;
+    }
+
+    get autoplay() {
+        return this.#autoplay;
     }
 
     get videos() {

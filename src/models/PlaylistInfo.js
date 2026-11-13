@@ -7,20 +7,22 @@ export class PlaylistInfo {
     #playlistId;
     #videoId;
     #showOnInit;
+    #autoplay;
     #videos = [];
     #extra;
     #source;
 
-    constructor(
-        provider,
-        target,
-        playlistId,
-        videoId,
-        showOnInit,
-        key,
-        extra,
-        source
-    ) {
+    constructor({
+                    provider,
+                    target,
+                    playlistId,
+                    videoId,
+                    showOnInit,
+                    autoplay,
+                    key,
+                    extra,
+                    source
+                }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
         ValueChecks.requireNotNullOrEmpty(target, "target");
         ValueChecks.requireNotNullOrEmpty(playlistId, "playlistId");
@@ -30,6 +32,7 @@ export class PlaylistInfo {
         this.#playlistId = playlistId;
         this.#videoId = videoId;
         this.#showOnInit = showOnInit;
+        this.#autoplay = autoplay;
         this.#extra = extra;
         this.#source = source;
 
@@ -66,6 +69,10 @@ export class PlaylistInfo {
 
     get showOnInit() {
         return this.#showOnInit;
+    }
+
+    get autoplay() {
+        return this.#autoplay;
     }
 
     get extra() {

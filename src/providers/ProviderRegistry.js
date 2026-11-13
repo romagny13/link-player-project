@@ -12,7 +12,7 @@ export class ProviderRegistry {
     register(provider) {
         if (!provider?.id || !Array.isArray(provider.hosts))
             throw new TypeError(
-                "register(): a provider needs an id and a hosts array"
+                "register(): a providers needs an id and a hosts array"
             );
         this.#providers.set(provider.id.toLowerCase(), provider);
         return this;

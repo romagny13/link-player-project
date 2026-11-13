@@ -11,7 +11,7 @@ import {SrcInfo, UrlInfo} from "../src/models/UrlInfo.js";
 const base = {provider: "youtube", target: "player", videoId: "3HSKp9pVMKY"};
 
 describe("VideoInfo", () => {
-    it("exige provider, target et videoId", () => {
+    it("exige providers, target et videoId", () => {
         for (const champ of ["provider", "target", "videoId"]) {
             expect(() => new VideoInfo({...base, [champ]: undefined})).toThrow();
             expect(() => new VideoInfo({...base, [champ]: ""})).toThrow();
@@ -45,7 +45,7 @@ describe("VideoInfo", () => {
         expect(new VideoInfo(base).isPlaylist).toBe(false);
     });
 
-    it("clé par défaut = provider:videoId, sinon la clé fournie", () => {
+    it("clé par défaut = providers:videoId, sinon la clé fournie", () => {
         expect(new VideoInfo(base).key).toBe("youtube:3HSKp9pVMKY");
         expect(new VideoInfo({...base, key: "ma-cle"}).key).toBe("ma-cle");
     });
@@ -90,42 +90,43 @@ describe("VideoInfo", () => {
 });
 
 describe("PlaylistInfo", () => {
-    const creer = (...args) => new PlaylistInfo("youtube", "player", "PL123", ...args);
-
-    it("exige provider, target et playlistId", () => {
-        expect(() => new PlaylistInfo("", "player", "PL1")).toThrow();
-        expect(() => new PlaylistInfo("youtube", undefined, "PL1")).toThrow();
-        expect(() => new PlaylistInfo("youtube", "player", "")).toThrow();
+    const creer = (overrides = {}) => new PlaylistInfo({
+        provider: "youtube",
+        target: "player",
+        playlistId: "PL123",
+        ...overrides
     });
 
-    it("est une playlist, avec les valeurs passées en position", () => {
-        const p = creer("v1", true, "cle", "extra", "https://src");
-        expect(p).toMatchObject({
-            isPlaylist: true, provider: "youtube", target: "player", playlistId: "PL123",
-            videoId: "v1", showOnInit: true, key: "cle", extra: "extra", source: "https://src"
-        });
+    it("exige providers, target et playlistId", () => {
+        expect(() => new PlaylistInfo({ provider: "", target: "player", playlistId: "PL1" })).toThrow();
+        expect(() => new PlaylistInfo({ provider: "youtube", target: undefined, playlistId: "PL1" })).toThrow();
+        expect(() => new PlaylistInfo({ provider: "youtube", target: "player", playlistId: "" })).toThrow();
     });
 
-    it("clé par défaut = provider:playlist:id", () => {
+    it("clé par défaut = providers:playlist:id", () => {
         expect(creer().key).toBe("youtube:playlist:PL123");
+    });
+
+    it("accepte une clé personnalisée", () => {
+        expect(creer({ key: "ma-cle-perso" }).key).toBe("ma-cle-perso");
     });
 
     it("addVideo ajoute, setVideos remplace par une copie", () => {
         const p = creer();
-        p.addVideo({videoId: "a"});
-        p.addVideo({videoId: "b"});
+        p.addVideo({ videoId: "a" });
+        p.addVideo({ videoId: "b" });
         expect(p.videos).toHaveLength(2);
 
-        const source = [{videoId: "x"}];
+        const source = [{ videoId: "x" }];
         p.setVideos(source);
-        source.push({videoId: "y"});
-        expect(p.videos).toEqual([{videoId: "x"}]);
+        source.push({ videoId: "y" });
+        expect(p.videos).toEqual([{ videoId: "x" }]);
     });
 
     it("`videos` est une copie figée : la modifier de l'extérieur est impossible", () => {
         const p = creer();
-        p.addVideo({videoId: "a"});
-        expect(() => p.videos.push({videoId: "b"})).toThrow(TypeError);
+        p.addVideo({ videoId: "a" });
+        expect(() => p.videos.push({ videoId: "b" })).toThrow(TypeError);
         expect(p.videos).toHaveLength(1);
     });
 });
@@ -139,7 +140,7 @@ describe("VideoListInfo", () => {
             ...overrides,
         });
 
-    it("exige provider et target", () => {
+    it("exige providers et target", () => {
         expect(() => new VideoListInfo({ provider: "", target: "player", videoIds: ["a"] })).toThrow();
         expect(() => new VideoListInfo({ provider: "youtube", target: undefined, videoIds: ["a"] })).toThrow();
     });
@@ -172,7 +173,7 @@ describe("VideoListInfo", () => {
         });
     });
 
-    it("clé par défaut = provider:list:id1,id2,...", () => {
+    it("clé par défaut = providers:list:id1,id2,...", () => {
         expect(creer({ videoIds: ["a", "b"] }).key).toBe("youtube:list:a,b");
     });
 

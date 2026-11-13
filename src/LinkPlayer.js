@@ -1,14 +1,15 @@
 import {resolveScope} from "./utils/dom.js";
-import {defaultStore, MemoryStore} from "./storage.js";
 import {AUTOPLAY_MODES, isTouch} from "./utils/helpers.js";
 import {Emitter} from "./utils/Emitter.js";
+import {defaultStore, MemoryStore} from "./storage.js";
+import {DefaultRegionHost} from "./DefaultRegionHost.js";
 import {Region} from "./Region.js";
 import {ProviderRegistry} from "./providers/ProviderRegistry.js";
 import {YouTubeProvider} from "./providers/youtube/YouTubeProvider.js";
 import {OkruProvider} from "./providers/okru/OkruProvider.js";
 import {YouTubeDataApi} from "./providers/youtube/YouTubeDataApi.js";
 import {YouTubeMetaResolver} from "./providers/youtube/YouTubeMetaResolver.js";
-import {applyItems} from "./metaMerge.js";
+import {applyItems, applyDefinition} from "./metaMerge.js";
 import {Tooltip} from "./ui/Tooltip.js";
 import {ThumbnailService} from "./ui/ThumbnailService.js";
 
@@ -20,6 +21,7 @@ export class LinkPlayer {
     #scopeEl;
     #isGlobal;
     #currentBehavior;
+    #boundaryBehavior;
     #useStorage;
     #scanEmbeds;
     #regions = new Map();
@@ -32,6 +34,7 @@ export class LinkPlayer {
     #thumbnails;
     #definitions;
     #youtubeMeta;
+    #youtubeMetaScope;
     #panelOptions;
     #events = new Emitter();
     #detachers = new Set();
@@ -43,9 +46,12 @@ export class LinkPlayer {
                     useStorage = true,
                     tooltip = true,
                     currentBehavior = "toggle",
+                    boundaryBehavior = "stop",
                     scanEmbeds = true,
                     youtubeApiKey = null,
                     youtubeMeta = null,
+                    youtubeMetaScope = "playlists",
+                    youtubeMetaRequired = undefined,
                     fallbackTitle = undefined,
                     okruEmbedBaseUrl = null,
                     store = null,
@@ -71,6 +77,7 @@ export class LinkPlayer {
         this.#scanEmbeds = scanEmbeds;
         this.#definitions = definitions;
         this.#currentBehavior = currentBehavior;
+        this.#boundaryBehavior = boundaryBehavior;
 
         this.#store = store ?? (useStorage ? defaultStore() : new MemoryStore());
         this.#registry =
@@ -95,15 +102,19 @@ export class LinkPlayer {
 
         this.#thumbnails = thumbnails ?? new ThumbnailService();
         this.#tooltip = tooltip && !isTouch() ? new Tooltip(tooltipRenderer) : null;
+
+        if (youtubeMetaScope !== "playlists" && youtubeMetaScope !== "all")
+            throw new TypeError(`Invalid youtubeMetaScope '${youtubeMetaScope}': expected "playlists" or "all".`);
+        this.#youtubeMetaScope = youtubeMetaScope;
         this.#youtubeMeta =
             youtubeMeta ??
             new YouTubeMetaResolver({
-                api: youtubeApiKey
-                    ? new YouTubeDataApi({apiKey: youtubeApiKey})
-                    : null,
+                api: youtubeApiKey ? new YouTubeDataApi({apiKey: youtubeApiKey}) : null,
                 cache: this.#store,
-                fallbackTitle
+                fallbackTitle,
+                required: youtubeMetaRequired
             });
+
         this.#panelOptions = {
             panelRenderer,
             itemRenderer,
@@ -168,7 +179,8 @@ export class LinkPlayer {
             target,
             registry: this.#registry,
             currentBehavior: this.#currentBehavior,
-            resolveMeta: (info) => this.#enrich(info),
+            boundaryBehavior: this.#boundaryBehavior,
+            resolveMeta: (info, options) => this.#enrich(info, options),
             thumbnails: this.#thumbnails,
             ...this.#panelOptions
         });
@@ -204,9 +216,13 @@ export class LinkPlayer {
             const provider = def.url
                 ? this.#registry.resolve(def.url)
                 : this.#registry.get(def.provider);
+
+            if (!def.target && this.#defaultTarget)
+                def.target = this.#defaultTarget;
+
             const info = provider.getInfoFromDefinition(def);
 
-            const target = def.target;
+            let target = def.target ||= this.#defaultTarget;
             if (!target) throw new Error(`Target is required for definition at index ${index} (definition: ${JSON.stringify(def)}).`);
 
             const region = this.getRegion(target);
@@ -298,7 +314,7 @@ export class LinkPlayer {
         try {
             provider = this.#registry.resolve(src);
         } catch {
-            return; // an iframe that is not an embed of a known provider: not our business
+            return; // an iframe that is not an embed of a known providers: not our business
         }
         if (!provider) return;
 
@@ -315,13 +331,16 @@ export class LinkPlayer {
         element.dataset.lp = this.#id;
     }
 
-    /** Completes the items of a playlist; called by the region the first time the playlist is shown. */
-    async #enrich(info) {
+    async #enrich(info, {force = false} = {}) {
         if (info.provider !== "youtube") return false;
-        const items = await this.#youtubeMeta.resolve(info);
+        if (!info.isPlaylist && !force && this.#youtubeMetaScope !== "all") return false;
+        const items = await this.#youtubeMeta.resolve(info, {force});
         if (!items?.length) return false;
-        applyItems(info, items);
-        return true;
+        if (info.isPlaylist) {
+            applyItems(info, items);
+            return true;
+        }
+        return applyDefinition(info, items[0]);
     }
 
     /** The region events already carry `info` and `data`. */
@@ -338,12 +357,10 @@ export class LinkPlayer {
 
     #init(region) {
         const saved = this.getSavedState(region);
-        const restored = saved && region.get(saved.key);
-        if (restored)
-            return region.navigate(restored.key, {index: saved.index ?? 0});
+        if (saved && region.restore(saved.key, {index: saved.index ?? 0})) return;
 
         const first = region.infos.find((info) => info.showOnInit);
-        if (first) {
+        if (first && !region.isCurrent(first.key)) {
             region.navigate(first.key, {
                 autoplay: first.autoplay === AUTOPLAY_MODES.INIT,
                 index: first.index
@@ -374,132 +391,4 @@ export class LinkPlayer {
 function describe(el) {
     if (!el) return String(el);
     return `<${el.localName ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
-}
-
-
-/**
- * Discovers links, target containers and frames in a root and reports the NEW ones.
- * No observer: discovery happens when discoverAll() is called (LinkPlayer.scan()), and what is
- * not found yet (a container created later...) is looked up again on the next call.
- */
-export class DefaultRegionHost {
-    #registeredLinks = new Map();   // element -> url
-    #registeredTargets = new Map(); // target id -> container
-    #registeredFrames = new Set();
-    #defaultTarget = null;
-    #root = null;
-    #onLinkDiscovered = null;
-    #onFrameDiscovered = null;
-    #onTargetDiscovered = null
-
-    init({root, onLinkDiscovered = null, onFrameDiscovered = null, onTargetDiscovered = null}) {
-        this.#root = root ?? document;
-        this.#onLinkDiscovered = onLinkDiscovered;
-        this.#onFrameDiscovered = onFrameDiscovered;
-        this.#onTargetDiscovered = onTargetDiscovered;
-    }
-
-    get links() {
-        return Object.freeze([...this.#registeredLinks.keys()]);
-    }
-
-    get targets() {
-        return Object.freeze([...this.#registeredTargets]);
-    }
-
-    get frames() {
-        return Object.freeze([...this.#registeredFrames]);
-    }
-
-    get defaultTarget() {
-        return this.#defaultTarget;
-    }
-
-    setDefaultTarget(target) {
-        this.#defaultTarget = target;
-    }
-
-    discoverAll() {
-        this.discoverLinks();
-        this.discoverTargets();
-        this.discoverFrames();
-    }
-
-    discoverLinks() {
-        this.#forget(this.#registeredLinks.keys(), (el) => this.#registeredLinks.delete(el));
-
-        const linkElements = this.#root.querySelectorAll("[data-link]");
-        const newLinks = [];
-
-        for (const element of linkElements) {
-            const href = element.tagName === "A" ? element.href : element.dataset.url;
-
-            // keyed by element: two links to the same url are two links
-            if (href && !this.#registeredLinks.has(element)) {
-                this.#registeredLinks.set(element, href);
-                newLinks.push(element);
-            }
-        }
-
-        if (newLinks.length > 0) this.#onLinkDiscovered?.(newLinks);
-    }
-
-    discoverTargets() {
-        const wanted = new Set();
-        if (this.#defaultTarget) wanted.add(this.#defaultTarget);
-        for (const link of this.#registeredLinks.keys()) {
-            const target = link.dataset.target || this.#defaultTarget; // the element is not modified
-            if (target) wanted.add(target);
-        }
-
-        const newTargets = new Map();
-        for (const target of wanted) {
-            const known = this.#registeredTargets.get(target);
-            if (known?.isConnected) continue;
-
-            const container = this.#findById(target);
-            if (container && container !== known) {
-                this.#registeredTargets.set(target, container);
-                newTargets.set(target, container);
-            }
-        }
-        if (newTargets.size > 0) this.#onTargetDiscovered?.(newTargets);
-    }
-
-    discoverFrames() {
-        this.#forget(this.#registeredFrames, (el) => this.#registeredFrames.delete(el));
-
-        const frameElements = this.#root.querySelectorAll("iframe");
-        const newFrames = [];
-
-        for (const element of frameElements) {
-            if (!this.#registeredFrames.has(element)) {
-                this.#registeredFrames.add(element);
-                newFrames.push(element);
-            }
-        }
-
-        if (newFrames.length > 0) this.#onFrameDiscovered?.(newFrames);
-    }
-
-    clear() {
-        this.#registeredLinks.clear();
-        this.#registeredTargets.clear();
-        this.#registeredFrames.clear();
-        this.#defaultTarget = null;
-    }
-
-    // ───────── internals ─────────
-
-    /** Elements removed from the page are forgotten, so they are discovered again if they come back. */
-    #forget(elements, remove) {
-        for (const el of [...elements]) if (!el.isConnected) remove(el);
-    }
-
-    /** `getElementById` only exists on a document / shadow root; a scope is an element. */
-    #findById(id) {
-        return typeof this.#root.getElementById === "function"
-            ? this.#root.getElementById(id)
-            : this.#root.querySelector(`#${CSS.escape(id)}`);
-    }
 }

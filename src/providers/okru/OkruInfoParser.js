@@ -1,8 +1,8 @@
-import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
+import {InfoParser} from "../InfoParser.js";
 import {timeToSeconds, toAutoplayMode, toBool01, toInt} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
-import {InfoParser} from "../InfoParser.js";
+import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
 
 export class OkruInfoParser extends InfoParser {
 
@@ -102,7 +102,7 @@ export class OkruInfoParser extends InfoParser {
                     target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(urlInfos.autoplay),
-                    source: urlInfos.source
+                    source: {url: urlInfos.source, element: frame}
                 });
         }
     }
@@ -118,7 +118,7 @@ export class OkruInfoParser extends InfoParser {
         return `https://ok.ru/video/${id}`;
     }
 
-    parseDefinition(def) {
+    parseDefinition(def, element) {
         const urlInfos = this.parseUrl(def.url);
         if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
 
@@ -142,7 +142,7 @@ export class OkruInfoParser extends InfoParser {
                     showOnInit: def.showOnInit,
                     key: def.key,
                     extra: def.extra,
-                    source: def.url
+                    source: {url: def.url, element}
                 });
             case "videoList": {
                 const labels = urlInfos.labels;
@@ -160,9 +160,10 @@ export class OkruInfoParser extends InfoParser {
                     videoIds,
                     index,
                     showOnInit: def.showOnInit,
+                    autoplay: toAutoplayMode(def.autoplay),
                     key: def.key,
                     extra: def.extra,
-                    source: def.url
+                    source: {url: def.url, element}
                 });
 
                 videoIds.forEach((videoId, i) => {

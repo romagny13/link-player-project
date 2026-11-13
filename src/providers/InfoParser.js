@@ -54,14 +54,14 @@ export class InfoParser {
     parseFromLink(link) {
         const url = this.getUrl(link);
         if (!url) throw new Error(`No URL found for element '${link}'`);
-        return this.parseDefinition({url, ...this.readLinkData(link)});
+        return this.parseDefinition({url, ...this.readLinkData(link)}, link);
     }
 
     parseFromFrame(frame){
         throw new Error("parseFromFrame() must be implemented");
     }
 
-    parseDefinition(def) {
+    parseDefinition(def, element) {
         throw new Error("parseDefinition() must be implemented");
     }
 

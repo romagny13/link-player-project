@@ -1,12 +1,12 @@
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {YouTubeInfoParser} from "../src/providers/youtube/YouTubeInfoParser.js";
-import {OkruInfoParser} from "../src/providers/okru/OkruInfoParser.js";
-import {InfoParser} from "../src/providers/InfoParser.js";
-import {VideoInfo} from "../src/models/VideoInfo.js";
-import {VideoListInfo} from "../src/models/VideoListInfo.js";
-import {PlaylistInfo} from "../src/models/PlaylistInfo.js";
-import {SrcInfo, UrlInfo} from "../src/models/UrlInfo.js";
-import {AUTOPLAY_MODES} from "../src/utils/helpers.js";
+import {YouTubeInfoParser} from "../../src/providers/youtube/YouTubeInfoParser.js";
+import {OkruInfoParser} from "../../src/providers/okru/OkruInfoParser.js";
+import {InfoParser} from "../../src/providers/InfoParser.js";
+import {VideoInfo} from "../../src/models/VideoInfo.js";
+import {VideoListInfo} from "../../src/models/VideoListInfo.js";
+import {PlaylistInfo} from "../../src/models/PlaylistInfo.js";
+import {SrcInfo, UrlInfo} from "../../src/models/UrlInfo.js";
+import {AUTOPLAY_MODES} from "../../src/utils/helpers.js";
 
 // ───────────────────────── outils ─────────────────────────
 // Pas de DOM nécessaire : de simples objets suffisent à simuler les éléments.
@@ -17,10 +17,16 @@ const V3 = "p8yXdbwFNgc";
 
 const lien = (href, dataset = {}) => ({tagName: "A", href, dataset});
 const iframe = (src, parentElement = {id: "player"}) => ({tagName: "IFRAME", src, parentElement, dataset: {}});
+const expectSource = (info, url, element = undefined) => {
+    expect(info.source).toEqual(expect.objectContaining({
+        url,
+        ...(element !== undefined ? { element } : {})
+    }));
+};
 
-// Les BUG ci-dessous sont écrits avec `it.fails` : le test décrit le comportement CORRECT et
+// Les BUG ci-dessous sont écrits avec `it` : le test décrit le comportement CORRECT et
 // « échoue » tant que le bug existe (la suite reste verte). Une fois le bug corrigé, vitest
-// indiquera que le test passe : remplacer alors `it.fails` par `it`.
+// indiquera que le test passe : remplacer alors `it` par `it`.
 
 // ═════════════════════ InfoParser (classe de base) ═════════════════════
 
@@ -207,7 +213,7 @@ describe("YouTubeInfoParser", () => {
             expect(() => parser.parseUrl(`https://www.youtube.com/shorts/${V1}`)).toThrow(/Unsupported YouTube URL/);
         });
 
-        it.fails("BUG : refuse un faux domaine qui se termine par « youtube.com » (evilyoutube.com)", () => {
+        it("refuse un faux domaine qui se termine par « youtube.com » (evilyoutube.com)", () => {
             expect(() => parser.parseUrl(`https://evilyoutube.com/watch?v=${V1}`)).toThrow();
         });
     });
@@ -273,7 +279,7 @@ describe("YouTubeInfoParser", () => {
             expect(() => parser.parseSrc("https://www.youtube.com/embed/trop-court")).toThrow(/Invalid embed URL/);
         });
 
-        it.fails("BUG : refuse un faux domaine qui se termine par « youtube.com »", () => {
+        it("refuse un faux domaine qui se termine par « youtube.com »", () => {
             expect(() => parser.parseSrc(`https://evilyoutube.com/embed/${V1}`)).toThrow();
         });
     });
@@ -292,13 +298,19 @@ describe("YouTubeInfoParser", () => {
         });
 
         it("vidéo seule => VideoInfo YouTube dont la cible est l'id du parent", () => {
-            const info = parser.parseFromFrame(iframe(`https://www.youtube.com/embed/${V1}?start=30&autoplay=1`, {id: "zone"}));
+            const frame = iframe(`https://www.youtube.com/embed/${V1}?start=30&autoplay=1`, {id: "zone"});
+            const info = parser.parseFromFrame(frame);
+
             expect(info).toBeInstanceOf(VideoInfo);
             expect(info).toMatchObject({
-                provider: "youtube", target: "zone", videoId: V1,
-                autoplay: AUTOPLAY_MODES.INIT, startSeconds: 30
+                provider: "youtube",
+                target: "zone",
+                videoId: V1,
+                autoplay: AUTOPLAY_MODES.INIT,
+                startSeconds: 30
             });
-            expect(info.source).toContain(`/embed/${V1}`);
+            expect(info.source.url).toContain(`/embed/${V1}`);
+            expect(info.source.element).toBe(frame);   // si tu le renseignes
         });
 
         it("autoplay absent ou à 0 => NONE", () => {
@@ -316,17 +328,13 @@ describe("YouTubeInfoParser", () => {
             parser.parseFromFrame(iframe(`https://www.youtube.com/embed/${V1}`, avecId));
             expect(avecId.id).toBe("existant");
         });
-
-        // BUG : le `switch` ne traite que "video". Pour "videoList" et "playlist" la fonction
-        // retombe sur `undefined` (le `case "playlist":` est vide, sans `default`), alors que c'est
-        // le cas principal d'une iframe avec ?playlist=... ou ?list=...
-        it.fails("BUG : iframe avec ?playlist=a,b,c => VideoListInfo (et non undefined)", () => {
+        it("iframe avec ?playlist=a,b,c => VideoListInfo (et non undefined)", () => {
             const info = parser.parseFromFrame(iframe(`https://www.youtube.com/embed/${V1}?playlist=${V1},${V2},${V3}`));
             expect(info).toBeInstanceOf(VideoListInfo);
             expect(info.videoIds).toEqual([V1, V2, V3]);
         });
 
-        it.fails("BUG : iframe avec ?list=PL => PlaylistInfo (et non undefined)", () => {
+        it("iframe avec ?list=PL => PlaylistInfo (et non undefined)", () => {
             const info = parser.parseFromFrame(iframe("https://www.youtube.com/embed/videoseries?list=PL1"));
             expect(info).toBeInstanceOf(PlaylistInfo);
             expect(info.playlistId).toBe("PL1");
@@ -342,11 +350,24 @@ describe("YouTubeInfoParser", () => {
                 autoplay: "click", start: "1m", title: "T", description: "D", channel: "C",
                 channelUrl: "U", duration: "2m", showOnInit: true, key: "k", extra: "x"
             }));
+
             expect(info).toBeInstanceOf(VideoInfo);
             expect(info).toMatchObject({
-                provider: "youtube", target: "player", videoId: V1, autoplay: AUTOPLAY_MODES.CLICK,
-                startSeconds: 60, title: "T", description: "D", channel: "C", channelUrl: "U",
-                duration: 120, thumbnail: `miniature:${V1}`, showOnInit: true, key: "k", extra: "x", source: url
+                provider: "youtube",
+                target: "player",
+                videoId: V1,
+                autoplay: AUTOPLAY_MODES.CLICK,
+                startSeconds: 60,
+                title: "T",
+                description: "D",
+                channel: "C",
+                channelUrl: "U",
+                duration: 120,
+                thumbnail: `miniature:${V1}`,
+                showOnInit: true,
+                key: "k",
+                extra: "x",
+                source: expect.objectContaining({ url })
             });
         });
 
@@ -423,49 +444,57 @@ describe("YouTubeInfoParser", () => {
             expect(() => parser.parseDefinition(def("nope"))).toThrow();
         });
 
-        // BUG : `new VideoListInfo(..., def.key, urlInfos.source)` : le constructeur attend
+        // `new VideoListInfo(..., def.key, urlInfos.source)` : le constructeur attend
         // (..., key, extra, source). L'URL arrive donc dans `extra`, `source` reste vide et
         // def.extra est perdu. Même chose pour PlaylistInfo (et pour OkruInfoParser).
-        it.fails("BUG : VideoListInfo.source contient l'URL d'origine", () => {
+        it("VideoListInfo.source contient l'URL d'origine", () => {
             const url = `https://www.youtube.com/watch_videos?video_ids=${V1},${V2}`;
-            expect(parser.parseDefinition(def(url)).source).toBe(url);
+            expect(parser.parseDefinition(def(url)).source.url).toBe(url);
         });
 
-        it.fails("BUG : VideoListInfo.extra reprend def.extra", () => {
+        it("VideoListInfo.extra reprend def.extra", () => {
             const url = `https://www.youtube.com/watch_videos?video_ids=${V1},${V2}`;
             expect(parser.parseDefinition(def(url, {extra: "mon extra"})).extra).toBe("mon extra");
         });
 
-        it.fails("BUG : PlaylistInfo.source contient l'URL d'origine", () => {
+        it("PlaylistInfo.source contient l'URL d'origine", () => {
             const url = "https://www.youtube.com/watch?list=PL1";
-            expect(parser.parseDefinition(def(url)).source).toBe(url);
+            expect(parser.parseDefinition(def(url)).source.url).toBe(url);
         });
 
-        it.fails("BUG : PlaylistInfo.extra reprend def.extra", () => {
+        it("PlaylistInfo.extra reprend def.extra", () => {
             expect(parser.parseDefinition(def("https://www.youtube.com/watch?list=PL1", {extra: "mon extra"})).extra).toBe("mon extra");
         });
 
-        // BUG : l'autoplay du lien n'est pas conservé sur la liste / la playlist elle-même, seulement
+        // l'autoplay du lien n'est pas conservé sur la liste / la playlist elle-même, seulement
         // sur les vidéos d'une liste. Or LinkPlayer lit `info.autoplay` : il vaut undefined, donc
         // l'autoplay au clic ou à l'init ne fonctionne jamais pour une liste ou une playlist.
-        it.fails("BUG : une liste de vidéos conserve l'autoplay du lien", () => {
+        it("une liste de vidéos conserve l'autoplay du lien", () => {
             const url = `https://www.youtube.com/watch_videos?video_ids=${V1},${V2}`;
             expect(parser.parseDefinition(def(url, {autoplay: "true"})).autoplay).toBe(AUTOPLAY_MODES.INIT);
         });
 
-        it.fails("BUG : une playlist conserve l'autoplay du lien", () => {
+        it("une playlist conserve l'autoplay du lien", () => {
             expect(parser.parseDefinition(def("https://www.youtube.com/watch?list=PL1", {autoplay: "true"})).autoplay).toBe(AUTOPLAY_MODES.INIT);
         });
     });
 
     describe("parseFromLink", () => {
         it("lien classique => VideoInfo construite à partir de l'URL et des data-*", () => {
-            const info = parser.parseFromLink(lien(`https://youtu.be/${V1}`, {
+            const el = lien(`https://youtu.be/${V1}`, {
                 autoplay: "", start: "90", title: "T", target: "player"
-            }));
-            expect(info).toMatchObject({
-                videoId: V1, autoplay: AUTOPLAY_MODES.INIT, startSeconds: 90, title: "T", target: "player"
             });
+            const info = parser.parseFromLink(el);
+
+            expect(info).toMatchObject({
+                videoId: V1,
+                autoplay: AUTOPLAY_MODES.INIT,
+                startSeconds: 90,
+                title: "T",
+                target: "player"
+            });
+            expect(info.source.url).toBe(`https://youtu.be/${V1}`);
+            expect(info.source.element).toBe(el);   // si tu le renseignes dans le parser
         });
 
         it("data-videos (JSON) fournit les métadonnées d'une liste", () => {
@@ -561,9 +590,9 @@ describe("OkruInfoParser", () => {
             expect(() => parser.parseSrc("https://ok.ru/videoembed/abc")).toThrow(/Invalid OK.ru embed path/);
         });
 
-        // BUG : `SrcInfo` n'est pas importé dans OkruInfoParser.js (seul UrlInfo l'est) : toute
+        // `SrcInfo` n'est pas importé dans OkruInfoParser.js (seul UrlInfo l'est) : toute
         // adresse valide provoque une ReferenceError. Corriger : import {SrcInfo, UrlInfo} from ...
-        it.fails("BUG : une adresse embed valide retourne une SrcInfo (ReferenceError : SrcInfo non importé)", () => {
+        it("une adresse embed valide retourne une SrcInfo (ReferenceError : SrcInfo non importé)", () => {
             const info = parser.parseSrc("https://www.ok.ru/videoembed/123?autoplay=1");
             expect(info).toMatchObject({kind: "video", videoId: "123", autoplay: true});
         });
@@ -579,13 +608,13 @@ describe("OkruInfoParser", () => {
         });
 
         // Ces deux cas sont bloqués par le bug de SrcInfo ci-dessus (la ReferenceError survient avant).
-        it.fails("BUG : iframe OK.ru valide => VideoInfo okru", () => {
+        it("iframe OK.ru valide => VideoInfo okru", () => {
             const info = parser.parseFromFrame(iframe("https://ok.ru/videoembed/123?autoplay=1", {id: "zone"}));
             expect(info).toBeInstanceOf(VideoInfo);
             expect(info).toMatchObject({provider: "okru", target: "zone", videoId: "123", autoplay: AUTOPLAY_MODES.INIT});
         });
 
-        it.fails("BUG : iframe OK.ru sans parent => erreur « no parent element »", () => {
+        it("iframe OK.ru sans parent => erreur « no parent element »", () => {
             expect(() => parser.parseFromFrame(iframe("https://ok.ru/videoembed/123", null))).toThrow(/no parent element/);
         });
     });
@@ -603,7 +632,7 @@ describe("OkruInfoParser", () => {
             expect(info).toMatchObject({
                 provider: "okru", target: "player", videoId: "123", autoplay: AUTOPLAY_MODES.CLICK,
                 startSeconds: 30, title: "T", description: "D", channel: "C", duration: 60,
-                thumbnail: "", showOnInit: true, key: "k", source: url
+                thumbnail: "", showOnInit: true, key: "k", source: expect.objectContaining({ url })
             });
         });
 
@@ -648,16 +677,16 @@ describe("OkruInfoParser", () => {
             expect(liste.videos.map((v) => v.autoplay)).toEqual([AUTOPLAY_MODES.CLICK, AUTOPLAY_MODES.CLICK]);
         });
 
-        it.fails("BUG : VideoListInfo.source contient l'URL d'origine (elle arrive dans `extra`)", () => {
+        it("VideoListInfo.source contient l'URL d'origine (elle arrive dans `extra`)", () => {
             const url = "https://ok.ru/video?video_ids=1,2";
-            expect(parser.parseDefinition(def(url)).source).toBe(url);
+            expect(parser.parseDefinition(def(url)).source.url).toBe(url);
         });
 
-        it.fails("BUG : VideoListInfo.extra reprend def.extra", () => {
+        it("VideoListInfo.extra reprend def.extra", () => {
             expect(parser.parseDefinition(def("https://ok.ru/video?video_ids=1,2", {extra: "mon extra"})).extra).toBe("mon extra");
         });
 
-        it.fails("BUG : une liste de vidéos conserve l'autoplay du lien", () => {
+        it("une liste de vidéos conserve l'autoplay du lien", () => {
             expect(parser.parseDefinition(def("https://ok.ru/video?video_ids=1,2", {autoplay: "true"})).autoplay).toBe(AUTOPLAY_MODES.INIT);
         });
     });

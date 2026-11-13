@@ -2,6 +2,25 @@ import {PanelRenderer} from "./ui/PanelRenderer.js";
 import {NavigationJournal} from "./NavigationJournal.js";
 import {Emitter} from "./utils/Emitter.js";
 
+const NO_PARAMS = Object.freeze({});
+
+/**
+ * Navigation params are a SNAPSHOT: later changes of the caller's object do not leak into the history,
+ * and a hook cannot alter what the next one sees.
+ */
+const freezeParams = (params) => (params ? Object.freeze({...params}) : NO_PARAMS);
+
+/**
+ * What an afterNavigate hook receives.
+ * @typedef {Object} NavigationState
+ * @property {object} info    VideoInfo / VideoListInfo / PlaylistInfo shown.
+ * @property {number} index   Item of the list / playlist (0 for a single video).
+ * @property {object|null} item  The video playing: `info` for a single video, `info.videos[index]` for a list
+ *                            (null while the items are not known yet).
+ * @property {Readonly<object>} params  Free data given by the caller of navigate(); {} when none.
+ * @property {string} reason  "navigate" | "replace" | "back" | "forward" | "restore" | "adopt" | "item" | "meta" | "immediate"
+ */
+
 export class Region {
     #target;
     #host = null; // container (html element); null until it is discovered
@@ -17,18 +36,26 @@ export class Region {
     #panelInfo = null; // the playlist the panel is drawn for
     #resolveMeta;
     #resolved = new WeakSet();
-    #dependentViews = new Map();
+    #afterHooks = new Set();
+    #from = null;      // the state notified last: the `from` of the next hook call
     #currentBehavior;
+    #boundaryBehavior;
     #pending = []; // navigation actions waiting for the container
 
     /**
      * @param {object} options
-     * @param {(info) => Promise<boolean>|boolean} [options.resolveMeta] Completes the items of a playlist (true when it changed something).
+     * @param {"toggle"|"skip"|string} [options.currentBehavior] What navigate() does on the info already shown.
+     * @param {"stop"|"loop"} [options.boundaryBehavior] What nextInfo() / previousInfo() do at the ends of the
+     *   list of infos: "stop" (nothing happens) or "loop" (last -> first, first -> last). Needs 2 infos or more.
+     * @param {(info, options: {force: boolean}) => Promise<boolean>|boolean} [options.resolveMeta] Completes the metadata
+     *   of an info (items of a playlist, title / channel of a single video...): true when it changed something. Called the
+     *   first time each info is shown (force: false) and by refreshMeta(); it decides by itself what is worth fetching.
      */
     constructor({
                     target,
                     registry,
                     currentBehavior = "toggle",
+                    boundaryBehavior = "stop",
                     resolveMeta = null,
                     panelRenderer = null,
                     itemRenderer = null,
@@ -41,6 +68,9 @@ export class Region {
         this.#host = document.getElementById(target); // may be null: it will be registered when discovered
         this.#registry = registry;
         this.#currentBehavior = currentBehavior;
+        if (boundaryBehavior !== "stop" && boundaryBehavior !== "loop")
+            throw new TypeError(`Invalid boundaryBehavior '${boundaryBehavior}': expected "stop" or "loop".`);
+        this.#boundaryBehavior = boundaryBehavior;
         this.#resolveMeta = resolveMeta;
         this.#panel = panelRenderer ?? new PanelRenderer({
             itemRenderer,
@@ -69,6 +99,11 @@ export class Region {
         return this.#journal.current?.index ?? 0;
     }
 
+    /** The params of the current navigation ({} when none). */
+    get currentParams() {
+        return this.#journal.current?.params ?? NO_PARAMS;
+    }
+
     get isVisible() {
         return this.#host !== null && !this.#host.hidden;
     }
@@ -94,12 +129,13 @@ export class Region {
     }
 
     get canGoPreviousInfo() {
-        return this.#infoIndex() > 0;
+        return this.#infoIndex() > 0 || this.#canLoop();
     }
 
     get canGoNextInfo() {
         const i = this.#infoIndex();
-        return i >= 0 ? i < this.#infos.size - 1 : this.#infos.size > 0;
+        const hasNext = i >= 0 ? i < this.#infos.size - 1 : this.#infos.size > 0;
+        return hasNext || this.#canLoop();
     }
 
     get canGoPreviousItem() {
@@ -162,6 +198,12 @@ export class Region {
         return !!(info && this.#journal.current?.info === info);
     }
 
+    /**
+     * @param {string} key
+     * @param {{autoplay?: boolean, index?: number, params?: object}} [options]
+     *   `params`: free data of THIS navigation (who asked, why...). Given to the afterNavigate hooks and
+     *   to the "change" event, and kept in the history (back / forward give them again).
+     */
     navigate(key, options) {
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
@@ -174,14 +216,36 @@ export class Region {
         });
     }
 
-    replace(key, {autoplay = false, index = 0} = {}) {
+    /** Like navigate(), but the current history entry is replaced (nothing is added). */
+    replace(key, {autoplay = false, index = 0, params} = {}) {
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
         this.#whenReady(() => {
             const info = this.get(key);
-            this.#journal.replace({info, index});
+            this.#journal.replace({info, index, params: freezeParams(params)});
             this.#show(info, {autoplay, index}, "replace");
         });
+    }
+
+    /**
+     * Restores a saved state. Unlike navigate(), it never toggles: when the info is already the
+     * current one (adopted iframe), only the item may change, with a single command.
+     * @returns {boolean} false when the key is unknown (a saved key may have disappeared).
+     */
+    restore(key, {index = 0, params} = {}) {
+        if (!this.has(key)) return false;
+        this.#whenReady(() => {
+            const info = this.get(key);
+            if (this.isCurrent(key)) {
+                if (!info.isPlaylist || index === this.currentIndex) return;
+                this.#journal.updateCurrent({index});
+                this.#select(info, {autoplay: false, index});
+                this.#changed("restore");
+                return;
+            }
+            this.#navigate(info, {autoplay: false, index, params}, "restore");
+        });
+        return true;
     }
 
     goBack() {
@@ -194,12 +258,13 @@ export class Region {
         return this.#restore(this.#journal.forward(), "forward");
     }
 
-    nextInfo() {
-        return this.#step(1);
+    /** @param {{autoplay?: boolean, params?: object}} [options] autoplay is true by default. */
+    nextInfo(options) {
+        return this.#step(1, options);
     }
 
-    previousInfo() {
-        return this.#step(-1);
+    previousInfo(options) {
+        return this.#step(-1, options);
     }
 
     nextItem() {
@@ -211,8 +276,8 @@ export class Region {
     }
 
     playAt(index) {
+        this.#playerIndex = index; // BEFORE the command: a player that answers synchronously (Ok.ru) is then ignored as already known
         this.#player?.playAt(index);
-        this.#playerIndex = index;
         this.#journal.updateCurrent({index});
         this.#panel.setCurrent(index); // immediate feedback; the player confirms with "itemChange"
         this.#changed("item");
@@ -222,7 +287,7 @@ export class Region {
      * Takes over an iframe that is already in the page (and inside the target): the player drives it
      * and the panel is added for a playlist / list. `info` is parsed from the iframe src.
      */
-    adopt(iframe, info, {index = 0} = {}) {
+    adopt(iframe, info, {index = 0, params} = {}) {
         // the parent of the iframe is its container: usable even when the target was not discovered yet
         if (!this.#host) this.register(iframe.parentElement);
         // iframe region == region with single info
@@ -235,7 +300,7 @@ export class Region {
         this.#unsubscribe = this.#subscribe(this.#player);
         this.#rendered = info;
         this.#playerIndex = index;
-        this.#journal.push({info, index});
+        this.#journal.push({info, index, params: freezeParams(params)});
         this.#syncPanel(info, iframe, index);
         this.#changed("adopt");
         this.#resolveMetaLater(info);
@@ -266,38 +331,50 @@ export class Region {
         this.#disposePlayer();
         this.#panel.destroy();
         this.#pending.length = 0;
+        this.#afterHooks.clear();
         this.#events.clear();
     }
 
-    // ───────── dependent Views ─────────
+    // ───────── after-navigation hooks ─────────
 
-    hasDependentView(id) {
-        return this.#dependentViews.has(id);
+    /**
+     * Registers a hook run AFTER every navigation (navigate, replace, back, forward, restore, adopt) and every
+     * item change of a playlist: the video is shown, the history and the panel are up to date. It is meant to
+     * update the page next to the video; it cannot cancel or change the navigation. Not run for show / hide.
+     * `to.reason === "meta"` : the titles / thumbnails of the playlist have just been completed.
+     * A hook that throws (or rejects) is reported in the console and does not stop the others.
+     * The same function registered twice runs once.
+     *
+     * @param {(to: NavigationState, from: NavigationState|null) => void|Promise<void>} hook
+     * @param {{immediate?: boolean}} [options] immediate: also runs once now when something is already shown
+     *   (`from` is null, reason "immediate"): useful when the hook is registered after the first scan.
+     * @returns {() => void} Function that removes the hook.
+     */
+    afterNavigate(hook, {immediate = false} = {}) {
+        if (typeof hook !== "function") throw new TypeError("afterNavigate(): a function is expected");
+        this.#afterHooks.add(hook);
+        if (immediate) {
+            const to = this.#state("immediate");
+            if (to) this.#runHook(hook, to, null);
+        }
+        return () => this.#afterHooks.delete(hook);
     }
 
-    registerDependentView(id, fn) {
-        if (this.hasDependentView(id)) {
-            throw new Error(`Duplicate dependent view ID: '${id}' is already registered.`);
-        }
-        this.#dependentViews.set(id, fn);
-    }
+    // ───────── metadata ─────────
 
-    unregisterDependentView(id) {
-        if (!this.hasDependentView(id)) {
-            console.warn(`Attempted to unregister non-existent dependent view: '${id}'`);
-            return false;
-        }
-        return this.#dependentViews.delete(id);
-    }
-
-    notifyDependentViews(info) {
-        for (const [id, fn] of this.#dependentViews) {
-            try {
-                fn(info);
-            } catch (error) {
-                console.error(`Error processing dependent view '${id}':`, error);
-            }
-        }
+    /**
+     * Completes the metadata (title, description, channel...) of an info, even a single video, then runs the
+     * afterNavigate hooks with reason "meta" when something changed. Unlike the automatic call (first display only),
+     * it asks again each time it is called.
+     * @param {string} [key] Key of the info; the current one by default.
+     * @param {{force?: boolean}} [options] force (default true): do not skip an info whose required fields are present.
+     * @returns {Promise<boolean>} true when something changed; false too when there is nothing to resolve or it failed.
+     */
+    refreshMeta(key = this.current?.key, {force = true} = {}) {
+        const info = key ? this.get(key) : null;
+        if (!info || !this.#resolveMeta) return Promise.resolve(false);
+        this.#resolved.add(info);
+        return this.#completeMeta(info, {force});
     }
 
     // ───────── internals ─────────
@@ -324,23 +401,38 @@ export class Region {
         return this.infos.indexOf(this.current);
     }
 
-    #navigate(info, {autoplay = false, index = 0} = {}) {
-        this.#journal.push({info, index});
-        this.#show(info, {autoplay, index}, "navigate");
+    #navigate(info, {autoplay = false, index = 0, params} = {}, reason = "navigate") {
+        this.#journal.push({info, index, params: freezeParams(params)});
+        this.#show(info, {autoplay, index}, reason);
     }
 
+    /** The history entry carries its params: the hooks get the same ones as the first time. */
     #restore(entry, reason) {
         if (!entry) return false;
         this.#show(entry.info, {autoplay: false, index: entry.index}, reason); // restore the state, do not start playing
         return true;
     }
 
-    #step(delta) {
+    #step(delta, options = {}) {
         if (!this.#host) return false;
-        const target = this.infos[this.#infoIndex() + delta];
+        const target = this.#stepTarget(delta);
         if (!target) return false;
-        this.#navigate(target, {autoplay: true});
+        this.#navigate(target, {autoplay: true, ...options});
         return true;
+    }
+
+    /** The info `delta` (1 or -1) away from the current one; at an end: the other end when looping, else undefined. */
+    #stepTarget(delta) {
+        const infos = this.infos;
+        const next = infos[this.#infoIndex() + delta];
+        if (next) return next;
+        if (!this.#canLoop()) return undefined;
+        return infos.at(delta > 0 ? 0 : -1);
+    }
+
+    /** Looping onto the only info would navigate to the current one (and toggle it): it needs two infos. */
+    #canLoop() {
+        return this.#boundaryBehavior === "loop" && this.#infos.size > 1;
     }
 
     /**
@@ -363,7 +455,7 @@ export class Region {
     #render(info, {autoplay, index}) {
         const provider = this.#registry.get(info.provider);
 
-        // teardown of what was shown (another provider, another info): it must never block the new content
+        // teardown of what was shown (another providers, another info): it must never block the new content
         const previous = this.#player?.iframe;
         this.#disposePlayer();
         try {
@@ -377,13 +469,13 @@ export class Region {
         this.#player = provider.createPlayer();
         this.#unsubscribe = this.#subscribe(this.#player);
 
+        this.#playerIndex = index; // BEFORE load(): a player that notifies its item synchronously (Ok.ru) is then ignored
         this.#player.load(info, {autoplay, index});
         const iframe = this.#player.iframe;
         iframe.dataset.lp ||= this.#target; // marks it as ours: the region host must not discover it as a frame to adopt
         if (!iframe.isConnected) this.#host.prepend(iframe); // iframe before the panel (CSS anchoring)
 
         this.#rendered = info;
-        this.#playerIndex = index;
         this.#syncPanel(info, iframe, index);
     }
 
@@ -416,18 +508,33 @@ export class Region {
         });
     }
 
-    /** Titles / thumbnails of a playlist may come from an API: the panel is drawn first, then drawn again. */
+    /** Metadata may come from an API: what is shown first is drawn again once it is known. Asked once per info. */
     #resolveMetaLater(info) {
-        if (!info.isPlaylist || !this.#resolveMeta || this.#resolved.has(info)) return;
+        if (!this.#resolveMeta || this.#resolved.has(info)) return;
         this.#resolved.add(info);
-        Promise.resolve(this.#resolveMeta(info)).then(
+        this.#completeMeta(info, {force: false});
+    }
+
+    #completeMeta(info, options) {
+        return Promise.resolve(this.#resolveMeta(info, options)).then(
             (changed) => {
-                if (!changed || this.current !== info || !this.#player?.iframe) return;
-                this.#panelInfo = null; // force the redraw
-                this.#syncPanel(info, this.#player.iframe, this.currentIndex);
+                if (changed) this.#metaChanged(info);
+                return Boolean(changed);
             },
-            (error) => this.#fail(error, {info})
+            (error) => {
+                this.#fail(error, {info});
+                return false;
+            }
         );
+    }
+
+    #metaChanged(info) {
+        if (this.current !== info) return;
+        if (info.isPlaylist && this.#player?.iframe) {
+            this.#panelInfo = null; // force the redraw
+            this.#syncPanel(info, this.#player.iframe, this.currentIndex);
+        }
+        this.#runAfterHooks("meta"); // `to.item` may have just got its title, channel...
     }
 
     /** The name of the subscription method differs between players. */
@@ -438,10 +545,11 @@ export class Region {
 
     #onPlayerEvent(event) {
         if (event.type === "itemChange") {
+            // already known (playAt, select, first notification after a load): no second notification
+            if (event.index === this.#playerIndex) return;
             this.#playerIndex = event.index;
             this.#journal.updateCurrent({index: event.index}); // going back restores the item too
             this.#panel.setCurrent(event.index);
-            this.notifyDependentViews(this.current);
             this.#changed("item");
         } else if (event.type === "state") {
             this.#events.emit("state", {region: this, state: event.state, index: event.index ?? this.currentIndex});
@@ -456,8 +564,39 @@ export class Region {
             reason,
             info: this.current,
             index: this.currentIndex,
+            params: this.currentParams,
             visible: this.isVisible
         });
+        if (reason !== "visibility") this.#runAfterHooks(reason);
+    }
+
+    // ───────── hooks (internals) ─────────
+
+    #state(reason) {
+        const entry = this.#journal.current;
+        if (!entry) return null;
+        const {info, index, params} = entry;
+        const item = info.isPlaylist ? (info.videos[index] ?? null) : info;
+        return Object.freeze({info, index, item, params: params ?? NO_PARAMS, reason});
+    }
+
+    #runAfterHooks(reason) {
+        const to = this.#state(reason);
+        if (!to) return;
+        const from = this.#from;
+        this.#from = to;
+        for (const hook of [...this.#afterHooks]) this.#runHook(hook, to, from);
+    }
+
+    #runHook(hook, to, from) {
+        try {
+            const result = hook(to, from);
+            if (typeof result?.then === "function") {
+                result.catch((error) => console.error("[Region] afterNavigate hook failed:", error));
+            }
+        } catch (error) {
+            console.error("[Region] afterNavigate hook failed:", error);
+        }
     }
 
     #fail(error, context = {}) {

@@ -170,3 +170,14 @@ defunur des shortcuts ?
 shortcut:a => youtube:videoid
 shortcut:b => youtube:a,b,c
 shortcut:c => youtube:pl123
+
+
+
+ajouter la source
+source url
+source element
+
+ne pas reevaluer des elements checkés
+
+
+// nextInfo / previousInfo => mode / behavior loop cad que du dernier element si on fait encore nextInfo on revient au premier element, du premier element si on fait  previousInfo on va au dernier element

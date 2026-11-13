@@ -138,7 +138,7 @@ export class PanelRenderer {
         this.#info = info;
         this.#onSelectItem = onSelectItem;
         this.#current = current ?? info.index ?? null;
-        this.#defaultWidth = items.some((item) => item.thumbnailPath) ? 280 : 176;
+        this.#defaultWidth = items.some((item) => item.thumbnail) ? 280 : 176;
 
         this.#setupHost(host);
         this.#setupAnchor(iframe);
@@ -596,14 +596,14 @@ export class ItemRenderer {
             text.append(chan);
         }
 
-        if (item.thumbnailPath) {
+        if (item.thumbnail) {
             const thumb = document.createElement("div");
             thumb.className = "lp-thumb";
 
             const image = document.createElement("img");
             image.alt = "";
             image.loading = "lazy";
-            this._thumbnails.resolve(item.thumbnailPath).then((url) => {
+            this._thumbnails.resolve(item.thumbnail).then((url) => {
                 if (url) image.src = url;
                 else thumb.remove(); // broken or missing: the row falls back to the number
             });

@@ -11,7 +11,7 @@ import {PlaylistInfo} from "../../models/PlaylistInfo.js";
  * Which iframe shows which info is decided by the caller (PlayerContentAdapter): another info means
  * another player (so another iframe); the same info with another item only needs `selectItem` / `playAt`.
  *
- * Events sent to subscribers (same shape for every provider):
+ * Events sent to subscribers (same shape for every providers):
  *   { type: "itemChange", index }  the playing item of a playlist / list changed
  *   { type: "state", state, index? } playing / paused / ended
  *   { type: "error", error }

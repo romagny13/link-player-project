@@ -4,6 +4,7 @@
  * not found yet (a container created later...) is looked up again on the next call.
  */
 export class DefaultRegionHost {
+    #id;
     #registeredLinks = new Map();   // element -> url
     #registeredTargets = new Map(); // target id -> container
     #registeredFrames = new Set();
@@ -13,7 +14,8 @@ export class DefaultRegionHost {
     #onFrameDiscovered = null;
     #onTargetDiscovered = null
 
-    init({root, onLinkDiscovered = null, onFrameDiscovered = null, onTargetDiscovered = null}) {
+    init({id, root, onLinkDiscovered = null, onFrameDiscovered = null, onTargetDiscovered = null}) {
+        this.#id = id;
         this.#root = root ?? document;
         this.#onLinkDiscovered = onLinkDiscovered;
         this.#onFrameDiscovered = onFrameDiscovered;
@@ -66,6 +68,18 @@ export class DefaultRegionHost {
     }
 
     discoverTargets() {
+        this.#forget(
+            this.#registeredTargets.values(),
+            (el) => {
+                for (const [id, container] of this.#registeredTargets) {
+                    if (container === el) {
+                        this.#registeredTargets.delete(id);
+                        break;
+                    }
+                }
+            }
+        );
+
         const wanted = new Set();
         if (this.#defaultTarget) wanted.add(this.#defaultTarget);
         for (const link of this.#registeredLinks.keys()) {
@@ -118,9 +132,16 @@ export class DefaultRegionHost {
     }
 
     /** `getElementById` only exists on a document / shadow root; a scope is an element. */
+    // #findById(id) {
+    //     return typeof this.#root.getElementById === "function"
+    //         ? this.#root.getElementById(id)
+    //         : this.#root.querySelector(`#${CSS.escape(id)}`);
+    // }
     #findById(id) {
-        return typeof this.#root.getElementById === "function"
-            ? this.#root.getElementById(id)
-            : this.#root.querySelector(`#${CSS.escape(id)}`);
+        const escaped = (typeof CSS !== "undefined" && CSS.escape)
+            ? CSS.escape(id)
+            : id.replace(/([ !"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
+
+        return this.#root.querySelector(`#${escaped}`);
     }
 }

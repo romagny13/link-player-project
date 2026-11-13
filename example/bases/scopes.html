@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+
+<a href="https://www.youtube.com/watch?v=69iUWLA0oVc" data-target="global-target" data-link>Global link</a>
+<div id="global-target"></div>
+
+<div id="scope-1">
+    <a data-link href="https://www.youtube.com/watch?v=5drmgVauSMg" data-target="scoped-target" data-link>Scoped
+        link</a>
+    <div id="scoped-target"></div>
+</div>
+
+<script type="module">
+    import {LinkPlayer} from "../../src/LinkPlayer.js";
+
+    new LinkPlayer({scope: "#scope-1", tooltip:false, useStorage:false});
+
+    // global
+    new LinkPlayer();
+
+
+</script>
+</body>
+</html>

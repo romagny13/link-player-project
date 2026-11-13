@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>LinkPlayer – Advanced</title>
+    <style>
+        :root {
+            --ink: #6b4f27;
+            --gold: #f0b95a;
+            --line: #f1eadb;
+            /* overrides panel */
+            --lp-bg: #1a140c;
+            --lp-border: #3a2e1a;
+            --lp-hover: #2a2114;
+            --lp-text: #c8b48a;
+            --lp-text-active: #fff8e7;
+            --lp-muted: #8a7350;
+            --lp-accent: #f0b95a;
+            --lp-w: 220px;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px 12px;
+            font-family: system-ui, sans-serif;
+            color: var(--ink);
+            background: #fffdf9;
+        }
+
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            gap: 28px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/9;
+            overflow: hidden;
+            border-radius: 16px;
+            background: #f6f2ea;
+            border: 4px solid #fff;
+            box-shadow: 0 12px 32px rgba(120, 100, 60, .18);
+        }
+
+        .video-container iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        .links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .links a, .links button {
+            padding: 8px 14px;
+            border-radius: 999px;
+            border: 1px solid #f1e4c4;
+            background: #fffaf0;
+            color: #a97a2a;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: .85rem;
+        }
+
+        /* scoped zone sans tooltip */
+        #scoped-zone {
+            padding: 16px;
+            border: 2px dashed #e8d9b5;
+            border-radius: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <section>
+        <h2>Existing iframe with playlist</h2>
+        <div class="video-container">
+            <iframe width="560" height="315"
+                    src="https://www.youtube.com/embed/videoseries?si=h1BeWoZmrj2u6j6Z&amp;list=PLfO5yE9Cc3wo"
+                    title="YouTube video player" frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+    </section>
+</div>
+
+<script type="module">
+    import {LinkPlayer} from "../src/LinkPlayer.js";
+
+    // ── Custom Item Renderer (exemple) ──
+    class GoldItemRenderer {
+        render(item, index, isCurrent) {
+            const row = document.createElement("div");
+            row.className = "lp-item";
+            row.dataset.index = String(index);
+            row.tabIndex = 0;
+            row.setAttribute("role", "button");
+            if (isCurrent) row.dataset.current = "";
+            row.innerHTML = `
+        <span class="lp-num">${String(index + 1).padStart(2, "0")}</span>
+        <div class="lp-info">
+          <div class="lp-title">${item.title || "Vidéo " + (index + 1)}</div>
+          ${item.channel ? `<div class="lp-chan">${item.channel}</div>` : ""}
+        </div>`;
+            return row;
+        }
+    }
+
+    // ── Custom Tooltip Renderer (minimal) ──
+    class SimpleTipRenderer {
+        render() {
+            const tip = document.createElement("div");
+            tip.className = "lp-tip";
+            tip.innerHTML = `<div class="lp-tip-loader"></div><img alt=""><div class="lp-tip-play"></div><span class="lp-tip-title"></span>`;
+            return tip;
+        }
+
+        onShow(tip, {title, provider}) {
+            tip.dataset.provider = provider.id ?? "";
+            tip.lastChild.textContent = title;
+            tip.children[0].hidden = false;
+            tip.children[1].hidden = true;
+        }
+
+        onLoading(tip) {
+            tip.children[0].hidden = false;
+        }
+
+        onThumbLoaded(tip, url) {
+            tip.children[0].hidden = true;
+            tip.children[1].src = url;
+            tip.children[1].hidden = false;
+        }
+
+        onFallback(tip) {
+            tip.children[0].hidden = true;
+            tip.classList.add("lp-nothumb");
+        }
+    }
+
+    // https://www.youtube.com/embed/videoseries?si=h1BeWoZmrj2u6j6Z&list=PLfO5yE9Cc3wo&enablejsapi=1&origin=http%3A%2F%2Flocalhost%3A63342
+    // https://www.youtube.com/embed/videoseries?si=h1BeWoZmrj2u6j6Z&list=PLfO5yE9Cc3wo
+    // Global player
+    const globalLp = new LinkPlayer({
+        useStorage: false,
+        // currentBehavior: "toggle",
+        // tooltip: true,
+        // tooltipRenderer: new SimpleTipRenderer(),
+        // itemRenderer: new GoldItemRenderer(),
+        youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
+        fallbackTitle: (i) => `Épisode ${i + 1}`,
+    });
+
+    // Scoped player (dans #scoped-zone) – pas de tooltip
+    // const scopedLp = new LinkPlayer({
+    //     scope: "scoped-zone",
+    //     tooltip: false,
+    //     useStorage: true,
+    //     currentBehavior: "skip",
+    // });
+</script>
+</body>
+</html>

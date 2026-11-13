@@ -17,14 +17,16 @@ const fillEmpty = (meta, extra = {}) => {
 const isPlaceholder = (id) => typeof id === "string" && id.includes("#");
 
 /**
- * Completes the items of a YouTube list / playlist for the panel.
+ * Completes the metadata of a YouTube video, list or playlist (panel, page sections...).
  * Order: what is declared (data-videos, code definitions) > YouTube Data API (cached) > fallback title ("Video 1"...).
  *
- * It only works when a REQUIRED field is empty (`required`, the title by default): everything declared is then
- * left alone and every other empty field is filled from the API too (description, channel, channelUrl, thumbnail, duration).
- * Without `api` (no key, or refused) only the fallback title is given. Never rejects.
+ * It only works when a REQUIRED field is empty (`required`, the title by default) unless `force` is given:
+ * everything declared is then left alone and every other empty field is filled from the API too
+ * (description, channel, channelUrl, thumbnail, duration).
+ * Without `api` (no key, or refused) a list only gets the fallback title, and a single video gets nothing
+ * (a fallback title would hide the real one later). Never rejects.
  *
- * Its result is applied by applyItems() (metaMerge.js).
+ * Its result is applied by applyItems() (lists, metaMerge.js) or applyDefinition() (single video).
  */
 export class YouTubeMetaResolver {
     #api;
@@ -40,8 +42,9 @@ export class YouTubeMetaResolver {
      * @param {{ get(key): any, set(key, value, ttlMs): void }|null} [options.cache]
      * @param {number} [options.videoTtlMs] Video titles rarely change.
      * @param {number} [options.playlistTtlMs] A playlist content changes more often.
-     * @param {(index: number) => string} [options.fallbackTitle] Title of an item that is still without one.
-     * @param {string[]} [options.required] The fields that must not stay empty (names of VideoInfo getters).
+     * @param {(index: number) => string} [options.fallbackTitle] Title of a list item that is still without one.
+     * @param {string[]} [options.required] The fields that must not stay empty (names of VideoInfo getters):
+     *   when one is empty the API is asked. Add "description", "channel"... to complete a video that already has a title.
      */
     constructor({
                     api = null,
@@ -60,15 +63,36 @@ export class YouTubeMetaResolver {
     }
 
     /**
-     * @param {VideoListInfo|PlaylistInfo} info
+     * @param {VideoInfo|VideoListInfo|PlaylistInfo} info
+     * @param {{ force?: boolean }} [options] force: ask even when nothing required is missing. Declared values are
+     *   still never overwritten.
      * @returns {Promise<object[]|null>} Items [{ id, title, description, channel, channelUrl, thumbnail, duration }]
-     *   for applyItems(), or null when there is nothing to do (not YouTube, not a list, or nothing required is missing).
+     *   (one item for a single video), or null when there is nothing to do (not YouTube, or nothing required is
+     *   missing, or the API has nothing).
      */
-    async resolve(info) {
-        if (info.provider !== "youtube" || !info.isPlaylist) return null;
+    async resolve(info, {force = false} = {}) {
+        if (info.provider !== "youtube") return null;
+        return info.isPlaylist ? this.#resolveList(info, force) : this.#resolveVideo(info, force);
+    }
 
+    async #resolveVideo(info, force) {
+        const declared = fieldsOf(info);
+        if (!force && this.#isComplete(declared)) return null;
+        if (!this.#api?.available) return null; // nothing to ask, and no fallback title for a single video
+
+        let meta;
+        try {
+            meta = (await this.#videosMeta([info.videoId])).get(info.videoId);
+        } catch (error) {
+            console.warn("[YouTubeMetaResolver] API failed:", error.message);
+            return null;
+        }
+        return meta ? [{id: info.videoId, ...fillEmpty(declared, meta)}] : null; // private / deleted video: absent
+    }
+
+    async #resolveList(info, force) {
         const declared = info.videos.map((v) => ({id: v.videoId, meta: fieldsOf(v)}));
-        if (declared.length > 0 && declared.every((d) => this.#isComplete(d.meta))) return null;
+        if (!force && declared.length > 0 && declared.every((d) => this.#isComplete(d.meta))) return null;
 
         let fetched = [];
         if (this.#api?.available) {
@@ -91,7 +115,7 @@ export class YouTubeMetaResolver {
         return info.videoIds.filter((id) => meta.has(id)).map((id) => ({id, meta: meta.get(id)}));
     }
 
-    /** Cache per video: two lists sharing videos do not pay twice. */
+    /** Cache per video: two lists (or a list and a single video) sharing videos do not pay twice. */
     async #videosMeta(ids) {
         const result = new Map();
         const missing = [];
