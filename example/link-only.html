@@ -69,14 +69,14 @@
                 Playlist (start video ≠ first)
             </a>
 
-            <!-- Playlist sans videoId de départ -->
+            <!-- Playlist sans videoId de départ
             <a data-link
-               href="https://www.youtube.com/playlist?list=PLYALQE76y6LQ"
+               href="https://www.youtube.com/?list=PLYALQE76y6LQ"
                data-target="player-main"
                data-title="Playlist pure"
                data-channel="Retime Clips">
                 Playlist (sans videoId)
-            </a>
+            </a>-->
         </div>
     </div>
 
@@ -109,7 +109,7 @@
     const lp = new LinkPlayer({
         useStorage: true,
         currentBehavior: "toggle",   // ou "skip"
-        // youtubeApiKey: "VOTRE_CLE", // optionnel pour enrichir titres/thumbs
+        youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
         fallbackTitle: (i) => `Vidéo ${i + 1}`,
     });
 </script>

@@ -1,223 +1,675 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LinkedEmbed — demo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LinkPlayer : page d'exemples</title>
     <style>
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        :root {
+            color-scheme: light dark;
+            --bg: #f5f6f8; --card: #ffffff; --ink: #1a1f26; --muted: #5a6572; --line: #dbe0e6;
+            --accent: #c2410c; --accent-ink: #ffffff; --chip-yt: #b91c1c; --chip-ok: #b45309;
+            --ok: #15803d; --err: #b91c1c; --warn: #a16207; --code: #eef0f3;
         }
-
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: #0f0f0f;
-            color: #e8e8e8;
-            padding: 2rem;
-            line-height: 1.6;
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0e1217; --card: #161b22; --ink: #e6eaef; --muted: #98a3b0; --line: #29313b;
+                --accent: #fb923c; --accent-ink: #1a1208; --chip-yt: #f87171; --chip-ok: #fbbf24;
+                --ok: #4ade80; --err: #f87171; --warn: #facc15; --code: #1f262f;
+            }
         }
-
-        h2 {
-            font-size: .7rem;
-            letter-spacing: .15em;
-            text-transform: uppercase;
-            color: #666;
-            margin-bottom: 1rem;
-        }
-
-        .link-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .5rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .link-list a[data-link] {
-            display: inline-block;
-            padding: .35rem .85rem;
-            border: 1px solid #333;
-            border-radius: 4px;
-            color: #ccc;
-            text-decoration: none;
-            font-size: .85rem;
-            transition: border-color .2s, color .2s;
-        }
-
-        .link-list a[data-link]:hover {
-            border-color: #888;
-            color: #fff;
-        }
-
-        .demo-note {
-            font-size: .8rem;
-            color: #888;
-            margin-bottom: .75rem;
-        }
-
-        .demo-note code {
-            color: #ccc;
-            background: #1c1c1c;
-            padding: .1rem .35rem;
-            border-radius: 3px;
-        }
-
-        /* ── embed container ── */
-        .video-container {
-            position: relative;
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08),
-                0 4px 12px rgba(0, 0, 0, 0.04);
-            transition: transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1),
-                box-shadow 0.4s ease-out;
-        }
-
-        .video-container::before {
-            content: "";
-            display: block;
-            padding-top: 56.25%;
-            /* 16:9 Aspect Ratio */
-        }
-
-        .video-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 12px;
-            overflow: hidden;
-            scrollbar-width: none;
-        }
-
-        .video-container:hover {
-            transform: scale(1.02) translateY(-5px);
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1),
-                0 5px 15px rgba(0, 0, 0, 0.06);
-        }
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+        body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+        .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; max-width: 1380px; margin: 0 auto; padding: 24px 16px 80px; }
+        @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } aside { position: static !important; max-height: none !important; } }
+        header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+        header p, .what, .note { color: var(--muted); margin: 6px 0 12px; }
+        code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86em; }
+        code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+        pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow: auto; margin: 8px 0 12px; }
+        nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 20px; }
+        nav.toc a { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; color: var(--ink); background: var(--card); font-size: .9rem; }
+        section.sec { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 0 0 22px; }
+        section.sec > h2 { margin: 0 0 2px; font-size: 1.2rem; }
+        h3 { margin: 18px 0 4px; font-size: 1rem; }
+        .links { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+        .links a, button { font: inherit; font-size: .92rem; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; text-decoration: none; }
+        .links a:hover, button:hover:not(:disabled) { border-color: var(--accent); }
+        button:disabled { opacity: .4; cursor: not-allowed; }
+        button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+        .chip { display: inline-block; font-size: .68rem; font-weight: 700; letter-spacing: .03em; padding: 1px 6px; border-radius: 4px; margin-right: 6px; color: #fff; vertical-align: 1px; }
+        .chip.yt { background: var(--chip-yt); } .chip.ok { background: var(--chip-ok); }
+        .player-zone { min-height: 72px; border: 1px dashed var(--line); border-radius: 10px; padding: 8px; margin: 10px 0 6px; }
+        .player-zone:empty::before { content: "zone cible : rien d'affiché pour l'instant"; color: var(--muted); font-size: .85rem; }
+        .player-zone iframe { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; }
+        .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 4px; }
+        .controls .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+        .status { font-size: .82rem; color: var(--muted); margin-left: auto; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+        .tag { font-size: .75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+        .details { border-left: 3px solid var(--accent); padding: 4px 12px; margin: 10px 0; min-height: 3.2em; }
+        .details strong { display: block; }
+        .warn { color: var(--warn); }
+        aside { position: sticky; top: 16px; align-self: start; max-height: calc(100vh - 32px); display: flex; flex-direction: column; gap: 12px; }
+        aside .box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+        aside h2 { margin: 0 0 8px; font-size: 1rem; }
+        aside input { width: 100%; font: inherit; font-size: .85rem; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); margin-bottom: 6px; }
+        #log { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 46vh; font-size: .78rem; font-family: ui-monospace, monospace; }
+        #log li { padding: 3px 0; border-bottom: 1px solid var(--line); word-break: break-word; }
+        #log .who { color: var(--muted); } #log .t-change { color: var(--ok); } #log .t-state { color: var(--accent); } #log .t-error { color: var(--err); font-weight: 600; }
     </style>
 </head>
-
 <body>
-
-    <div id="scope">
-        <h2>YouTube</h2>
-        <p class="demo-note">
-            Option <code>autoplayOnClick: true</code>: the first video is displayed paused on load,
-            then each click on a link starts playback.
+<div class="layout">
+<main>
+    <header>
+        <h1>LinkPlayer : page d'exemples</h1>
+        <p>
+            YouTube et OK.ru, en trois modes (<em>link only</em>, <em>code only</em>, <em>mixed</em>), plus les options
+            (<code>showOnInit</code>, <code>useStorage</code>, <code>currentBehavior</code>, <code>defaultTarget</code>),
+            l'API YouTube Data, les dépendances de vue, l'adoption d'iframes et un LinkPlayer global à côté d'un LinkPlayer « scopé ».
+            Chaque section a son propre <code>scope</code> et ses propres cibles ; le journal à droite reçoit tous les événements
+            <code>change</code> / <code>state</code> / <code>error</code>.
         </p>
-        <div class="link-list">
-            <a href="https://www.youtube.com/watch?v=FVhqw12-BVo" data-link data-target="target" data-show-on-init>
-                Video 1 (paused on load, plays on click)
-            </a>
-            <a href="https://youtu.be/wPw_5Qtf0wc?si=ndSj0Q6XzixxAllF&t=110" data-link data-target="target">
-                Video with start time
-            </a>
-            <a href="https://www.youtube.com/watch?v=k98esvB9E40&list=PLRVWztDBSD_Jh0PwXtJ0wBP0TLtHga1_Y" data-link
-                data-target="target">
-                Playlist partagée
-            </a>
-            <a href="https://www.youtube.com/watch_videos?video_ids=3HSKp9pVMKY,m_luzarfbbM,p8yXdbwFNgc" data-link
-                data-target="target">
-                Playlist dynamique
-            </a>
+        <p class="note">
+            À servir en HTTP(S) (par exemple <code>npx vite</code>), pas en <code>file://</code> : les modules ES et
+            <code>crypto.randomUUID()</code> l'exigent. Adapte l'import de <code>LinkPlayer</code> en bas de la page si besoin.
+        </p>
+        <nav class="toc">
+            <a href="#sec-link">1 · Link only</a><a href="#sec-code">2 · Code only</a><a href="#sec-mixed">3 · Mixed</a>
+            <a href="#sec-behavior">4 · Comportements</a><a href="#sec-api">5 · API YouTube</a>
+            <a href="#sec-adopt">6 · Adoption d'iframes</a><a href="#sec-global">7 · Global vs scopé</a>
+        </nav>
+    </header>
 
-            <a href="https://www.youtube.com/watch?v=7fgxMSYPILU&list=PLPcL-4_gAMDYTBbLP-yrN9QsxIql2csrf&index=8"
-                data-link data-target="target">Playlist avec Index </a>
-        </div>
-
-        <h2>Playlist (autoplayOnClick)</h2>
-        <p class="demo-note">
-            The first video is displayed paused on load. A click on any item,
-            including the first one, starts playback.
+    <!-- ═══════════════════ 1. LINK ONLY ═══════════════════ -->
+    <section class="sec" id="sec-link">
+        <h2>1 · Link only : tout est défini sur les <code>data-link</code></h2>
+        <p class="what">
+            Aucune définition en code. Titre, chaîne, miniature, autoplay, start et <code>data-videos</code> sont lus sur le lien.
+            Tous les liens visent la même cible <code>player-link</code> : passer d'un lien OK.ru à un lien YouTube remplace l'iframe et le panneau.
         </p>
 
-        <div class="link-list">
-            <a href="https://www.youtube.com/watch?v=YCfcg9gzCYc" data-link data-target="target">
-                1 · Bahamas
-            </a>
-            <a href="https://www.youtube.com/watch?v=GLhUitFjgso" data-link data-target="target">
-                2 · Miami
-            </a>
-            <a href="https://www.youtube.com/watch?v=5drmgVauSMg" data-link data-target="target">
-                3 · Tahiti
-            </a>
-            <a href="https://www.youtube.com/watch?v=IowWQQfgUPA" data-link data-target="target">
-                4 · Bora Bora
-            </a>
+        <h3><span class="chip yt">YT</span>YouTube</h3>
+        <div class="links">
+            <!-- vidéo simple, sans rien -->
+            <a data-link href="https://www.youtube.com/watch?v=69iUWLA0oVc" data-target="player-link"
+               data-title="Maldives (vidéo simple)">Vidéo simple</a>
+
+            <!-- autoplay au clic + start dans l'URL (t=2712s) -->
+            <a data-link href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s" data-target="player-link"
+               data-autoplay="click" data-title="Bahamas" data-channel="Me"
+               data-thumbnail="https://i.ytimg.com/vi/z2sv_RsNwM4/mqdefault.jpg">Autoplay au clic + start 45:12 (URL)</a>
+
+            <!-- start dans data-start (écrit en 1m30s) : prioritaire sur t= de l'URL -->
+            <a data-link href="https://www.youtube.com/watch?v=5drmgVauSMg" data-target="player-link"
+               data-autoplay="click" data-start="1m30s" data-title="Tahiti">Autoplay au clic + data-start="1m30s"</a>
+
+            <!-- liste de vidéos : index + métadonnées par vidéo (data-videos) -->
+            <a data-link href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=1"
+               data-target="player-link" data-title="Trip"
+               data-videos='[{"title":"ASMR","start":"30"},{"title":"Trains","channel":"Me","start":"1m"}]'>Liste de vidéos (index=1)</a>
+
+            <!-- playlist avec vidéo de départ différente de la première -->
+            <a data-link href="https://www.youtube.com/watch?v=C_dEl2cMCEA&list=PLYALQE76y6LQ" data-target="player-link"
+               data-channel="Retime Clips"
+               data-videos='[{"videoId":"s11CNT_hQTg","title":"V (1983) – L’arrivée des Visiteurs"},{"videoId":"C_dEl2cMCEA","title":"V (1983) – Diana propose son expérience"}]'>Playlist, départ sur la 2e vidéo</a>
+
+            <!-- même playlist SANS vidéo de départ : il faut une key différente, sinon c'est la même info (clé = playlist) -->
+            <a data-link href="https://www.youtube.com/watch?list=PLYALQE76y6LQ" data-target="player-link"
+               data-key="playlist-sans-depart" data-channel="Retime Clips"
+               data-videos='[{"videoId":"s11CNT_hQTg","title":"V (1983) – L’arrivée des Visiteurs"},{"videoId":"C_dEl2cMCEA","title":"V (1983) – Diana propose son expérience"}]'>Playlist, sans vidéo de départ</a>
+        </div>
+        <p class="note">
+            Dans les exemples d'origine, les métadonnées s'appelaient <code>data-items</code> et <code>"id"</code> ;
+            les parsers lisent <code>data-videos</code> et <code>"videoId"</code> (pour les playlists). Le <code>start</code> d'une vidéo
+            <em>à l'intérieur</em> d'une liste est lu par le parser mais <code class="warn">YouTubePlayer</code> charge la liste avec
+            <code>startSeconds = 0</code> : il n'est pas appliqué pour l'instant.
+        </p>
+
+        <h3><span class="chip ok">OK</span>OK.ru</h3>
+        <div class="links">
+            <a data-link href="https://ok.ru/video/17222095800962" data-target="player-link"
+               data-title="MacGyver S03E08 VF | Accident en Haute Montagne" data-channel="Retime Clips Okru">Vidéo OK.ru simple</a>
+
+            <!-- ancienne version : video_ids + labels dans l'URL (virgule dans un titre = %2C) -->
+            <a data-link data-target="player-link"
+               href="https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF">Ancienne version OK.ru (video_ids + labels)</a>
         </div>
 
-        <h2>Okru</h2>
-        <div class="link-list">
-            <a href="https://ok.ru/video/2406546410212" data-link data-target="target">
-                Vidéo Okru
-            </a>
+        <div class="player-zone" id="player-link"></div>
+        <div class="controls" data-controls="player-link"></div>
+    </section>
 
-            <a href="https://ok.ru/video/6615657941574?video_ids=6615657941574, 6615658662470, 6615658728006, 6615658859078, 6615661611590, 6615661808198, 6615662004806, 6615662070342, 6615662201414, 6615662594630, 6615691954758, 6615692151366, 6615692413510, 6615692544582, 6615692741190, 6615693003334, 6615693134406, 6615693199942, 6615693396550, 6615693658694, 6615693724230, 6615694051910, 6615694117446, 6615694772806, 6615695034950, 6615695231558, 6615695362630, 6615695493702, 6615695952454, 6615696083526, 6615731800646, 6615731931718, 6615732324934, 6615732587078, 6615733111366, 6615733307974, 6615733963334, 6615734094406, 6615734225478, 6615734487622, 6615734749766, 6615735142982, 6615735208518, 6615735405126, 6615735667270, 6615736388166, 6615736650310, 6615736781382, 6615737043526, 6615737240134"
-                data-link data-target="target"
-                data-thumbnail="https://iv.okcdn.ru/videoPreview?id=5536137415238&type=32&idx=2&tkn=iZGppoupEAVDxxwdJHqbH0brpTU&fn=external_8">
-                Playlist Okru
-            </a>
+    <!-- ═══════════════════ 2. CODE ONLY ═══════════════════ -->
+    <section class="sec" id="sec-code">
+        <h2>2 · Code only : définitions + boutons liés aux méthodes de la région</h2>
+        <p class="what">
+            Pas un seul lien dans le HTML. Les infos viennent du tableau <code>definitions</code> ; les boutons ci-dessous sont
+            générés depuis <code>region.infos</code> et appellent <code>region.navigate(key, {autoplay})</code>.
+            Le <code>LinkPlayer</code> est créé avec <code>autoScan: false</code> puis on appelle <code>scan()</code> à la main.
+            La première définition a <code>showOnInit: true</code>.
+        </p>
+        <div class="links" id="code-buttons"></div>
+        <div class="player-zone" id="player-code"></div>
+        <div class="controls" data-controls="player-code"></div>
+        <div class="details" id="code-details"></div>
+        <p class="note">
+            Le bloc « détails » utilise <code>region.registerDependentView()</code> : la fonction est appelée à chaque changement
+            <em>d'item dans une liste ou playlist</em> ; pour un changement d'info on écoute <code>region.on("change")</code>.
+        </p>
+    </section>
 
-            <a href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557,6812123990773,6812124449525,6812124908277,6812125301493,6812125694709,6812125956853,6824795769589,6849631423221,6849632406261,6849632930549,6849633585909,6849634437877,6849635486453,6849636666101,6855173081845,6855173409525,6855173933813,6856768424693&labels=Episode%2054%20(VF),Episode%2055%20(VF),Episode%2056%20(VF),Episode%2057%20(VF),Episode%2058%20(VF),Episode%2059%20(VF),Episode%2060%20(VF),Episode%2061%20(VF),Episode%2062%20(VF),Episode%2063%20(VF),Episode%2064%20(VF),Episode%2065%20(VF),Episode%2070%20(VF),Episode%2071%20(VF),Episode%2073%20(VF),Episode%2074%20(VF),Episode%2075%20(VF),Episode%2076%20(VF),Episode%2078%20(VF),Episode%2080%20(VF),Episode%2086%20(VF),Episode%2087%20(VF),Episode%2088%20(VF),Episode%2095%20(VF)"
-                data-link data-target="target">Playlist Okru with labels</a>
-
-            <a href="https://ok.ru/video/3771214858774?video_ids=3771214858774,3771215186454,3771215055382,3771215383062,3771215120918,3771215317526,3771215251990,3771215579670,3771215514134,3771215448598,3771216038422,3771216103958,3771216169494,3771216235030,3771216562710,3771216300566,3771216628246,3771216366102,3771216431638,3771216497174,3771217480214,3771217611286,3771217676822,3771217873430,3771217742358,3771217807894,3771220167190,3771220232726,3771220298262,3771220625942,3771220363798,3771220757014,3771220429334,3771220494870,3771220691478,3771220560406,3771221019158,3771221084694,3771221150230,3771221215766,3771221608982,3771221281302,3771221477910,3771221346838,3771221543446,3771221412374,3771222133270,3771222067734,3771221871126,3771222002198,3771221936662,3771222198806,3771223443990,3771223509526,3771223575062,3771223640598,3771223837206,3771223968278,3771223902742,3771224033814,3771223706134,3771223771670,3771224164886,3771224230422,3771224295958,3771224492566,3771224361494,3771224689174,3771224820246,3771224623638,3771224427030,3771224754710,3771224951318,3771225016854,3771225082390,3771225147926,3771225344534,3771225410070,3771225475606,3771225934358,3771225541142,3771225868822,3771225737750,3771225606678,3771225803286,3771225672214,3771226065430,3771226130966,3771226196502,3771226262038,3771226393110,3771226720790,3771226458646,3771226655254,3771226524182,3771226589718&labels=Juliette%20Je%20t'aime%2C%20%C3%A9p.01%20-%20Une%20nouvelle%20venue%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.02%20-%20Qui%20est%20le%20Rom%C3%A9o%20de%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.03%20-%20Enfin%20seul%20avec%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.04%20-Hugo%20et%20ses%20examens,Juliette%20Je%20t'aime%2C%20%C3%A9p.05%20-%20Hugo%20s'est%20enfui%20de%20la%20pension%20des%20Mimosas,Juliette%20Je%20t'aime%2C%20%C3%A9p.06%20-%20Le%20secret%20de%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.07%20-%20L'image%20de%20Maxime,Juliette%20Je%20t'aime%2C%20%C3%A9p.08%20-%20Hugo%20se%20jure%20d'y%20arriver,Juliette%20Je%20t'aime%2C%20%C3%A9p.09%20-%20Le%20myst%C3%A9rieux%20professeur%20de%20tennis,Juliette%20Je%20t'aime%2C%20%C3%A9p.10%20-%20Maxime%20s%C3%A8me%20la%20zizanie,Juliette%20Je%20t'aime%2C%20%C3%A9p.11%20-%20Le%20premier%20amour%20de%20L%C3%A9o,Juliette%20Je%20t'aime%2C%20%C3%A9p.12%20-%20Labyrinthe%20amoureux,Juliette%20Je%20t'aime%2C%20%C3%A9p.13%20-%20Hugo%20et%20ses%20conqu%C3%AAtes,Juliette%20Je%20t'aime%2C%20%C3%A9p.14%20-%20Le%20premier%20rendez-vous%20de%20Juliette%20et%20de%20Hugo,Juliette%20Je%20t'aime%2C%20%C3%A9p.15%20-%20Le%20prince%20et%20la%20princesse,Juliette%20Je%20t'aime%2C%20%C3%A9p.16%20-%20Qui%20prendra%20soin%20de%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.17%20-%20Le%20premier%20amour%20de%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.18%20-%20Quel%20est%20le%20secret%20de%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.19%20-%20Une%20soir%C3%A9e%20en%20amoureux,Juliette%20Je%20t'aime%2C%20%C3%A9p.20%20-%20Hugo%20reviendra-t-il%20un%20jour,Juliette%20Je%20t'aime%2C%20%C3%A9p.21%20-%20Une%20nouvelle%20petite%20Juliette,Juliette%20Je%20t'aime%2C%20%C3%A9p.22%20-%20Le%20d%C3%A9part%20de%20Juliette%20-%201re%20partie,Juliette%20Je%20t'aime%2C%20%C3%A9p.23%20-%20Le%20d%C3%A9part%20de%20Juliette%20-%202e%20partie,Juliette%20Je%20t'aime%2C%20%C3%A9p.24%20-%20Deux%20ans%20d%C3%A9j%C3%A0,Juliette%20Je%20t'aime%2C%20%C3%A9p.25%20-%20La%20Strat%C3%A9gie%20de%20Fran%C3%A7ois,Juliette%20Je%20t'aime%2C%20%C3%A9p.26%20-%20Juliette%20change%20d'attitude,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.01%20-%20Maxime%20a%20disparu,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.02%20-%20Le%20p%C3%A8re%20de%20L%C3%A9o,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.03%20-%20La%20grande%20nuit%20de%20la%20peur,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.04%20-%20Le%20mariage,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.05%20-%20On%20finit%20toujours%20par%20regretter,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.06%20-%20Le%20cadeau%20empoisonn%C3%A9,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.07%20-%20La%20lettre,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.08%20-%20La%20strat%C3%A9gie%20de%20grand-m%C3%A8re,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.09%20-%20La%20poursuite%20infernale,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.10%20-%20Un%20amour%20d%C3%A9%C3%A7u,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.11%20-%20Une%20mascarade%20impromptue,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.12%20-%20Les%20angoisses%20de%20Suzanne,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.13%20-%20La%20pierre%20de%20No%C3%ABl,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.14%20-%20Joyeux%20No%C3%ABl,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.15%20-%20Vive%20le%20bon%20air,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.16%20-%20Hugo%20se%20casse%20la%20jambe,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.17%20-%20Les%20rivaux,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.18%20-%20Le%20pass%C3%A9%20inavou%C3%A9%20de%20St%C3%A9phane,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.19%20-%20Un%20amour%20v%C3%A9ritable,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.20%20-%20Une%20course%20pour%20Juliette,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.21%20-%20Juliette%20se%20fache,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.22%20-%20Loreiller%20de%20Juliette,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.23%20-%20Comment%20supporter%20les%20chiensen%2010%20le%C3%A7ons,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.24%20-%20Les%20premiers%20soupirs%20de%20Juliette,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.25%20-%20Un%20bruit%20qui%20court,Juliette%2C%20je%20t'aime%20(s2)%2C%20%C3%A9p.26%20-%20Les%20tristes%20souvenirs%20de%20Juliettes,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.01%20-%20La%20d%C3%A9claration%20de%20guerre,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.02%20-%20Le%20traquenard,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.03%20-%20Une%20nouvelle%20intrigue%20de%20Cl%C3%A9mentine,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.04%20-%20On%20ne%20renonce%20pas%20facilement%20%C3%A0%20son%20premier%20amour,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.05%20-%20Fran%C3%A7ois%20se%20d%C3%A9clare,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.06%20-%20Juliette%20se%20pose%20des%20questions,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.07%20-%20La%20d%C3%A9claration%20d'amour%20par%20magn%C3%A9tophone,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.08%20-%20%20Le%20malentendu,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.09%20-%20Les%20vacances%20de%20Juliette,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.10%20-%20Une%20%C3%A9trange%20baignade,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.11%20-%20Les%20cours%20particuliers,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.12%20-%20Tel%20est%20pris%20qui%20croyait%20prendre,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.13%20-%20Hugo%20essaye%20de%20se%20d%C3%A9barrasser%20de%20Cl%C3%A9mentine,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.14%20-%20Le%20d%C3%A9fi%20de%20Cl%C3%A9mentine,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.15%20-%20Hugo%20cherche%20du%20travail,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.16%20-%20Basebal,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.17%20-%20Une%20journ%C3%A9e%20%C3%A0%20la%20piscine,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.18%20-%20Les%20adieux%20%C3%A0%20l'a%C3%AFeule,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.19%20-%20Une%20soir%C3%A9e%20de%20Carnaval,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.20%20-%20Le%20porte-bonheur,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.21%20-%20Le%20groupe%20sanguin,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.22%20-%20Hugo%20prend%20ses%20responsabilit%C3%A9s,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.23%20-%20La%20maladie%20d'amour,Juliette%2C%20je%20t'aime%20(s3)%2C%20%C3%A9p.24%20-%20Les%20critiques%20de%20Fran%C3%A7ois,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.01%20-%20En%20toute%20conscience,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.02%20-%20Le%20secret%20de%20Hugo,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.03%20-%20Hugo%20fait%20la%20nounou,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.04%20-%20Cabaret,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.05%20-%20Fran%C3%A7ois%20voit%20rouge,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.06%20-%20Lola%20s'en%20va,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.07%20-%20Le%20pi%C3%A8ge,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.08%20-%20O%C3%B9%20Juliette%20a-t-elle%20pass%C3%A9%20la%20nuit,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.09%20-%20La%20bagarre,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.10%20-%20L'examen,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.11%20-%20Un%20heureux%20%C3%A9v%C3%A9nement,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.12%20-%20Le%20sacrifice,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.13%20-%20Le%20malentendu,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.14%20-%20Une%20nouvelle%20responsable,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.15%20-%20Hugo%20et%20Charlotte,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.16%20-%20La%20d%C3%A9claration%20d'amour,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.17%20-%20Hugo%20trouve%20un%20emploi,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.18%20-%20La%20demande%20en%20mariage,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.19%20-%20La%20bague%20de%20fian%C3%A7ailles,Juliette%2C%20je%20t'aime%20(s4)%2C%20%C3%A9p.20%20-%20La%20pension%20des%20mimosas%2C%20%C2%AB%20un%20paradis%20%C2%BB"
-                data-link data-target="target">
-                Playlist with long labels
-            </a>
-
-            <!-- index via l'URL (&index=3 → 4e vidéo) -->
-            <a href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059&index=3"
-                data-link data-target="target">
-                Playlist Okru avec index (URL, ?index=3)
-            </a>
-
-            <!-- index via l'attribut data-index (prioritaire sur l'URL) -->
-            <a href="https://ok.ru/video/6806953659125?video_ids=6806953659125,6806954052341,6812121631477,6812122483445,6812122811125,6812123597557&labels=Episode%2054,Episode%2055,Episode%2056,Episode%2057,Episode%2058,Episode%2059"
-                data-link data-target="target" data-index="5">
-                Playlist Okru avec data-index="5"
-            </a>
+    <!-- ═══════════════════ 3. MIXED ═══════════════════ -->
+    <section class="sec" id="sec-mixed">
+        <h2>3 · Mixed : les liens naviguent, les définitions décrivent</h2>
+        <p class="what">
+            Les liens n'ont que <code>data-link</code> (ni <code>data-target</code>, ni titre) : la cible vient de
+            <code>defaultTarget</code>. Les infos sont celles de <code>definitions</code> : un lien retrouve sa définition parce
+            que sa <strong>key</strong> est la même (par défaut <code>youtube:ID</code>, <code>youtube:list:ids</code>,
+            <code>youtube:playlist:PL…</code>, <code>okru:ID</code>, ou <code>data-key</code>). Survole les liens : l'infobulle montre la définition.
+        </p>
+        <div class="links" id="mixed-links">
+            <a data-link href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s"><span class="chip yt">YT</span>Bahamas (vidéo + start)</a>
+            <a data-link data-key="maldives" href="https://www.youtube.com/watch?v=69iUWLA0oVc"><span class="chip yt">YT</span>Maldives (key personnalisée)</a>
+            <a data-link href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2"><span class="chip yt">YT</span>Liste de vidéos</a>
+            <a data-link href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ"><span class="chip yt">YT</span>Playlist</a>
+            <a data-link href="https://ok.ru/video/17222095800962"><span class="chip ok">OK</span>Vidéo OK.ru</a>
+            <a data-link data-old-okru href="#"><span class="chip ok">OK</span>Ancienne version OK.ru</a>
         </div>
+        <div class="links">
+            <button id="add-link" class="primary" type="button">+ ajouter un lien dynamiquement (Tahiti)</button>
+            <span class="note">Il n'y a pas d'observer : le lien n'est pris en compte qu'après <code>lp.scan()</code>, appelé par ce bouton.</span>
+        </div>
+        <div class="player-zone" id="player-mixed"></div>
+        <div class="controls" data-controls="player-mixed"></div>
+    </section>
 
-        <div id="target" class="video-container"></div>
+    <!-- ═══════════════════ 4. COMPORTEMENTS ═══════════════════ -->
+    <section class="sec" id="sec-behavior">
+        <h2>4 · Comportements : <code>currentBehavior</code>, <code>useStorage</code>, <code>showOnInit</code>, <code>defaultTarget</code></h2>
+        <p class="what">
+            Mêmes liens, deux <code>LinkPlayer</code>. Clique <strong>deux fois</strong> sur le lien en cours :
+            avec <code>"toggle"</code> le lecteur se masque puis se ré-affiche, avec <code>"skip"</code> il ne se passe rien.
+            Le premier lien de chaque zone a <code>data-show-on-init</code> (affiché au chargement).
+            À gauche <code>useStorage: true</code> : recharge la page, le dernier lien est restauré (et prime sur <code>showOnInit</code>) ;
+            à droite <code>useStorage: false</code> : on repart toujours de <code>showOnInit</code>.
+        </p>
+        <div class="row">
+            <div id="zone-toggle">
+                <span class="tag">currentBehavior: "toggle" · useStorage: true · defaultTarget: "player-toggle"</span>
+                <div class="links">
+                    <a data-link data-show-on-init href="https://www.youtube.com/watch?v=69iUWLA0oVc" data-title="Maldives">Maldives</a>
+                    <a data-link href="https://www.youtube.com/watch?v=5drmgVauSMg" data-title="Tahiti">Tahiti</a>
+                    <a data-link href="https://ok.ru/video/17222095800962" data-title="MacGyver">OK.ru</a>
+                </div>
+                <div class="player-zone" id="player-toggle"></div>
+                <div class="controls" data-controls="player-toggle"></div>
+            </div>
+            <div id="zone-skip">
+                <span class="tag">currentBehavior: "skip" · useStorage: false · defaultTarget: "player-skip"</span>
+                <div class="links">
+                    <a data-link data-show-on-init href="https://www.youtube.com/watch?v=69iUWLA0oVc" data-title="Maldives">Maldives</a>
+                    <a data-link href="https://www.youtube.com/watch?v=5drmgVauSMg" data-title="Tahiti">Tahiti</a>
+                    <a data-link href="https://ok.ru/video/17222095800962" data-title="MacGyver">OK.ru</a>
+                </div>
+                <div class="player-zone" id="player-skip"></div>
+                <div class="controls" data-controls="player-skip"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════ 5. API YOUTUBE ═══════════════════ -->
+    <section class="sec" id="sec-api">
+        <h2>5 · YouTube Data API et <code>fallbackTitle</code></h2>
+        <p class="what">
+            Ces liens n'ont aucun <code>data-videos</code> : les titres des vidéos viennent de l'API YouTube Data quand une clé est
+            fournie (champ à droite), sinon <code>fallbackTitle: (i) => "Épisode " + (i + 1)</code> les remplace.
+        </p>
+        <p class="note" id="api-status"></p>
+        <div class="links">
+            <a data-link data-target="player-api" href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4"><span class="chip yt">YT</span>Liste de vidéos sans titres</a>
+            <a data-link data-target="player-api" href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ"><span class="chip yt">YT</span>Playlist sans titres</a>
+        </div>
+        <div class="player-zone" id="player-api"></div>
+        <div class="controls" data-controls="player-api"></div>
+        <p class="note">L'id de playlist <code>PLYALQE76y6LQ</code> vient de tes exemples : il paraît tronqué, une vraie playlist a 34 caractères.</p>
+    </section>
+
+    <!-- ═══════════════════ 6. ADOPTION ═══════════════════ -->
+    <section class="sec" id="sec-adopt">
+        <h2>6 · Adoption d'iframes existantes (playlist et liste de vidéos)</h2>
+        <p class="what">
+            Ces iframes sont déjà dans la page ; le <code>LinkPlayer</code> les reconnaît, lit leur <code>src</code>
+            (<code>list=</code> pour la playlist, <code>playlist=a,b&amp;index=2&amp;start=120</code> pour la liste), les pilote
+            et ajoute le panneau. Chaque iframe est dans son propre conteneur (un conteneur = une région = un seul item actif).
+        </p>
+        <h3>Playlist <code>embed/videoseries?list=…</code></h3>
+        <div class="player-zone" id="adopt-playlist">
+            <iframe src="https://www.youtube.com/embed/videoseries?list=PLfO5yE9Cc3wo" title="Playlist adoptée"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+        <div class="controls" data-controls="adopt-playlist"></div>
+
+        <h3>Liste de vidéos <code>embed/?playlist=…&amp;index=2&amp;start=120</code></h3>
+        <div class="player-zone" id="adopt-list">
+            <iframe src="https://www.youtube.com/embed/?playlist=z2sv_RsNwM4,-xiF9YIIUk4&index=2&start=120" title="Liste adoptée"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+        </div>
+        <div class="controls" data-controls="adopt-list"></div>
+        <p class="note">
+            À l'adoption, <code>YouTubePlayer</code> recharge l'iframe une fois pour y ajouter <code>enablejsapi=1</code> et
+            <code>origin</code> (sinon aucune commande ne passerait).
+        </p>
+    </section>
+
+    <!-- ═══════════════════ 7. GLOBAL vs SCOPÉ ═══════════════════ -->
+    <section class="sec" id="sec-global">
+        <h2>7 · Un LinkPlayer global, un LinkPlayer scopé sans infobulle</h2>
+        <p class="what">
+            Le LinkPlayer <strong>global</strong> (sans <code>scope</code>) regarde tout le document, avec infobulles, <code>"toggle"</code>
+            et <code>defaultTarget: "player-global"</code>. Le LinkPlayer <strong>scopé</strong> ne voit que <code>#zone-scoped</code>,
+            sans infobulle, avec <code>"skip"</code>. Un lien déjà pris en charge (<code>data-lp</code>) est ignoré par l'autre :
+            <strong>les scopés sont donc créés avant le global</strong> (voir le script), sinon le global prendrait leurs liens.
+        </p>
+        <div class="row">
+            <div>
+                <span class="tag">global · tooltip: true · toggle</span>
+                <div class="links">
+                    <a data-link href="https://www.youtube.com/watch?v=k8m0SaGQ_1c" data-title="Vietnam" data-channel="Me"
+                       data-thumbnail="https://i.ytimg.com/vi/k8m0SaGQ_1c/mqdefault.jpg">Vietnam (global)</a>
+                    <a data-link href="https://ok.ru/video/17222095800962" data-title="MacGyver" data-channel="Retime Clips Okru">OK.ru (global)</a>
+                </div>
+                <div class="player-zone" id="player-global"></div>
+                <div class="controls" data-controls="player-global"></div>
+            </div>
+            <div id="zone-scoped">
+                <span class="tag">scopé (#zone-scoped) · tooltip: false · skip</span>
+                <div class="links">
+                    <a data-link data-target="player-scoped" data-show-on-init href="https://www.youtube.com/watch?v=YCfcg9gzCYc"
+                       data-title="Scoped only">Vidéo scopée (showOnInit)</a>
+                </div>
+                <div class="player-zone" id="player-scoped"></div>
+                <div class="controls" data-controls="player-scoped"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="sec">
+        <h2>Personnalisation (non montrée ici)</h2>
+        <p class="what">
+            Panneau, infobulle et styles se branchent par options du constructeur. Je ne connais pas les interfaces de tes classes,
+            donc rien n'est actif : le squelette est dans le script, en commentaire.
+        </p>
+    </section>
+</main>
+
+<aside>
+    <div class="box">
+        <h2>Clé YouTube Data API</h2>
+        <input id="yt-key" type="password" placeholder="AIza… (gardée dans localStorage)" autocomplete="off">
+        <div class="controls" style="margin:0">
+            <button id="yt-save" type="button" class="primary">Enregistrer + recharger</button>
+            <button id="yt-clear" type="button">Effacer</button>
+        </div>
+        <p class="note" style="margin:8px 0 0">La clé n'est pas écrite dans la page : elle reste dans ton navigateur.</p>
     </div>
+    <div class="box">
+        <h2>Stockage</h2>
+        <button id="reset-storage" type="button">Oublier l'état sauvegardé + recharger</button>
+        <p class="note" style="margin:8px 0 0">Supprime les entrées <code>localStorage</code> dont la clé contient <code>state:</code> (heuristique).</p>
+    </div>
+    <div class="box" style="min-height:0; display:flex; flex-direction:column">
+        <h2>Journal <button id="log-clear" type="button" style="float:right;padding:1px 8px">Effacer</button></h2>
+        <ul id="log"></ul>
+    </div>
+</aside>
+</div>
 
+<script type="module">
+    // Adapte ce chemin à ton projet (LinkPlayer.js exporte aussi DefaultRegionHost).
+    import {LinkPlayer} from "../src/LinkPlayer.js";
 
-    <script type="module">
-        import { LinkPlayer } from "../src/LinkPlayer.js";
+    // Rendus personnalisés : à décommenter si tu veux les essayer (chemins et classes = les tiens).
+    // import {SimpleTipRenderer} from "./ui/SimpleTipRenderer.js";
+    // import {GoldItemRenderer} from "./ui/GoldItemRenderer.js";
 
-        function getTheme() {
-            const saved = localStorage.getItem('theme');
-            if (saved) return saved;
+    // ───────── réglages communs ─────────
+    const OKRU_BASE = "https://okru-embed.vercel.app/";
+    const KEY_STORE = "lp-demo-yt-key";
+    // "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M"
+    const YT_KEY = (() => { try { return localStorage.getItem(KEY_STORE) || ""; } catch { return ""; } })();
+    const fallbackTitle = (i) => `Épisode ${i + 1}`;
 
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const $ = (sel, root = document) => root.querySelector(sel);
+
+    // ───────── journal ─────────
+    const logEl = $("#log");
+    function log(who, type, text) {
+        const li = document.createElement("li");
+        const time = new Date().toLocaleTimeString("fr-FR");
+        li.innerHTML = `<span class="who">${time} ${who}</span> <span class="t-${type}">${type}</span> `;
+        li.append(text);
+        logEl.prepend(li);
+        while (logEl.children.length > 80) logEl.lastChild.remove();
+    }
+    $("#log-clear").onclick = () => (logEl.textContent = "");
+
+    /** Callbacks onChange / onState / onError de chaque LinkPlayer, branchés sur le journal. */
+    const hooks = (who) => ({
+        onChange: (e) => log(who, "change", `${e.region?.target} · ${e.reason} · ${e.info?.key ?? "—"} #${e.index ?? 0}${e.visible === false ? " · masqué" : ""}`),
+        onState: (e) => log(who, "state", `${e.region?.target} · ${e.state}${e.index != null ? " #" + e.index : ""}`),
+        onError: (e) => log(who, "error", String(e.error?.message ?? e.error ?? e))
+    });
+
+    const base = (who, extra = {}) => ({
+        useStorage: false,
+        okruEmbedBaseUrl: OKRU_BASE,
+        ...hooks(who),
+        ...extra
+    });
+
+    // ───────── helpers de page ─────────
+    const regions = new Map(); // id de cible -> region
+
+    /** Récupère les régions d'un LinkPlayer pour les contrôles de page. */
+    function track(lp, ...targets) {
+        for (const t of targets) regions.set(t, lp.getRegion(t));
+    }
+
+    /** Barre de navigation d'une région : toutes les méthodes de navigation + un état lisible. */
+    function mountControls(host, region) {
+        const actions = [
+            ["◀ Back", "goBack", "canGoBack"],
+            ["Forward ▶", "goForward", "canGoForward"],
+            null,
+            ["⏮ Info préc.", "previousInfo", "canGoPreviousInfo"],
+            ["Info suiv. ⏭", "nextInfo", "canGoNextInfo"],
+            null,
+            ["‹ Item préc.", "previousItem", "canGoPreviousItem"],
+            ["Item suiv. ›", "nextItem", "canGoNextItem"],
+            null,
+            ["Afficher / masquer", "toggle", null]
+        ];
+        const buttons = [];
+        for (const a of actions) {
+            if (!a) {
+                const sep = document.createElement("span");
+                sep.className = "sep";
+                host.append(sep);
+                continue;
+            }
+            const [label, method, can] = a;
+            const b = document.createElement("button");
+            b.type = "button";
+            b.textContent = label;
+            b.onclick = () => region[method]();
+            b.dataset.can = can ?? "";
+            buttons.push(b);
+            host.append(b);
+        }
+        const status = document.createElement("span");
+        status.className = "status";
+        host.append(status);
+
+        const refresh = () => {
+            for (const b of buttons) b.disabled = b.dataset.can ? !region[b.dataset.can] : false;
+            const cur = region.current;
+            status.textContent = cur
+                ? `${cur.key}${cur.isPlaylist ? " · item " + region.currentIndex : ""}${region.isVisible ? "" : " · masqué"}`
+                : "aucune info affichée";
+        };
+        region.on("change", refresh);
+        refresh();
+    }
+
+    // ═══════════ 1. LINK ONLY ═══════════
+    const lpLink = new LinkPlayer({
+        scope: "sec-link",
+        tooltip: true,
+        ...base("1-link")
+    });
+    track(lpLink, "player-link");
+
+    // ═══════════ 2. CODE ONLY ═══════════
+    const T_CODE = "player-code";
+    const LOREM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit…";
+
+    // (même forme que ton createDestination ; `url` évite de dépendre de buildUrl)
+    const destination = ({title, videoId, description, link, startSeconds, ...rest}) => ({
+        key: title.toLowerCase(),
+        title,
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        target: T_CODE,
+        start: startSeconds,
+        autoplay: "click",
+        extra: {
+            description: description || LOREM,
+            link: link || {href: `https://example.com/${title}`, text: `Guide de ${title}`}
+        },
+        ...rest
+    });
+
+    const OK_IDS = ["3953767680692", "3953767877300", "3953768270516", "3953768532660"];
+    const OK_LABELS = OK_IDS.map((_, i) => `La Caverne de la Rose d'Or, ép.0${i + 1} - BluRay 720p VF`);
+    // ancien format : ids séparés par des virgules, labels encodés (une virgule dans un titre devient %2C)
+    const OLD_OK_URL = `https://ok.ru/video/${OK_IDS[0]}?video_ids=${OK_IDS.join(",")}&labels=${OK_LABELS.map(encodeURIComponent).join(",")}`;
+
+    const codeDefs = [
+        destination({title: "Bahamas", videoId: "z2sv_RsNwM4", startSeconds: 2712, showOnInit: true,
+            description: "Un archipel de plus de 700 îles : eaux turquoise…"}),
+        destination({title: "Maldives", videoId: "69iUWLA0oVc"}),
+        destination({title: "Tahiti", videoId: "5drmgVauSMg"}),
+        {
+            key: "trip", url: "https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4,69iUWLA0oVc",
+            target: T_CODE, title: "Trip (liste)", index: 1, autoplay: "click",
+            videos: [{title: "ASMR"}, {title: "Trains", channel: "Me"}, {title: "Maldives"}],
+            extra: {description: "Liste de trois vidéos, démarrage sur la 2e (index 1).", link: {href: "https://example.com/trip", text: "Détails du trip"}}
+        },
+        {
+            key: "v1983", url: "https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ",
+            target: T_CODE, channel: "Retime Clips",
+            videos: [
+                {videoId: "s11CNT_hQTg", title: "V (1983) – L’arrivée des Visiteurs"},
+                {videoId: "C_dEl2cMCEA", title: "V (1983) – Diana propose son expérience"}
+            ],
+            extra: {description: "Playlist avec vidéo de départ.", link: {href: "https://example.com/v", text: "Fiche de la série"}}
+        },
+        {
+            key: "macgyver", url: "https://ok.ru/video/17222095800962", target: T_CODE,
+            title: "MacGyver S03E08 VF | Accident en Haute Montagne", channel: "Retime Clips Okru",
+            extra: {description: "Vidéo OK.ru simple.", link: {href: "https://ok.ru", text: "OK.ru"}}
+        },
+        {
+            key: "caverne", url: OLD_OK_URL, target: T_CODE,
+            extra: {description: "Ancienne version : video_ids + labels dans l'URL.", link: {href: "https://ok.ru", text: "OK.ru"}}
+        }
+    ];
+
+    const lpCode = new LinkPlayer({
+        scope: "sec-code",
+        autoScan: false,
+        tooltip: false,
+        definitions: codeDefs,
+        ...base("2-code")
+    });
+    lpCode.scan(); // les définitions existent déjà : un scan suffit pour initialiser la région (showOnInit)
+    track(lpCode, T_CODE);
+
+    {
+        const region = regions.get(T_CODE);
+        const box = $("#code-buttons");
+
+        // un bouton par info, branché sur region.navigate()
+        for (const info of region.infos) {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.textContent = info.title || info.key;
+            b.title = info.key;
+            b.onclick = () => region.navigate(info.key, {autoplay: true});
+            box.append(b);
         }
 
-        console.log("Theme de l'appareil", getTheme());
+        // détails : dépendance de vue (item d'une liste) + écoute du changement d'info
+        const details = $("#code-details");
+        const render = (info) => {
+            details.textContent = "";
+            if (!info) return;
+            const item = info.isPlaylist ? info.videos[region.currentIndex] : null;
+            const title = document.createElement("strong");
+            title.textContent = item?.title || info.title || info.key;
+            const desc = document.createElement("span");
+            desc.textContent = (info.extra?.description ?? "") + (item ? ` — item ${region.currentIndex + 1}` : "");
+            details.append(title, desc);
+            if (info.extra?.link) {
+                const a = document.createElement("a");
+                a.href = info.extra.link.href;
+                a.textContent = ` ${info.extra.link.text}`;
+                a.target = "_blank";
+                a.rel = "noopener";
+                details.append(a);
+            }
+        };
+        region.registerDependentView("details", render); // item d'une liste / playlist
+        region.on("change", (e) => render(e.info));      // changement d'info
+        render(region.current);
+    }
 
-        new LinkPlayer({
-            scope: '#scope',
-            embedBaseUrl: "https://okru-embed.vercel.app/?id=",
-            youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
-            // theme:"light",
-            // wrapEmbed: iframe => `<div class="video-container">${iframe}</div>`,
-            onChange: (url, link) => {
-                console.log("change", url, link);
-            },
-            onError: msg => console.warn('[LinkedEmbed]', msg),
-        });
-    </script>
+    // ═══════════ 3. MIXED ═══════════
+    const T_MIXED = "player-mixed";
+    $('a[data-old-okru]').href = OLD_OK_URL; // même URL que la définition, donc même key
 
+    const mixedDefs = [
+        {url: "https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s", target: T_MIXED, title: "Bahamas", channel: "Me",
+            thumbnail: "https://i.ytimg.com/vi/z2sv_RsNwM4/mqdefault.jpg", autoplay: "click"},
+        {url: "https://www.youtube.com/watch?v=69iUWLA0oVc", target: T_MIXED, key: "maldives", title: "Maldives", channel: "Me", autoplay: "click"},
+        {url: "https://www.youtube.com/watch?v=5drmgVauSMg", target: T_MIXED, title: "Tahiti (ajouté par scan())"},
+        {url: "https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2", target: T_MIXED, title: "Trip",
+            videos: [{title: "ASMR"}, {title: "Trains", channel: "Me"}]},
+        {url: "https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ", target: T_MIXED, channel: "Retime Clips",
+            videos: [
+                {videoId: "s11CNT_hQTg", title: "V (1983) – L’arrivée des Visiteurs"},
+                {videoId: "C_dEl2cMCEA", title: "V (1983) – Diana propose son expérience"}
+            ]},
+        {url: "https://ok.ru/video/17222095800962", target: T_MIXED,
+            title: "MacGyver S03E08 VF | Accident en Haute Montagne", channel: "Retime Clips Okru"},
+        {url: OLD_OK_URL, target: T_MIXED}
+    ];
+
+    const lpMixed = new LinkPlayer({
+        scope: "sec-mixed",
+        tooltip: true,
+        defaultTarget: T_MIXED,
+        definitions: mixedDefs,
+        ...base("3-mixed")
+    });
+    track(lpMixed, T_MIXED);
+
+    $("#add-link").onclick = (e) => {
+        const a = document.createElement("a");
+        a.dataset.link = "";
+        a.href = "https://www.youtube.com/watch?v=5drmgVauSMg"; // même key que la définition « Tahiti »
+        a.innerHTML = '<span class="chip yt">YT</span>Tahiti (ajouté)';
+        $("#mixed-links").append(a);
+        lpMixed.scan(); // pas d'observer : on demande la découverte
+        e.currentTarget.disabled = true;
+        log("3-mixed", "change", "lien ajouté puis lp.scan()");
+    };
+
+    // ═══════════ 4. COMPORTEMENTS ═══════════
+    const lpToggle = new LinkPlayer({
+        scope: "zone-toggle",
+        currentBehavior: "toggle",
+        defaultTarget: "player-toggle",
+        tooltip: true,
+        ...base("4-toggle", {useStorage: true})
+    });
+    const lpSkip = new LinkPlayer({
+        scope: "zone-skip",
+        currentBehavior: "skip",
+        defaultTarget: "player-skip",
+        tooltip: true,
+        ...base("4-skip", {useStorage: false})
+    });
+    track(lpToggle, "player-toggle");
+    track(lpSkip, "player-skip");
+
+    // ═══════════ 5. API YOUTUBE + fallbackTitle ═══════════
+    const lpApi = new LinkPlayer({
+        scope: "sec-api",
+        tooltip: false,
+        youtubeApiKey: YT_KEY || null,
+        fallbackTitle,
+        ...base("5-api")
+    });
+    track(lpApi, "player-api");
+    $("#api-status").textContent = YT_KEY
+        ? "Clé API présente : les titres sont demandés à YouTube Data (fallbackTitle sert si la requête échoue)."
+        : "Pas de clé API : les titres viennent de fallbackTitle (« Épisode 1 », « Épisode 2 »…). Ajoute une clé à droite pour comparer.";
+
+    // ═══════════ 6. ADOPTION ═══════════
+    const lpAdopt = new LinkPlayer({
+        scope: "sec-adopt",
+        tooltip: false,
+        youtubeApiKey: YT_KEY || null,
+        fallbackTitle,
+        ...base("6-adopt")
+    });
+    track(lpAdopt, "adopt-playlist", "adopt-list");
+
+    // ═══════════ 7. SCOPÉ puis GLOBAL (l'ordre compte) ═══════════
+    const lpScoped = new LinkPlayer({
+        scope: "zone-scoped",
+        tooltip: false,
+        currentBehavior: "skip",
+        ...base("7-scoped")
+    });
+    track(lpScoped, "player-scoped");
+
+    // Créé EN DERNIER : un lien déjà marqué data-lp par un scopé est ignoré par le global.
+    const lpGlobal = new LinkPlayer({
+        tooltip: true,
+        currentBehavior: "toggle",
+        defaultTarget: "player-global",
+        youtubeApiKey: YT_KEY || null,
+        fallbackTitle,
+        // tooltipRenderer: new SimpleTipRenderer(),
+        // itemRenderer: new GoldItemRenderer(),
+        ...base("7-global", {useStorage: true})
+    });
+    track(lpGlobal, "player-global");
+
+    // ───────── barres de navigation ─────────
+    for (const host of document.querySelectorAll("[data-controls]")) {
+        const region = regions.get(host.dataset.controls);
+        if (region) mountControls(host, region);
+        else host.textContent = `(pas de région « ${host.dataset.controls} »)`;
+    }
+
+    // ───────── panneau latéral ─────────
+    const keyInput = $("#yt-key");
+    keyInput.value = YT_KEY;
+    $("#yt-save").onclick = () => {
+        try { localStorage.setItem(KEY_STORE, keyInput.value.trim()); } catch {}
+        location.reload();
+    };
+    $("#yt-clear").onclick = () => {
+        try { localStorage.removeItem(KEY_STORE); } catch {}
+        location.reload();
+    };
+    $("#reset-storage").onclick = () => {
+        try {
+            Object.keys(localStorage).filter((k) => k.includes("state:")).forEach((k) => localStorage.removeItem(k));
+        } catch {}
+        location.reload();
+    };
+
+    // pour tester dans la console
+    window.lps = {lpLink, lpCode, lpMixed, lpToggle, lpSkip, lpApi, lpAdopt, lpScoped, lpGlobal};
+</script>
 </body>
-
 </html>

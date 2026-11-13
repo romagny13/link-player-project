@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo</title>
+</head>
+
+<body>
+
+<script>
+    // scan ne decouvre pas les elements
+
+    // decouvre les elements dans le dom
+    class RegionHost {
+        #catalog;
+        #root;
+
+        init({
+                 catalog,
+                 root = document,
+                 onDiscoverLink,
+                 onDiscoverTarget,
+                 onDiscoverFrame
+             }) {
+            this.#catalog = catalog;
+            this.#root = root;
+
+            this.discoverLinks();
+            this.discoverTargets();
+            this.discoverFrames();
+        }
+
+        // get regions
+        discoverLinks() {
+
+        }
+    }
+
+    class RegionCatalog {
+        #regions;
+    }
+
+
+</script>
+
+<h2>Links</h2>
+
+<div id="links-region"></div>
+
+<a href="https://www.youtube.com/watch?v=z2sv_RsNwM4" data-link>Single Video</a>
+<a href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4" data-link>Video List</a>
+<a href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ" data-link>Playlist</a>
+
+
+<script type="module">
+    import {LinkPlayer} from "../src/LinkPlayer.js";
+
+    class UrlInfo {
+        #kind;
+        #videoId;
+        #videoIds;
+        #playlistId;
+        #startSeconds;
+        #index;
+        #autoplay;
+        #mute;
+
+        constructor({
+                        kind,
+                        videoId = null,
+                        videoIds = null,
+                        playlistId = null,
+                        startSeconds = null,
+                        index = null,
+                        autoplay = null,
+                        mute = null
+                    }) {
+            this.#kind = kind;
+            this.#videoId = videoId;
+            this.#videoIds = videoIds;
+            this.#playlistId = playlistId;
+            this.#startSeconds = startSeconds;
+            this.#index = index;
+            this.#autoplay = autoplay;
+            this.#mute = mute;
+        }
+
+        get kind() {
+            return this.#kind;
+        }
+
+        get videoId() {
+            return this.#videoId;
+        }
+
+        get videoIds() {
+            return this.#videoIds;
+        }
+
+        get playlistId() {
+            return this.#playlistId;
+        }
+
+        get startSeconds() {
+            return this.#startSeconds;
+        }
+
+        get index() {
+            return this.#index;
+        }
+
+        get autoplay() {
+            return this.#autoplay;
+        }
+
+        get mute() {
+            return this.#mute;
+        }
+    }
+
+    class UrlInfoHelper {
+        static isValidVideoId(id) {
+            return typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id);
+        }
+
+        static timeToSeconds(v) {
+            if (v == null || v === '') return null;
+            if (/^\d+$/.test(v)) return parseInt(v, 10);
+
+            const m = String(v).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
+            if (!m || (!m[1] && !m[2] && !m[3])) return null;
+
+            return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
+        }
+
+        static toInt(v) {
+            if (v == null || v === '') return null;
+            const n = parseInt(v, 10);
+            return Number.isNaN(n) ? null : n;
+        }
+
+        static toBool01(v) {
+            if (v === '1' || v === 1 || v === true) return true;
+            if (v === '0' || v === 0 || v === false) return false;
+            return null;
+        }
+    }
+
+    class YouTubeUrl {
+        resolveFromUrl(url) {
+            const u = this.#getValidUrl(url);
+            if (!u) throw new Error("Invalid URL");
+
+            let host = u.hostname.toLowerCase();
+            if (host.startsWith('www.')) host = host.slice(4);
+
+            const path = u.pathname.replace(/\/+$/, '') || '/';
+            const p = u.searchParams;
+
+            // ---------- youtu.be ----------
+            if (host === 'youtu.be') {
+                const videoId = path.slice(1);
+
+                if (!UrlInfoHelper.isValidVideoId(videoId)) {
+                    throw new Error("Invalid video ID");
+                }
+
+                const playlistId = p.get('list') || null;
+                const startSeconds = UrlInfoHelper.timeToSeconds(p.get('t'));
+
+                return new UrlInfo({
+                    kind: playlistId ? 'playlist' : 'video',
+                    videoId,
+                    playlistId,
+                    startSeconds
+                });
+            }
+
+            // ---------- youtube.com family ----------
+            if (host.endsWith('youtube.com')) {
+
+                // /watch
+                if (path === '/watch') {
+                    const videoId = p.get('v');
+                    const playlistId = p.get('list') || null;
+                    const index = UrlInfoHelper.toInt(p.get('index'));
+                    const startSeconds = UrlInfoHelper.timeToSeconds(p.get('t'));
+
+                    if (videoId && !UrlInfoHelper.isValidVideoId(videoId)) {
+                        throw new Error("Invalid video ID");
+                    }
+
+                    if (playlistId) {
+                        return new UrlInfo({
+                            kind: 'playlist',
+                            videoId: videoId || null,
+                            playlistId,
+                            startSeconds,
+                            index
+                        });
+                    }
+
+                    if (videoId) {
+                        return new UrlInfo({
+                            kind: 'video',
+                            videoId,
+                            startSeconds
+                        });
+                    }
+
+                    throw new Error("Missing video ID or playlist");
+                }
+
+                // /watch_videos
+                if (path === '/watch_videos') {
+                    const raw = p.get('video_ids');
+                    if (!raw) throw new Error("Missing video_ids");
+
+                    const videoIds = raw.split(',')
+                        .map(id => id.trim())
+                        .filter(id => UrlInfoHelper.isValidVideoId(id));
+
+                    if (videoIds.length === 0) {
+                        throw new Error("No valid video IDs");
+                    }
+
+                    const index = UrlInfoHelper.toInt(p.get('index'));
+
+                    return new UrlInfo({
+                        kind: 'videoList',
+                        videoIds,
+                        videoId: videoIds[0],
+                        index
+                    });
+                }
+            }
+
+            throw new Error("Unsupported YouTube URL");
+        }
+
+        resolveFromSrc(src) {
+            const u = this.#getValidUrl(src);          // ← corrigé
+            if (!u) throw new Error("Invalid URL");
+
+            let host = u.hostname.toLowerCase();
+            if (host.startsWith('www.')) host = host.slice(4);
+
+            if (!host.endsWith('youtube.com') && host !== 'youtube-nocookie.com') {
+                throw new Error("Invalid embed host");
+            }
+
+            const path = u.pathname.replace(/\/+$/, '');
+            if (!path.startsWith('/embed')) {
+                throw new Error("Invalid embed URL");
+            }
+
+            const p = u.searchParams;
+            const segments = path.split('/').filter(Boolean); // ["embed", "xxx"]
+            const seg = segments[1] || null;
+
+            const videoId = (seg && seg !== 'videoseries' && UrlInfoHelper.isValidVideoId(seg))
+                ? seg
+                : null;
+
+            const playlistId = p.get('list') || null;
+            const rawPlaylist = p.get('playlist'); // video list for embeds
+            const videoIds = rawPlaylist
+                ? rawPlaylist.split(',').map(id => id.trim()).filter(id => UrlInfoHelper.isValidVideoId(id))
+                : null;
+
+            const startSeconds = UrlInfoHelper.toInt(p.get('start'));
+            const index = UrlInfoHelper.toInt(p.get('index'));
+            const autoplay = UrlInfoHelper.toBool01(p.get('autoplay'));
+            const mute = UrlInfoHelper.toBool01(p.get('mute'));
+
+            let kind = null;
+            if (playlistId) kind = 'playlist';
+            else if (videoIds && videoIds.length) kind = 'videoList';
+            else if (videoId) kind = 'video';
+            else throw new Error("Invalid embed URL");
+
+            return new UrlInfo({
+                kind,
+                videoId,
+                videoIds,
+                playlistId,
+                startSeconds,
+                index,
+                autoplay,
+                mute
+            });
+        }
+
+        #getValidUrl(url) {
+            try {
+                return new URL(String(url).trim());
+            } catch {
+                return null;
+            }
+        }
+    }
+
+
+    // pour une region scoped on doit pouvoir definir la target pour tous les liens
+
+    class LinkResolver {
+        resolve(root) {
+            return root.querySelectorAll("[data-link]");
+        }
+
+        resolveRegion() {
+            // soit pour tous les liens d'un scope on recuere data-target
+            // et on retourne une collection
+        }
+    }
+
+    class RegionCatalog {
+        // delayed
+
+        // soit a la creation si l'element existe deja dans la page
+
+        // soit a la decouverte de l'element
+        // scan en boucle ? scan a la demande
+    }
+
+    // Host => a la decouverte d'un element region name => enregistre l'element dans le catalog
+    // code => get region () => effectuer une action de navigation => soit l'element / region existe/ enregistré
+    // => sinon on enregistre une action a executer (queu) dans le catalog
+    // decouvre les commands
+    // decouvre les elements regions
+    // decouvre iframes existantes
+
+    class RegionHost {
+        #root;
+        #links = new Map();      // href → element
+        #targets = new Set();    // target ids
+        #frames = new Set();     // iframe elements
+        #defaultTarget = null;
+
+        constructor(defaultTarget) {
+            if (defaultTarget) {
+                this.setDefaultTarget(defaultTarget);
+            }
+        }
+
+        get links() {
+            return Object.freeze([...this.#links.values()]);
+        }
+
+        get targets() {
+            return Object.freeze([...this.#targets]);
+        }
+
+        get frames() {
+            return Object.freeze([...this.#frames]);
+        }
+
+        get defaultTarget() {
+            return this.#defaultTarget;
+        }
+
+        Initialize(root = document) {
+            this.#root = root;
+        }
+
+        setDefaultTarget(target) {
+            if (!target) return;
+            this.#defaultTarget = target;
+            this.#targets.add(target);
+        }
+
+        discoverLinks() {
+            const elements = this.getLinks();
+            const newLinks = [];
+
+            for (const el of elements) {
+                const href = el.tagName === "A" ? el.href : el.dataset.url;
+
+                if (!href || this.#links.has(href)) continue;
+
+                if (el.dataset.target)
+                    this.#targets.add(el.dataset.target);
+
+                this.#links.set(href, el);
+                newLinks.push(el);
+            }
+
+            return newLinks;
+        }
+
+        getLinks() {
+            const elements = this.#root.querySelectorAll("[data-link]");
+            return elements;
+        }
+
+        discoverTargets() {
+           const newTargets = [];
+            for (const link of this.#links) {
+                const target = link.dataset.target?.trim();
+                if (!target) continue;
+
+
+                this.#targets.add(target);
+                newTargets.push(target);
+            }
+            return newTargets;
+        }
+
+        discoverFrames() {
+            const elements = this.#root.querySelectorAll("iframe");
+            const newFrames = [];
+
+            for (const el of elements) {
+                if (this.#frames.has(el)) continue;
+
+                this.#frames.add(el);
+                newFrames.push(el);
+            }
+
+            return newFrames;
+        }
+
+        // Optional: clear everything
+        clear() {
+            this.#links.clear();
+            this.#targets.clear();
+            this.#frames.clear();
+            this.#defaultTarget = null;
+        }
+    }
+
+    class Region {
+        #name;
+        #element;
+    }
+
+    // class Region Host
+    // decouvre tous les links , targets des links
+    // on cherche dans le root les elements correspondants aux targets (init puis observe)
+    // +> des qu'on trouve un element target pas encore enregostré => on notifie ou on enregsitre dans le "Region catalog"
+    // - si y a des actions de navigation pending on les execute.
+
+    // navigator
+    // en code, si on essaie de naviguer vers une region (class Region) avant que son element target soit decouvert on enregistre une action pending dans le catalog
+    //
+
+    class RegionHost {
+        // role, decouvrir dans le dom des regions
+    }
+
+    class RegionCatalog {
+        RegisterRegion(element, regionName) {
+
+        }
+    }
+
+    // c'est lui en fait le region catalog
+    class LinkPlayer {
+        constructor() {
+        }
+
+        registerRegion() {
+
+        }
+
+        scan() {
+            // detects links
+        }
+    }
+
+
+    // YouTube
+    // --- VIDEO ----
+    // URL => https://www.youtube.com/watch :
+    // https://youtu.be/s11CNT_hQTg?si=1pobxaALef3LSxuB&t=60
+    // - v (video Id OBLIGATOIRE)
+    // - t (temps de depart FACULTATIF en secondes t=90 ou format temporel t=1m30s, t=1h2m30s)
+
+    // IFRAME
+    // src="https://www.youtube.com/embed/OKmD6fS0P_I?si=wulUtSQlodRUnwvL&amp;start=120"
+    // SRC => src="https://www.youtube.com/embed
+    // - videoId (OBLIGATOIRE) dans le path src="https://www.youtube.com/embed/${videoId}"
+    // - start (FACULTATIF) temps en secondes
+    // - autoplay (FACULTATIF) (1 joue) requiert mute=1 sinon ne se lance pas
+
+    // --- VIDEO LIST ----
+    // URL => https://www.youtube.com/watch_videos
+    // - video_ids (OBLIGATOIRE) suite de videoIds séparés par une virgule en query
+    // - index (FACULTATIF 0-based mais attention troncate dans le src)
+
+    // IFRAME
+    // src="https://www.youtube.com/embed/3HSKp9pVMKY?playlist=3HSKp9pVMKY,m_luzarfbbM,p8yXdbwFNgc&start=120&index=2&autoplay=1&mute=1"
+    // src="https://www.youtube.com/embed/?playlist=3HSKp9pVMKY,m_luzarfbbM,p8yXdbwFNgc&index=2"
+    // - videoId dans le path (avec ou sans)
+    // - playlist (OBLIGATOIRE) serie de videoIds séparés par une virgule
+    // - start (FACULTATIF) temps en secondes
+    // - index (FACULTATIF 1-based) utilisé seulement si pas de videoId
+    // - autoplay (FACULTATIF) (1 joue) requiert mute=1 sinon ne se lance pas
+
+
+    // --- PLAYLIST ----
+    // URL => https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ
+    // https://youtu.be/VIDEO_ID?list=PLAYLIST_ID
+    // https://youtu.be/C_dEl2cMCEA?t=60&list=PLYALQE76y6LQ
+    // - v (quasiment OBLIGATOIRE) video id de video de depart
+    // - list (OBLIGATOIRE) playlistId
+    // et index facultatif (youtube resolve l'index selon la video id s'il correspond pas)
+    // https://www.youtube.com/watch?v=T4s1N0b6xd0&list=PLYALQE76y6LQ&index=3
+
+
+    // IFRAME
+    // src="https://www.youtube.com/embed/videoseries?list=PLfO5yE9Cc3wo"
+    // src="https://www.youtube.com/embed/m_luzarfbbM?list=PLfO5yE9Cc3wo"
+    // - videoId (FACULTATIF) dans le path (facultatif) sinon videoseries
+    // - list (OBLIGATOIRE) avec le playlistId
+    // - autoplay (FACULTATIF) (1 joue) requiert mute=1 sinon ne se lance pas
+
+
+</script>
+
+</body>
+
+</html>

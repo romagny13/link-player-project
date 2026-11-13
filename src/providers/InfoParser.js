@@ -7,17 +7,24 @@ export class InfoParser {
         return element.dataset?.url;
     }
 
-    parseTime(t) {
-        if (!t) return undefined;
+    toInt(v) {
+        if (v == null || v === '') return null;
+        const n = parseInt(v, 10);
+        return Number.isNaN(n) ? null : n;
+    }
 
-        // If it's just a raw number (e.g., "120" in seconds)
-        if (/^\d+$/.test(t)) return Number(t);
+    toBool01(v) {
+        if (v === '1' || v === 1 || v === true) return true;
+        if (v === '0' || v === 0 || v === false) return false;
+        return null;
+    }
 
-        // Regex matching YouTube's h/m/s format
-        const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(t);
+    timeToSeconds(v) {
+        if (v == null || v === '') return null;
+        if (/^\d+$/.test(v)) return parseInt(v, 10);
 
-        // If regex matches but no h, m, or s value was captured (invalid string), reject
-        if (!m || (!m[1] && !m[2] && !m[3])) return undefined;
+        const m = String(v).match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
+        if (!m || (!m[1] && !m[2] && !m[3])) return null;
 
         return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
     }
@@ -38,13 +45,13 @@ export class InfoParser {
         const data = element.dataset;
         return {
             autoplay: data.autoplay,
-            start: data.start,            // raw: parseTime reads "90" and "1m30s"
+            start: data.start,            // raw: reads "90" and "1m30s"
             title: data.title,
-            description : data.description,
+            description: data.description,
             channel: data.channel,
             channelUrl: data.channelUrl,
             thumbnail: data.thumbnail,
-            duration : data.duration,
+            duration: data.duration,
             videos: this.parseJsonAttribute(data.videos, "data-videos") ?? [],
             index: toNumber(data.index),
             target: data.target ?? (element.tagName === "IFRAME" ? element.parentElement?.id : undefined),
@@ -58,18 +65,34 @@ export class InfoParser {
         throw new Error("parseUrl() must be implemented");
     }
 
-    buildUrl(def){
+    parseSrc(src) {
+        throw new Error("parseSrc() must be implemented");
+    }
+
+    buildUrl(def) {
         throw new Error("buildUrl() must be implemented");
     }
 
-    parseFromElement(element) {
-        const url = this.getUrl(element);
-        if (!url) throw new Error(`No URL found for element '${element}'`);
-        return this.parseDefinition({url, ...this.readLinkData(element)});
+    parseFromLink(link) {
+        const url = this.getUrl(link);
+        if (!url) throw new Error(`No URL found for element '${link}'`);
+        return this.parseDefinition({url, ...this.readLinkData(link)});
+    }
+
+    parseFromFrame(frame){
+        throw new Error("parseFromFrame() must be implemented");
     }
 
     parseDefinition(def) {
         throw new Error("parseDefinition() must be implemented");
+    }
+
+    getValidUrl(url) {
+        try {
+            return new URL(String(url).trim());
+        } catch {
+            return null;
+        }
     }
 }
 

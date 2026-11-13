@@ -1,4 +1,4 @@
-import {UrlInfo} from "../../models/UrlInfo.js";
+import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
 import {toAutoplayMode, toInt} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
@@ -51,6 +51,7 @@ export class OkruInfoParser extends InfoParser {
                 videoIds,
                 index: toInt(u.searchParams.get("index")),
                 labels: this.#splitLabels(this.#rawQueryParam(u, "labels")),
+                source: url
             });
         }
         // extract video id from path
@@ -58,9 +59,52 @@ export class OkruInfoParser extends InfoParser {
         return match ?
             new UrlInfo({
                 kind: "video",
-                videoId: match[1]
+                videoId: match[1],
+                source: url
             }) :
             null;
+    }
+
+    parseSrc(src) {
+        const u = this.getValidUrl(src);
+        if (!u) throw new Error(`Invalid URL: ${JSON.stringify(src)}`);
+
+        const host = u.hostname.toLowerCase().replace(/^(www|m)\./, '');
+        if (host !== 'ok.ru' && host !== 'odnoklassniki.ru') {
+            throw new Error(`Invalid OK.ru embed host: '${host}'`);
+        }
+
+        const m = u.pathname.match(/^\/videoembed\/(\d+)\/?$/);
+        if (!m) throw new Error(`Invalid OK.ru embed path: '${u.pathname}'`);
+
+        return new SrcInfo({
+            kind: 'video',
+            videoId: m[1],
+            autoplay: this.toBool01(u.searchParams.get('autoplay')),
+            source: src
+        });
+    }
+
+    parseFromFrame(frame) {
+        if (frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: <${frame.tagName.toLowerCase()}>`);
+
+        const urlInfos = this.parseSrc(frame.src);
+        if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || '(empty)'}"`);
+
+        const host = frame.parentElement;
+        if (!host) throw new Error(`Iframe has no parent element (src: "${frame.src || '(empty)'}")`);
+
+        const target = (host.id ||= `host:${crypto.randomUUID()}`);
+        switch (urlInfos.kind) {
+            case "video":
+                return new VideoInfo({
+                    provider: "okru",
+                    target,
+                    videoId: urlInfos.videoId,
+                    autoplay: toAutoplayMode(urlInfos.autoplay),
+                    source: urlInfos.source
+                });
+        }
     }
 
     buildUrl(def) {
@@ -88,16 +132,17 @@ export class OkruInfoParser extends InfoParser {
                     target: def.target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(def.autoplay),
-                    startSeconds: this.parseTime(def.start),
+                    startSeconds: this.timeToSeconds(def.start),
                     title: def.title ?? "",
-                    description : def.description ?? "",
+                    description: def.description ?? "",
                     channel: def.channel ?? "",
                     channelUrl: def.channelUrl ?? "",
                     thumbnail: def.thumbnail ?? "",
-                    duration: this.parseTime(def.duration),
+                    duration: this.timeToSeconds(def.duration),
                     showOnInit: def.showOnInit,
                     key: def.key,
-                    extra: def.extra
+                    extra: def.extra,
+                    source: def.url
                 });
             case "videoList": {
                 const labels = urlInfos.labels;
@@ -110,7 +155,7 @@ export class OkruInfoParser extends InfoParser {
 
                 const index = urlInfos.index ?? def.index;
                 const list = new VideoListInfo(
-                    "okru", def.target, videoIds, index, def.showOnInit, def.key
+                    "okru", def.target, videoIds, index, def.showOnInit, def.key, def.extra, def.url
                 );
 
                 videoIds.forEach((videoId, i) => {
@@ -122,13 +167,13 @@ export class OkruInfoParser extends InfoParser {
                         target: def.target,
                         videoId,
                         autoplay: toAutoplayMode(v?.autoplay ?? def.autoplay),
-                        startSeconds: this.parseTime(v?.start),
+                        startSeconds: this.timeToSeconds(v?.start),
                         title: v?.title ?? "",
-                        description : v?.description ?? "",
+                        description: v?.description ?? "",
                         channel: v?.channel ?? "",
                         channelUrl: v?.channelUrl ?? "",
                         thumbnail: v?.thumbnail ?? "",
-                        duration: this.parseTime(v?.duration),
+                        duration: this.timeToSeconds(v?.duration),
                         key: v?.key,
                         extra: v?.extra
                     }));

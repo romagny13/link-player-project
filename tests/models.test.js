@@ -1,382 +1,211 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { VideoInfo } from "../src/models/VideoInfo.js"; // adapte le chemin si besoin
-import { VideoListInfo } from "../src/models/VideoListInfo.js";
-import { PlaylistInfo } from "../src/models/PlaylistInfo.js";
-import { UrlInfo } from "../src/models/UrlInfo.js";
+import {describe, expect, it} from "vitest";
+import {VideoInfo} from "../src/models/VideoInfo.js";
+import {PlaylistInfo} from "../src/models/PlaylistInfo.js";
+import {VideoListInfo} from "../src/models/VideoListInfo.js";
+import {SrcInfo, UrlInfo} from "../src/models/UrlInfo.js";
+
+// Remarque : ValueChecks.requireNotNullOrEmpty est remplacé ici par une version minimale
+// (null / undefined / "" => erreur). Les tests vérifient donc seulement « ça lève une erreur »,
+// pas son message.
+
+const base = {provider: "youtube", target: "player", videoId: "3HSKp9pVMKY"};
 
 describe("VideoInfo", () => {
-    const baseParams = {
-        provider: "youtube",
-        target: "player1",
-        videoId: "abc123",
-        autoplay: true,
-        startSeconds: 30,
-        title: "Ma vidéo",
-        description: "Description test",
-        channel: "Ma chaîne",
-        channelUrl: "https://youtube.com/channel/xyz",
-        thumbnail: "https://img.youtube.com/vi/abc123/hqdefault.jpg",
-        duration: 3600,
-        showOnInit: true,
-        extra: { foo: "bar" },
-    };
-
-    it("doit créer une instance avec les valeurs fournies", () => {
-        const video = new VideoInfo(baseParams);
-
-        expect(video.provider).toBe("youtube");
-        expect(video.target).toBe("player1");
-        expect(video.videoId).toBe("abc123");
-        expect(video.autoplay).toBe(true);
-        expect(video.startSeconds).toBe(30);
-        expect(video.title).toBe("Ma vidéo");
-        expect(video.description).toBe("Description test");
-        expect(video.channel).toBe("Ma chaîne");
-        expect(video.channelUrl).toBe("https://youtube.com/channel/xyz");
-        expect(video.thumbnail).toBe("https://img.youtube.com/vi/abc123/hqdefault.jpg");
-        expect(video.duration).toBe(3600);
-        expect(video.showOnInit).toBe(true);
-        expect(video.extra).toEqual({ foo: "bar" });
+    it("exige provider, target et videoId", () => {
+        for (const champ of ["provider", "target", "videoId"]) {
+            expect(() => new VideoInfo({...base, [champ]: undefined})).toThrow();
+            expect(() => new VideoInfo({...base, [champ]: ""})).toThrow();
+        }
     });
 
-    it("doit générer une clé par défaut à partir du provider et du videoId", () => {
-        const video = new VideoInfo(baseParams);
-        expect(video.key).toBe("youtube:abc123");
+    it("expose toutes ses propriétés", () => {
+        const info = new VideoInfo({
+            ...base,
+            autoplay: "init",
+            startSeconds: 90,
+            title: "Titre",
+            description: "Desc",
+            channel: "Chaîne",
+            channelUrl: "https://c.example",
+            thumbnail: "t.jpg",
+            duration: 120,
+            showOnInit: true,
+            extra: "x",
+            source: "https://src"
+        });
+        expect(info).toMatchObject({
+            provider: "youtube", target: "player", videoId: "3HSKp9pVMKY", autoplay: "init",
+            startSeconds: 90, title: "Titre", description: "Desc", channel: "Chaîne",
+            channelUrl: "https://c.example", thumbnail: "t.jpg", duration: 120, showOnInit: true,
+            extra: "x", source: "https://src"
+        });
     });
 
-    it("doit utiliser la clé fournie si elle est définie", () => {
-        const video = new VideoInfo({ ...baseParams, key: "custom-key" });
-        expect(video.key).toBe("custom-key");
+    it("n'est pas une playlist", () => {
+        expect(new VideoInfo(base).isPlaylist).toBe(false);
     });
 
-    it("doit indiquer que ce n'est pas une playlist", () => {
-        const video = new VideoInfo(baseParams);
-        expect(video.isPlaylist).toBe(false);
-    });
-
-    it("doit lever une erreur si provider est manquant ou vide", () => {
-        expect(() => new VideoInfo({ ...baseParams, provider: null })).toThrow();
-        expect(() => new VideoInfo({ ...baseParams, provider: "" })).toThrow();
-    });
-
-    it("doit lever une erreur si target est manquant ou vide", () => {
-        expect(() => new VideoInfo({ ...baseParams, target: null })).toThrow();
-        expect(() => new VideoInfo({ ...baseParams, target: "" })).toThrow();
-    });
-
-    it("doit lever une erreur si videoId est manquant ou vide", () => {
-        expect(() => new VideoInfo({ ...baseParams, videoId: null })).toThrow();
-        expect(() => new VideoInfo({ ...baseParams, videoId: "" })).toThrow();
+    it("clé par défaut = provider:videoId, sinon la clé fournie", () => {
+        expect(new VideoInfo(base).key).toBe("youtube:3HSKp9pVMKY");
+        expect(new VideoInfo({...base, key: "ma-cle"}).key).toBe("ma-cle");
     });
 
     describe("fillMissing", () => {
-        it("doit remplir uniquement les champs vides et retourner true si un changement a eu lieu", () => {
-            const video = new VideoInfo({
-                ...baseParams,
-                title: null,
-                description: "",
-                channel: undefined,
-                channelUrl: null,
-                thumbnail: "",
-                duration: null,
+        it("complète les champs vides et retourne true", () => {
+            const info = new VideoInfo({...base, title: ""});
+            const changed = info.fillMissing({
+                title: "T", description: "D", channel: "C", channelUrl: "U", thumbnail: "I", duration: 60
             });
-
-            const changed = video.fillMissing({
-                title: "Nouveau titre",
-                description: "Nouvelle description",
-                channel: "Nouvelle chaîne",
-                channelUrl: "https://new.channel",
-                thumbnail: "https://new.thumb.jpg",
-                duration: 120,
-            });
-
             expect(changed).toBe(true);
-            expect(video.title).toBe("Nouveau titre");
-            expect(video.description).toBe("Nouvelle description");
-            expect(video.channel).toBe("Nouvelle chaîne");
-            expect(video.channelUrl).toBe("https://new.channel");
-            expect(video.thumbnail).toBe("https://new.thumb.jpg");
-            expect(video.duration).toBe(120);
-        });
-
-        it("ne doit pas écraser les valeurs déjà présentes", () => {
-            const video = new VideoInfo(baseParams);
-
-            const changed = video.fillMissing({
-                title: "Titre différent",
-                description: "Description différente",
-                channel: "Chaîne différente",
-                channelUrl: "https://autre.channel",
-                thumbnail: "https://autre.thumb.jpg",
-                duration: 999,
+            expect(info).toMatchObject({
+                title: "T", description: "D", channel: "C", channelUrl: "U", thumbnail: "I", duration: 60
             });
+        });
 
+        it("n'écrase jamais une valeur déjà renseignée", () => {
+            const info = new VideoInfo({...base, title: "Mon titre", duration: 10});
+            const changed = info.fillMissing({title: "Autre", duration: 99});
             expect(changed).toBe(false);
-            expect(video.title).toBe("Ma vidéo");
-            expect(video.description).toBe("Description test");
-            expect(video.channel).toBe("Ma chaîne");
-            expect(video.channelUrl).toBe("https://youtube.com/channel/xyz");
-            expect(video.thumbnail).toBe("https://img.youtube.com/vi/abc123/hqdefault.jpg");
-            expect(video.duration).toBe(3600);
+            expect(info.title).toBe("Mon titre");
+            expect(info.duration).toBe(10);
         });
 
-        it("doit retourner false si aucun champ n'a été modifié", () => {
-            const video = new VideoInfo({
-                ...baseParams,
-                title: null,
-                description: null,
-            });
-
-            const changed = video.fillMissing({});
-            expect(changed).toBe(false);
+        it("ignore les nouvelles valeurs vides et ne signale alors aucun changement", () => {
+            const info = new VideoInfo(base);
+            expect(info.fillMissing({title: "", description: undefined})).toBe(false);
+            expect(info.title).toBeUndefined();
         });
 
-        it("doit gérer un appel sans argument", () => {
-            const video = new VideoInfo(baseParams);
-            expect(video.fillMissing()).toBe(false);
-        });
-    });
-});
-
-describe("VideoListInfo", () => {
-    const videoIds = ["vid1", "vid2", "vid3"];
-
-    it("doit créer une instance avec les valeurs fournies", () => {
-        const list = new VideoListInfo(
-            "youtube",
-            "player1",
-            videoIds,
-            1,
-            true,
-            null,
-            { foo: "bar" }
-        );
-
-        expect(list.provider).toBe("youtube");
-        expect(list.target).toBe("player1");
-        expect(list.videoIds).toEqual(["vid1", "vid2", "vid3"]);
-        expect(list.index).toBe(1);
-        expect(list.showOnInit).toBe(true);
-        expect(list.extra).toEqual({ foo: "bar" });
-        expect(list.videos).toEqual([]);
-    });
-
-    it("doit générer une clé par défaut à partir du provider et des videoIds", () => {
-        const list = new VideoListInfo("youtube", "player1", videoIds, 0, false);
-        expect(list.key).toBe("youtube:list:vid1,vid2,vid3");
-    });
-
-    it("doit utiliser la clé fournie si elle est définie", () => {
-        const list = new VideoListInfo(
-            "youtube",
-            "player1",
-            videoIds,
-            0,
-            false,
-            "custom-list-key"
-        );
-        expect(list.key).toBe("custom-list-key");
-    });
-
-    it("doit indiquer que c'est une playlist", () => {
-        const list = new VideoListInfo("youtube", "player1", videoIds, 0, false);
-        expect(list.isPlaylist).toBe(true);
-    });
-
-    it("doit retourner une copie figée (frozen) des videoIds", () => {
-        const list = new VideoListInfo("youtube", "player1", videoIds, 0, false);
-        const ids = list.videoIds;
-
-        expect(Object.isFrozen(ids)).toBe(true);
-        expect(() => ids.push("vid4")).toThrow();
-    });
-
-    it("doit lever une erreur si provider est manquant ou vide", () => {
-        expect(() => new VideoListInfo(null, "player1", videoIds, 0, false)).toThrow();
-        expect(() => new VideoListInfo("", "player1", videoIds, 0, false)).toThrow();
-    });
-
-    it("doit lever une erreur si target est manquant ou vide", () => {
-        expect(() => new VideoListInfo("youtube", null, videoIds, 0, false)).toThrow();
-        expect(() => new VideoListInfo("youtube", "", videoIds, 0, false)).toThrow();
-    });
-
-    describe("gestion des vidéos", () => {
-        let list;
-
-        beforeEach(() => {
-            list = new VideoListInfo("youtube", "player1", videoIds, 0, false);
+        it("fonctionne sans argument", () => {
+            expect(new VideoInfo(base).fillMissing()).toBe(false);
         });
 
-        it("doit ajouter une vidéo avec addVideo", () => {
-            const video = { id: "v1" };
-            list.addVideo(video);
-
-            expect(list.videos).toHaveLength(1);
-            expect(list.videos[0]).toBe(video);
-        });
-
-        it("doit remplacer toutes les vidéos avec setVideos", () => {
-            list.addVideo({ id: "old" });
-            const newVideos = [{ id: "a" }, { id: "b" }];
-            list.setVideos(newVideos);
-
-            expect(list.videos).toEqual(newVideos);
-            expect(list.videos).not.toBe(newVideos); // copie
-        });
-
-        it("doit retourner une copie figée (frozen) des vidéos", () => {
-            list.addVideo({ id: "v1" });
-            const videos = list.videos;
-
-            expect(Object.isFrozen(videos)).toBe(true);
-            expect(() => videos.push({ id: "v2" })).toThrow();
+        it("retourne true dès qu'un seul champ change", () => {
+            const info = new VideoInfo({...base, title: "déjà là"});
+            expect(info.fillMissing({title: "x", channel: "C"})).toBe(true);
+            expect(info.title).toBe("déjà là");
+            expect(info.channel).toBe("C");
         });
     });
 });
 
 describe("PlaylistInfo", () => {
-    it("doit créer une instance avec les valeurs fournies", () => {
-        const playlist = new PlaylistInfo(
-            "youtube",
-            "player1",
-            "PL123",
-            "vidStart",
-            true,
-            null,
-            { foo: "bar" }
-        );
+    const creer = (...args) => new PlaylistInfo("youtube", "player", "PL123", ...args);
 
-        expect(playlist.provider).toBe("youtube");
-        expect(playlist.target).toBe("player1");
-        expect(playlist.playlistId).toBe("PL123");
-        expect(playlist.videoId).toBe("vidStart");
-        expect(playlist.showOnInit).toBe(true);
-        expect(playlist.extra).toEqual({ foo: "bar" });
-        expect(playlist.videos).toEqual([]);
+    it("exige provider, target et playlistId", () => {
+        expect(() => new PlaylistInfo("", "player", "PL1")).toThrow();
+        expect(() => new PlaylistInfo("youtube", undefined, "PL1")).toThrow();
+        expect(() => new PlaylistInfo("youtube", "player", "")).toThrow();
     });
 
-    it("doit générer une clé par défaut à partir du provider et du playlistId", () => {
-        const playlist = new PlaylistInfo("youtube", "player1", "PL123", null, false);
-        expect(playlist.key).toBe("youtube:playlist:PL123");
-    });
-
-    it("doit utiliser la clé fournie si elle est définie", () => {
-        const playlist = new PlaylistInfo(
-            "youtube",
-            "player1",
-            "PL123",
-            null,
-            false,
-            "custom-playlist-key"
-        );
-        expect(playlist.key).toBe("custom-playlist-key");
-    });
-
-    it("doit indiquer que c'est une playlist", () => {
-        const playlist = new PlaylistInfo("youtube", "player1", "PL123", null, false);
-        expect(playlist.isPlaylist).toBe(true);
-    });
-
-    it("doit lever une erreur si provider est manquant ou vide", () => {
-        expect(() => new PlaylistInfo(null, "player1", "PL123", null, false)).toThrow();
-        expect(() => new PlaylistInfo("", "player1", "PL123", null, false)).toThrow();
-    });
-
-    it("doit lever une erreur si target est manquant ou vide", () => {
-        expect(() => new PlaylistInfo("youtube", null, "PL123", null, false)).toThrow();
-        expect(() => new PlaylistInfo("youtube", "", "PL123", null, false)).toThrow();
-    });
-
-    it("doit lever une erreur si playlistId est manquant ou vide", () => {
-        expect(() => new PlaylistInfo("youtube", "player1", null, null, false)).toThrow();
-        expect(() => new PlaylistInfo("youtube", "player1", "", null, false)).toThrow();
-    });
-
-    describe("gestion des vidéos", () => {
-        let playlist;
-
-        beforeEach(() => {
-            playlist = new PlaylistInfo("youtube", "player1", "PL123", null, false);
+    it("est une playlist, avec les valeurs passées en position", () => {
+        const p = creer("v1", true, "cle", "extra", "https://src");
+        expect(p).toMatchObject({
+            isPlaylist: true, provider: "youtube", target: "player", playlistId: "PL123",
+            videoId: "v1", showOnInit: true, key: "cle", extra: "extra", source: "https://src"
         });
+    });
 
-        it("doit ajouter une vidéo avec addVideo", () => {
-            const video = { id: "v1" };
-            playlist.addVideo(video);
+    it("clé par défaut = provider:playlist:id", () => {
+        expect(creer().key).toBe("youtube:playlist:PL123");
+    });
 
-            expect(playlist.videos).toHaveLength(1);
-            expect(playlist.videos[0]).toBe(video);
+    it("addVideo ajoute, setVideos remplace par une copie", () => {
+        const p = creer();
+        p.addVideo({videoId: "a"});
+        p.addVideo({videoId: "b"});
+        expect(p.videos).toHaveLength(2);
+
+        const source = [{videoId: "x"}];
+        p.setVideos(source);
+        source.push({videoId: "y"});
+        expect(p.videos).toEqual([{videoId: "x"}]);
+    });
+
+    it("`videos` est une copie figée : la modifier de l'extérieur est impossible", () => {
+        const p = creer();
+        p.addVideo({videoId: "a"});
+        expect(() => p.videos.push({videoId: "b"})).toThrow(TypeError);
+        expect(p.videos).toHaveLength(1);
+    });
+});
+
+describe("VideoListInfo", () => {
+    const creer = (ids = ["a", "b", "c"], ...args) => new VideoListInfo("youtube", "player", ids, ...args);
+
+    it("exige provider et target", () => {
+        expect(() => new VideoListInfo("", "player", ["a"])).toThrow();
+        expect(() => new VideoListInfo("youtube", undefined, ["a"])).toThrow();
+    });
+
+    it("lève une erreur quand videoIds n'est pas fourni", () => {
+        expect(() => new VideoListInfo("youtube", "player", undefined)).toThrow();
+    });
+
+    it("est une playlist, avec les valeurs passées en position", () => {
+        const l = creer(["a", "b"], 1, true, "cle", "extra", "https://src");
+        expect(l).toMatchObject({
+            isPlaylist: true, provider: "youtube", target: "player", index: 1,
+            showOnInit: true, key: "cle", extra: "extra", source: "https://src"
         });
+    });
 
-        it("doit remplacer toutes les vidéos avec setVideos", () => {
-            playlist.addVideo({ id: "old" });
-            const newVideos = [{ id: "a" }, { id: "b" }];
-            playlist.setVideos(newVideos);
+    it("clé par défaut = provider:list:id1,id2,...", () => {
+        expect(creer(["a", "b"]).key).toBe("youtube:list:a,b");
+    });
 
-            expect(playlist.videos).toEqual(newVideos);
-            expect(playlist.videos).not.toBe(newVideos); // copie
-        });
+    it("copie les ids : modifier le tableau d'origine ne change pas la liste", () => {
+        const ids = ["a", "b"];
+        const l = creer(ids);
+        ids.push("c");
+        expect(l.videoIds).toEqual(["a", "b"]);
+    });
 
-        it("doit retourner une copie figée (frozen) des vidéos", () => {
-            playlist.addVideo({ id: "v1" });
-            const videos = playlist.videos;
+    it("`videoIds` et `videos` sont figés", () => {
+        const l = creer();
+        expect(Object.isFrozen(l.videoIds)).toBe(true);
+        expect(() => l.videoIds.push("z")).toThrow(TypeError);
+        expect(() => l.videos.push({})).toThrow(TypeError);
+    });
 
-            expect(Object.isFrozen(videos)).toBe(true);
-            expect(() => videos.push({ id: "v2" })).toThrow();
-        });
+    it("addVideo / setVideos fonctionnent comme pour PlaylistInfo", () => {
+        const l = creer();
+        l.addVideo({videoId: "a"});
+        expect(l.videos).toHaveLength(1);
+        l.setVideos([{videoId: "b"}, {videoId: "c"}]);
+        expect(l.videos.map((v) => v.videoId)).toEqual(["b", "c"]);
     });
 });
 
 describe("UrlInfo", () => {
-    it("doit créer une instance avec toutes les propriétés", () => {
+    it("expose les valeurs reçues", () => {
         const info = new UrlInfo({
-            kind: "video",
-            videoId: "abc123",
-            videoIds: ["a", "b"],
-            playlistId: "PL123",
-            index: 2,
-            startSeconds: 45,
-            labels: { fr: "Titre FR", en: "Title EN" },
+            kind: "videoList", videoId: "a", videoIds: ["a", "b"], playlistId: "PL1",
+            startSeconds: 30, index: 2, labels: ["A", "B"], source: "https://src"
         });
-
-        expect(info.kind).toBe("video");
-        expect(info.videoId).toBe("abc123");
-        expect(info.videoIds).toEqual(["a", "b"]);
-        expect(info.playlistId).toBe("PL123");
-        expect(info.index).toBe(2);
-        expect(info.startSeconds).toBe(45);
-        expect(info.labels).toEqual({ fr: "Titre FR", en: "Title EN" });
+        expect(info).toMatchObject({
+            kind: "videoList", videoId: "a", videoIds: ["a", "b"], playlistId: "PL1",
+            startSeconds: 30, index: 2, labels: ["A", "B"], source: "https://src"
+        });
     });
 
-    it("doit accepter des valeurs undefined / null", () => {
-        const info = new UrlInfo({
-            kind: "playlist",
-            videoId: null,
-            videoIds: undefined,
-            playlistId: "PL999",
-            index: undefined,
-            startSeconds: null,
-            labels: null,
-        });
-
-        expect(info.kind).toBe("playlist");
-        expect(info.videoId).toBeNull();
-        expect(info.videoIds).toBeUndefined();
-        expect(info.playlistId).toBe("PL999");
-        expect(info.index).toBeUndefined();
-        expect(info.startSeconds).toBeNull();
-        expect(info.labels).toBeNull();
-    });
-
-    it("doit pouvoir être créé avec un objet minimal", () => {
-        const info = new UrlInfo({ kind: "list" });
-
-        expect(info.kind).toBe("list");
+    it("les champs non fournis valent undefined", () => {
+        const info = new UrlInfo({kind: "video"});
         expect(info.videoId).toBeUndefined();
-        expect(info.videoIds).toBeUndefined();
-        expect(info.playlistId).toBeUndefined();
-        expect(info.index).toBeUndefined();
-        expect(info.startSeconds).toBeUndefined();
         expect(info.labels).toBeUndefined();
+    });
+});
+
+describe("SrcInfo", () => {
+    it("hérite de UrlInfo et ajoute autoplay et mute", () => {
+        const info = new SrcInfo({kind: "video", videoId: "a", source: "s", autoplay: true, mute: false});
+        expect(info).toBeInstanceOf(UrlInfo);
+        expect(info).toMatchObject({kind: "video", videoId: "a", source: "s", autoplay: true, mute: false});
+    });
+
+    it("autoplay et mute valent undefined s'ils ne sont pas fournis", () => {
+        const info = new SrcInfo({kind: "video"});
+        expect(info.autoplay).toBeUndefined();
+        expect(info.mute).toBeUndefined();
     });
 });

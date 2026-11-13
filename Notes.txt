@@ -22,7 +22,7 @@ provider
 
 global
 
-creer une ou plusieurs pages d'exemples pour cette lib. pour montrer pour youtube :
+creer une ou plusieurs pages d'exemples pour cette lib. pour montrer pour youtube et okru :
 1. link only : infos definies sur les data-link
 2. code-only: utilisation des definitions , et binding de buttons pour utiliser les methodes de navigation de la region
 3. mixed: data-link servant juste a la navigation (typiquement des liens avec juste data-link, même pas data-target) , definitions servant a definir les infos
@@ -35,13 +35,18 @@ pour okru
 - video simple
 - ancienne version (avec videos_ids et labels dans l'url)
 
-+ show on init, use storagen currentBehavior (skip ou toggle quand on navigue vers la meme key)
++ show on init, use storage currentBehavior (skip ou toggle quand on navigue vers la meme key), defaultTarget
 
-utilisation de youtube data api, fallbacktitle, DefBuilder
+utilisation de youtube data api, fallbacktitle
 
-custom panel, custom tooltip renderers, styles "overrides"
+dependent viewsn autoplay on click
 
-dependent views
+adoption iframe avec playlist , videolist youtube
+
+navigation back forward, naxtinfo previopusinfo, next item previous item
+
+(custom panel, custom tooltip renderers, styles "overrides": pas obligé si tu nas pas assez d'informations)
+
 
 >> PLUS: autoplay "click"
 PROBLEMES:
@@ -103,7 +108,7 @@ dependent view , data
 //     const provider = this.#registry.resolve(url);
 //     const region = this.getRegion(target);
 //
-//     const parsed = provider.getInfoFromElement(element); // data-key is injected in the model (info.key)
+//     const parsed = provider.getInfoFromLink(element); // data-key is injected in the model (info.key)
 //     const info = region.add(parsed) ? parsed : region.get(parsed.key); // same key twice: keep the first object
 //     // if (info === parsed) this.#applyDefinition(info);
 //
@@ -140,3 +145,28 @@ dependent view , data
 //         release();
 //     });
 // }
+
+ne creer l'iframe qu'en cas de changement
+- video seule
+- video list => pas si on change de video dans la liste current
+- playlist => pas si on change de video de la liste current
+
+le src n'est pas modifié, on utilise postmessage pour changer de video de la liste / playlist
+
+=> une iframe adoptée, jamais on change le src ... et peut etre que si pour enablejsapi
+
+qyand changer de src? si la liste a,b,c , playlist PL123 ou video change
+link navigate a une url
+
+une region est single active item view
+
+// src youtube
+media path
+- video https://www.youtube.com/embed/   youtube:videoid
+' youtube:a,b,c
+youtube;pl123'
+
+defunur des shortcuts ?
+shortcut:a => youtube:videoid
+shortcut:b => youtube:a,b,c
+shortcut:c => youtube:pl123

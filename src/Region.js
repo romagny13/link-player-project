@@ -2,10 +2,9 @@ import {PanelRenderer} from "./ui/PanelRenderer.js";
 import {NavigationJournal} from "./NavigationJournal.js";
 import {Emitter} from "./utils/Emitter.js";
 
-
 export class Region {
     #target;
-    #host;
+    #host = null; // container (html element); null until it is discovered
     #registry;
     #infos = new Map();
     #journal = new NavigationJournal();
@@ -13,11 +12,14 @@ export class Region {
     #panel;
     #player = null;
     #unsubscribe = null;
+    #rendered = null;  // the info the current iframe shows
+    #playerIndex = 0;  // the item the player is on
     #panelInfo = null; // the playlist the panel is drawn for
     #resolveMeta;
     #resolved = new WeakSet();
     #dependentViews = new Map();
     #currentBehavior;
+    #pending = []; // navigation actions waiting for the container
 
     /**
      * @param {object} options
@@ -35,10 +37,8 @@ export class Region {
                     groupRenderer = null,
                     thumbnails = null
                 }) {
-        const host = document.getElementById(target);
-        if (!host) throw new Error(`Target #${target} not found`);
         this.#target = target;
-        this.#host = host;
+        this.#host = document.getElementById(target); // may be null: it will be registered when discovered
         this.#registry = registry;
         this.#currentBehavior = currentBehavior;
         this.#resolveMeta = resolveMeta;
@@ -70,7 +70,12 @@ export class Region {
     }
 
     get isVisible() {
-        return !this.#host.hidden;
+        return this.#host !== null && !this.#host.hidden;
+    }
+
+    /** true once the container (html element) is known. */
+    get hasContainer() {
+        return this.#host !== null;
     }
 
     /** Number of items of the current playlist / list, null when unknown, 0 for a single video. */
@@ -134,6 +139,22 @@ export class Region {
         return this.#infos.get(key);
     }
 
+    // ───────── container ─────────
+
+    /** The container has been discovered: runs the navigation actions that were waiting for it. */
+    register(host) {
+        if (this.#host !== host) {
+            // another element replaces the previous container: what was drawn in it is gone
+            if (this.#host) this.#resetContent();
+            this.#host = host;
+        }
+        this.#flushPending();
+    }
+
+    hasPending() {
+        return this.#pending.length > 0;
+    }
+
     // ───────── navigation ─────────
 
     isCurrent(key) {
@@ -142,30 +163,34 @@ export class Region {
     }
 
     navigate(key, options) {
-        console.log(key, this.#infos)
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
-        if (this.isCurrent(key)) {
-            if (this.#currentBehavior === "skip") return;
-            if (this.#currentBehavior === "toggle") return this.toggle();
-        }
-        const info = this.get(key);
-        this.#navigate(info, options);
+        this.#whenReady(() => {
+            if (this.isCurrent(key)) {
+                if (this.#currentBehavior === "skip") return;
+                if (this.#currentBehavior === "toggle") return this.toggle();
+            }
+            this.#navigate(this.get(key), options);
+        });
     }
 
     replace(key, {autoplay = false, index = 0} = {}) {
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
-        const info = this.get(key);
-        this.#journal.replace({info, index});
-        this.#show(info, {autoplay, index}, "replace");
+        this.#whenReady(() => {
+            const info = this.get(key);
+            this.#journal.replace({info, index});
+            this.#show(info, {autoplay, index}, "replace");
+        });
     }
 
     goBack() {
+        if (!this.#host) return false;
         return this.#restore(this.#journal.back(), "back");
     }
 
     goForward() {
+        if (!this.#host) return false;
         return this.#restore(this.#journal.forward(), "forward");
     }
 
@@ -187,6 +212,7 @@ export class Region {
 
     playAt(index) {
         this.#player?.playAt(index);
+        this.#playerIndex = index;
         this.#journal.updateCurrent({index});
         this.#panel.setCurrent(index); // immediate feedback; the player confirms with "itemChange"
         this.#changed("item");
@@ -197,11 +223,18 @@ export class Region {
      * and the panel is added for a playlist / list. `info` is parsed from the iframe src.
      */
     adopt(iframe, info, {index = 0} = {}) {
+        // the parent of the iframe is its container: usable even when the target was not discovered yet
+        if (!this.#host) this.register(iframe.parentElement);
+        // iframe region == region with single info
         if (!this.#host.contains(iframe)) throw new Error(`The iframe is not inside #${this.#target}`);
         this.add(info);
+        info = this.get(info.key); // the canonical info (the one already known for this key)
         this.#disposePlayer();
+        this.#panelInfo = null; // drawn again against the adopted iframe
         this.#player = this.#registry.get(info.provider).createPlayer({iframe});
-        this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
+        this.#unsubscribe = this.#subscribe(this.#player);
+        this.#rendered = info;
+        this.#playerIndex = index;
         this.#journal.push({info, index});
         this.#syncPanel(info, iframe, index);
         this.#changed("adopt");
@@ -211,16 +244,19 @@ export class Region {
     // ───────── visibility ─────────
 
     toggle() {
+        if (!this.#host) return;
         if (this.#host.hidden) this.show();
         else this.hide();
     }
 
     show() {
+        if (!this.#host) return;
         this.#host.hidden = false;
         this.#changed("visibility");
     }
 
     hide() {
+        if (!this.#host) return;
         this.#player?.pause();
         this.#host.hidden = true;
         this.#changed("visibility");
@@ -229,6 +265,7 @@ export class Region {
     dispose() {
         this.#disposePlayer();
         this.#panel.destroy();
+        this.#pending.length = 0;
         this.#events.clear();
     }
 
@@ -265,6 +302,24 @@ export class Region {
 
     // ───────── internals ─────────
 
+    /** Runs now when the container is known, otherwise when it is registered. */
+    #whenReady(action) {
+        if (this.#host) return action();
+        this.#pending.push(action);
+    }
+
+    #flushPending() {
+        if (!this.#host || !this.#pending.length) return;
+        const actions = this.#pending.splice(0);
+        for (const action of actions) {
+            try {
+                action();
+            } catch (error) {
+                this.#fail(error);
+            }
+        }
+    }
+
     #infoIndex() {
         return this.infos.indexOf(this.current);
     }
@@ -281,37 +336,67 @@ export class Region {
     }
 
     #step(delta) {
+        if (!this.#host) return false;
         const target = this.infos[this.#infoIndex() + delta];
         if (!target) return false;
         this.#navigate(target, {autoplay: true});
         return true;
     }
 
+    /**
+     * The frame is rewritten ONLY when the info changes (another video, another video list, another
+     * playlist). Same info, other item of the list / playlist: a single command to the existing player.
+     */
     #show(info, {autoplay, index}, reason) {
         try {
-            const provider = this.#registry.get(info.provider);
-
-            // one iframe per region: replaced only when the provider changes
-            //if (this.#player?.kind !== provider.id) {
-            const previous = this.#player?.iframe; // an adopted iframe is not removed by the player
-            this.#disposePlayer();
-            previous?.remove();
-            this.#player = provider.createPlayer();
-            this.#unsubscribe = this.#player.subscribe((e) => this.#onPlayerEvent(e));
-            //}
-
-            this.#player.load(info, {autoplay, index});
-            const iframe = this.#player.iframe;
-            if (!iframe.isConnected) this.#host.prepend(iframe); // iframe before the panel (CSS anchoring)
+            if (this.#player && this.#rendered === info) this.#select(info, {autoplay, index});
+            else this.#render(info, {autoplay, index});
             this.#host.hidden = false;
-
-            this.#syncPanel(info, iframe, index);
         } catch (error) {
             this.#fail(error, {info});
             return;
         }
         this.#changed(reason);
         this.#resolveMetaLater(info);
+    }
+
+    #render(info, {autoplay, index}) {
+        const provider = this.#registry.get(info.provider);
+
+        // teardown of what was shown (another provider, another info): it must never block the new content
+        const previous = this.#player?.iframe;
+        this.#disposePlayer();
+        try {
+            previous?.remove();
+        } catch (error) {
+            console.warn("[Region] unable to remove the previous iframe", error);
+        }
+        this.#panelInfo = null; // the panel is anchored to the previous iframe: always drawn again
+        this.#panel.clear();
+
+        this.#player = provider.createPlayer();
+        this.#unsubscribe = this.#subscribe(this.#player);
+
+        this.#player.load(info, {autoplay, index});
+        const iframe = this.#player.iframe;
+        iframe.dataset.lp ||= this.#target; // marks it as ours: the region host must not discover it as a frame to adopt
+        if (!iframe.isConnected) this.#host.prepend(iframe); // iframe before the panel (CSS anchoring)
+
+        this.#rendered = info;
+        this.#playerIndex = index;
+        this.#syncPanel(info, iframe, index);
+    }
+
+    /** Same info: no new frame, only a command. */
+    #select(info, {autoplay, index}) {
+        if (info.isPlaylist && index !== this.#playerIndex) {
+            this.#playerIndex = index;
+            if (this.#player.selectItem) this.#player.selectItem(info, index, {autoplay});
+            else this.#player.playAt(index);
+            this.#panel.setCurrent(index);
+        } else if (autoplay) {
+            this.#player.play?.();
+        }
     }
 
     #syncPanel(info, iframe, index) {
@@ -345,15 +430,21 @@ export class Region {
         );
     }
 
+    /** The name of the subscription method differs between players. */
+    #subscribe(player) {
+        const subscribe = player.subscribe;
+        return subscribe.call(player, (e) => this.#onPlayerEvent(e));
+    }
+
     #onPlayerEvent(event) {
         if (event.type === "itemChange") {
+            this.#playerIndex = event.index;
             this.#journal.updateCurrent({index: event.index}); // going back restores the item too
             this.#panel.setCurrent(event.index);
             this.notifyDependentViews(this.current);
             this.#changed("item");
         } else if (event.type === "state") {
             this.#events.emit("state", {region: this, state: event.state, index: event.index ?? this.currentIndex});
-
         } else if (event.type === "error") {
             this.#fail(event.error, {info: this.current});
         }
@@ -374,10 +465,30 @@ export class Region {
         if (!handled) console.error("[Region]", error);
     }
 
+    /** The fields are cleared FIRST: a player that throws in dispose() must not stay registered. */
     #disposePlayer() {
-        this.#unsubscribe?.();
-        this.#player?.dispose();
+        const unsubscribe = this.#unsubscribe;
+        const player = this.#player;
         this.#unsubscribe = null;
         this.#player = null;
+        this.#rendered = null;
+        try {
+            unsubscribe?.();
+        } catch (error) {
+            console.warn("[Region] unsubscribe failed", error);
+        }
+        try {
+            player?.dispose();
+        } catch (error) {
+            console.warn(`[Region] dispose failed (${player?.kind ?? "player"})`, error);
+        }
+    }
+
+    /** The container changed: nothing of what was drawn in the previous one exists anymore. */
+    #resetContent() {
+        this.#disposePlayer();
+        this.#rendered = null;
+        this.#panelInfo = null;
+        this.#panel.clear();
     }
 }

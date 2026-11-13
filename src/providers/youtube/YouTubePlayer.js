@@ -8,9 +8,13 @@ import {PlaylistInfo} from "../../models/PlaylistInfo.js";
  * commands: loading another video does NOT replace the iframe.
  * An existing iframe (embed URL with enablejsapi=1) can be adopted: `new YouTubePlayer({builder, iframe})`.
  *
+ * Which iframe shows which info is decided by the caller (PlayerContentAdapter): another info means
+ * another player (so another iframe); the same info with another item only needs `selectItem` / `playAt`.
+ *
  * Events sent to subscribers (same shape for every provider):
  *   { type: "itemChange", index }  the playing item of a playlist / list changed
- *   { type: "ended", index }       a video ended
+ *   { type: "state", state, index? } playing / paused / ended
+ *   { type: "error", error }
  */
 export class YouTubePlayer {
     kind = "youtube";
@@ -21,6 +25,7 @@ export class YouTubePlayer {
     #bridge = null;
     #owned = false; // true when this player created the iframe (and so removes it)
     #listeners = new Set();
+    #loading = false;
 
     /**
      * @param {Object} options
@@ -46,6 +51,7 @@ export class YouTubePlayer {
         return () => this.#listeners.delete(onEvent);
     }
 
+
     /** Without enablejsapi the commands would never be sent: the iframe is reloaded once with it. */
     #prepareAdopted(iframe) {
         try {
@@ -62,25 +68,30 @@ export class YouTubePlayer {
         }
     }
 
-    #loading = false;
-
     /**
      * @param {VideoInfo|VideoListInfo|PlaylistInfo} info
      * @param {{autoplay?: boolean, index?: number}} [options] `index`: starting item of a list / playlist.
      */
     load(info, {autoplay = false, index = 0} = {}) {
         this.#loading = true;
+        try {
+            this.#load(info, {autoplay, index});
+        } finally {
+            this.#loading = false; // was left to true after reusing an existing iframe: every later event was dropped
+        }
+    }
+
+    #load(info, {autoplay, index}) {
         const verb = autoplay ? "load" : "cue"; // load* starts playing, cue* does not
-        // 1. create iframe
+
+        // 1. create the iframe
         if (!this.#iframe) {
             this.#attach(this.#createIframe(this.#src(info, {autoplay, index})), true);
             // index applied only for videoList
             if (index > 0) {
-                // if (info instanceof VideoListInfo) {
-                //     this.#bridge.command(`${verb}Playlist`, [info.videoIds, index, 0]);
-                // } else
-                //
-                if (info instanceof PlaylistInfo) {
+                if (info instanceof VideoListInfo) {
+                    this.#bridge.command(`${verb}Playlist`, [info.videoIds, index, 0]);
+                } else if (info instanceof PlaylistInfo) {
                     this.#bridge.command(`${verb}Playlist`, [{
                         list: info.playlistId,
                         listType: "playlist",
@@ -89,7 +100,6 @@ export class YouTubePlayer {
                     }]);
                 }
             }
-            this.#loading = false;
             return;
         }
 
@@ -132,6 +142,24 @@ export class YouTubePlayer {
         this.#bridge?.command("playVideoAt", [index]);
     }
 
+    /**
+     * Another item of the list / playlist that is already loaded: one postMessage, the iframe is kept.
+     * Without autoplay the item is only cued.
+     */
+    selectItem(info, index, {autoplay = true} = {}) {
+        if (autoplay) return this.playAt(index);
+        if (info instanceof VideoListInfo) {
+            this.#bridge?.command("cuePlaylist", [info.videoIds, index, 0]);
+        } else if (info instanceof PlaylistInfo) {
+            this.#bridge?.command("cuePlaylist", [{
+                list: info.playlistId,
+                listType: "playlist",
+                index,
+                startSeconds: 0
+            }]);
+        }
+    }
+
     dispose() {
         this.#bridge?.disconnect();
         if (this.#owned) this.#iframe?.remove();
@@ -159,8 +187,8 @@ export class YouTubePlayer {
     }
 
     #onBridgeEvent(e) {
-        if(this.#loading)
-            return ;
+        if (this.#loading)
+            return;
 
         switch (e.type) {
             case YouTubeBridgeEvent.PlaylistIndexChange:

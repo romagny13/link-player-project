@@ -23,8 +23,12 @@ export class YouTubeProvider extends MediaProvider {
             embedSrcBuilder ?? new YouTubeEmbedSrcBuilder({enablejsapi: true});
     }
 
-    getInfoFromElement(link) {
-        return this.#infoParser.parseFromElement(link);
+    getInfoFromLink(link) {
+        return this.#infoParser.parseFromLink(link);
+    }
+
+    getInfoFromFrame(frame) {
+        return this.#infoParser.parseFromFrame(frame);
     }
 
     getInfoFromDefinition(definition) {

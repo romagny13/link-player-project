@@ -34,71 +34,8 @@ export function toAutoplayMode(value) {
     return AUTOPLAY_MODES.NONE;
 }
 
-function normalizeSeed(input) {
-    if (input == null) throw new TypeError("DefBuilder: input is required");
-    if (typeof input === "string") return {url: input};
-    if (typeof input === "object") return {...input};
-    throw new TypeError("DefBuilder: expected url string or object");
+/** `<iframe#main>`: what `${element}` should have shown instead of "[object HTMLIFrameElement]". */
+export function describe(el) {
+    if (!el) return String(el);
+    return `<${el.localName ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
 }
-
-function createBuilder(type, input, batchList = null) {
-    const data = {type, ...normalizeSeed(input)};
-
-    if (!batchList) {
-        batchList = [data];
-    } else {
-        batchList.push(data);
-    }
-
-    const set = (k, v) => {
-        data[k] = v;
-        return api;
-    };
-
-    const api = {
-        title: (v) => set("title", v),
-        description: (v) => set("description", v),
-        channel(v, url = null) {
-            data.channel = v;
-            if (url) {
-                data.channelUrl = url;
-            }
-            return api;
-        },
-        thumbnail: (v) => set("thumbnail", v),
-        duration: (v) => set("duration", v),
-        autoplay: (v = AUTOPLAY_MODES.INIT) => set("autoplay", v),
-        start: (v) => set("start", v),
-        showOnInit: (v = true) => set("showOnInit", v),
-        target: (v) => set("target", v),
-        key: (v) => set("key", v),
-        name: (v) => set("name", v),
-        videos(v) {
-            data.videos = v;
-            return api;
-        },
-        extra: (v) => set("extra", v),
-
-        video(input) {
-            return createBuilder("video", input, batchList);
-        },
-        videoList(input) {
-            return createBuilder("videoList", input, batchList);
-        },
-        playlist(input) {
-            return createBuilder("playlist", input, batchList);
-        },
-
-        build() {
-            return batchList;
-        }
-    };
-
-    return api;
-}
-
-export const DefBuilder = {
-    video: (input) => createBuilder("video", input),
-    videoList: (input) => createBuilder("videoList", input),
-    playlist: (input) => createBuilder("playlist", input),
-};

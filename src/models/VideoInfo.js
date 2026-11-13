@@ -16,6 +16,7 @@ export class VideoInfo {
     #duration;
     #showOnInit;
     #extra;
+    #source;
 
     constructor({
                     provider,
@@ -30,8 +31,9 @@ export class VideoInfo {
                     thumbnail,
                     duration,
                     showOnInit,
-                    key = null,
-                    extra = null
+                    key,
+                    extra,
+                    source
                 }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
         ValueChecks.requireNotNullOrEmpty(target, "target");
@@ -50,6 +52,7 @@ export class VideoInfo {
         this.#duration = duration;
         this.#showOnInit = showOnInit;
         this.#extra = extra;
+        this.#source = source;
 
         this.#key = key ?? `${this.#provider}:${this.#videoId}`;
     }
@@ -112,6 +115,10 @@ export class VideoInfo {
 
     get extra() {
         return this.#extra;
+    }
+
+    get source() {
+        return this.#source;
     }
 
     fillMissing({title, description, channel, channelUrl, thumbnail, duration} = {}) {

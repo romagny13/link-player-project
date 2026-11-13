@@ -1,4 +1,4 @@
-import {UrlInfo} from "../../models/UrlInfo.js";
+import {SrcInfo, UrlInfo} from "../../models/UrlInfo.js";
 import {toAutoplayMode, toInt} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
@@ -15,6 +15,264 @@ export class YouTubeInfoParser extends InfoParser {
     constructor({thumbnailUrlBuilder = null} = {}) {
         super();
         this.#thumbnailUrlBuilder = thumbnailUrlBuilder ?? new YouTubeThumbnailUrlBuilder();
+    }
+
+    isValidVideoId(id) {
+        return typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id);
+    }
+
+    parseUrl(url) {
+        const u = this.getValidUrl(url);
+        if (!u) throw new Error("Invalid URL");
+
+        let host = u.hostname.toLowerCase();
+        if (host.startsWith('www.')) host = host.slice(4);
+
+        const path = u.pathname.replace(/\/+$/, '') || '/';
+        const p = u.searchParams;
+
+        // ---------- youtu.be ----------
+        if (host === 'youtu.be') {
+            const videoId = path.slice(1);
+
+            if (!this.isValidVideoId(videoId)) {
+                throw new Error("Invalid video ID");
+            }
+
+            const playlistId = p.get('list') || null;
+            const startSeconds = this.timeToSeconds(p.get('t'));
+
+            return new UrlInfo({
+                kind: playlistId ? 'playlist' : 'video',
+                videoId,
+                playlistId,
+                startSeconds,
+                source: url,
+            });
+        }
+
+        // ---------- youtube.com family ----------
+        if (host.endsWith('youtube.com')) {
+
+            // /watch
+            if (path === '/watch') {
+                const videoId = p.get('v');
+                const playlistId = p.get('list') || null;
+                const index = this.toInt(p.get('index'));
+                const startSeconds = this.timeToSeconds(p.get('t'));
+
+                if (videoId && !this.isValidVideoId(videoId)) {
+                    throw new Error("Invalid video ID");
+                }
+
+                if (playlistId) {
+                    return new UrlInfo({
+                        kind: 'playlist',
+                        videoId: videoId || null,
+                        playlistId,
+                        startSeconds,
+                        index,
+                        source: url,
+                    });
+                }
+
+                if (videoId) {
+                    return new UrlInfo({
+                        kind: 'video',
+                        videoId,
+                        startSeconds,
+                        source: url,
+                    });
+                }
+
+                throw new Error("Missing video ID or playlist");
+            }
+
+            // /watch_videos
+            if (path === '/watch_videos') {
+                const raw = p.get('video_ids');
+                if (!raw) throw new Error("Missing video_ids");
+
+                const videoIds = raw.split(',')
+                    .map(id => id.trim())
+                    .filter(id => this.isValidVideoId(id));
+
+                if (videoIds.length === 0) {
+                    throw new Error("No valid video IDs");
+                }
+
+                const index = this.toInt(p.get('index'));
+
+                return new UrlInfo({
+                    kind: 'videoList',
+                    videoIds,
+                    videoId: videoIds[0],
+                    index,
+                    source: url,
+                });
+            }
+        }
+
+        throw new Error("Unsupported YouTube URL");
+    }
+
+    parseSrc(src) {
+        const u = this.getValidUrl(src);          // ← corrigé
+        if (!u) throw new Error("Invalid URL");
+
+        let host = u.hostname.toLowerCase();
+        if (host.startsWith('www.')) host = host.slice(4);
+
+        if (!host.endsWith('youtube.com') && host !== 'youtube-nocookie.com') {
+            throw new Error("Invalid embed host");
+        }
+
+        const path = u.pathname.replace(/\/+$/, '');
+        if (!path.startsWith('/embed')) {
+            throw new Error("Invalid embed URL");
+        }
+
+        const p = u.searchParams;
+        const segments = path.split('/').filter(Boolean); // ["embed", "xxx"]
+        const seg = segments[1] || null;
+
+        const videoId = (seg && seg !== 'videoseries' && this.isValidVideoId(seg))
+            ? seg
+            : null;
+
+        const playlistId = p.get('list') || null;
+        const rawPlaylist = p.get('playlist'); // video list for embeds
+        const videoIds = rawPlaylist
+            ? rawPlaylist.split(',').map(id => id.trim()).filter(id => this.isValidVideoId(id))
+            : null;
+
+        const startSeconds = this.toInt(p.get('start'));
+        const index = this.toInt(p.get('index'));
+        const autoplay = this.toBool01(p.get('autoplay'));
+        const mute = this.toBool01(p.get('mute'));
+
+        let kind = null;
+        if (playlistId) kind = 'playlist';
+        else if (videoIds && videoIds.length) kind = 'videoList';
+        else if (videoId) kind = 'video';
+        else throw new Error("Invalid embed URL");
+
+        return new SrcInfo({
+            kind,
+            videoId,
+            videoIds,
+            playlistId,
+            startSeconds,
+            index,
+            autoplay,
+            mute,
+            source: src
+        });
+    }
+
+    parseFromFrame(frame) {
+        if (frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: <${frame.tagName.toLowerCase()}>`);
+
+        const urlInfos = this.parseSrc(frame.src);
+        if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || '(empty)'}"`);
+
+        const host = frame.parentElement;
+        if (!host) throw new Error(`Iframe has no parent element (src: "${frame.src || '(empty)'}")`);
+
+        const target = (host.id ||= `host:${crypto.randomUUID()}`);
+        switch (urlInfos.kind) {
+            case "video":
+                return new VideoInfo({
+                    provider: "youtube",
+                    target,
+                    videoId: urlInfos.videoId,
+                    autoplay: toAutoplayMode(urlInfos.autoplay),
+                    startSeconds: urlInfos.startSeconds,
+                    // showOnInit: true, // ??
+                    source: urlInfos.source
+                });
+            case "playlist":
+                return new PlaylistInfo("youtube", target, urlInfos.playlistId, urlInfos.videoId, null, null, null, urlInfos.source);
+        }
+    }
+
+    parseDefinition(def) {
+        const urlInfos = this.parseUrl(def.url);
+        if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
+
+        const videos = def.videos ?? [];
+        if (!Array.isArray(videos)) throw new Error("videos must be an array");
+
+        switch (urlInfos.kind) {
+            case "video":
+                return new VideoInfo({
+                    provider: "youtube",
+                    target: def.target,
+                    videoId: urlInfos.videoId,
+                    autoplay: toAutoplayMode(def.autoplay),
+                    startSeconds: this.timeToSeconds(def.start) ?? urlInfos.startSeconds,
+                    title: def.title ?? "",
+                    description: def.description ?? "",
+                    channel: def.channel ?? "",
+                    channelUrl: def.channelUrl ?? "",
+                    duration: this.timeToSeconds(def.duration),
+                    thumbnail: def.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(urlInfos.videoId),
+                    showOnInit: def.showOnInit,
+                    key: def.key,
+                    extra: def.extra,
+                    source: urlInfos.source
+                });
+            case "videoList": {
+                const index = urlInfos.index ?? def.index;
+                const list = new VideoListInfo(
+                    "youtube", def.target, urlInfos.videoIds, index, def.showOnInit, def.key, def.extra, urlInfos.source
+                );
+                urlInfos.videoIds.forEach((videoId, i) => {
+                    const v = videos[i] ?? {};
+                    list.addVideo(new VideoInfo({
+                        provider: "youtube",
+                        target: def.target,
+                        videoId,
+                        autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),   // repli sur l'autoplay du lien (comme Okru)
+                        startSeconds: this.timeToSeconds(v.start),       // plus de def.start sur toutes les vidéos
+                        title: v.title ?? "",
+                        description: v.description ?? "",
+                        channel: v.channel ?? "",
+                        channelUrl: v.channelUrl ?? "",
+                        duration: this.timeToSeconds(v.duration),
+                        thumbnail: v.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId),
+                        key: v.key,
+                        extra: v.extra
+                    }));
+                });
+                return list;
+            }
+            case "playlist": {
+                const playlist = new PlaylistInfo(
+                    "youtube", def.target, urlInfos.playlistId, urlInfos.videoId, def.showOnInit, def.key, def.extra, urlInfos.source
+                );
+                const items = videos.length ? videos : [];
+
+                items.forEach((v, i) => {
+                    playlist.addVideo(new VideoInfo({
+                        provider: "youtube",
+                        target: def.target,
+                        videoId: v.videoId,
+                        autoplay: toAutoplayMode(v.autoplay),
+                        startSeconds: this.timeToSeconds(v.start),
+                        title: v.title ?? "",
+                        description: v.description ?? "",
+                        channel: v.channel ?? "",
+                        channelUrl: v.channelUrl ?? "",
+                        thumbnail: v.thumbnail ?? (v.videoId ? this.#thumbnailUrlBuilder.getThumbnailUrl(v.videoId) : ""),
+                        duration: this.timeToSeconds(v.duration),
+                        key: v.key,
+                        extra: v.extra
+                    }));
+                });
+                return playlist;
+            }
+        }
     }
 
     buildUrl(def) {
@@ -38,126 +296,5 @@ export class YouTubeInfoParser extends InfoParser {
         }
 
         return `https://www.youtube.com/${path}?${q}`;
-    }
-
-    parseUrl(url) {
-        const u = new URL(url);
-        const q = u.searchParams;
-
-        if (q.has("video_ids")) {
-            const videoIds = q.get("video_ids").split(",").map((s) => s.trim()).filter(Boolean);
-            if (videoIds.length === 0) return null;
-            return new UrlInfo({kind: "videoList", videoIds, index: toInt(q.get("index"))});
-        }
-
-        // watch?v=ID | youtu.be/ID | /embed/ID | /shorts/ID | /live/ID
-        const host = u.hostname.replace(/^www\./, "");
-        const pathId = /^\/(?:embed|shorts|live)\/([\w-]+)/.exec(u.pathname)?.[1];
-        const videoId =
-            q.get("v") ||
-            (host === "youtu.be" ? u.pathname.split("/")[1] : null) ||
-            (pathId !== "videoseries" ? pathId : null) ||
-            null;
-
-        // 1. a playlist: the video id is optional
-        if (q.has("list")) {
-            return new UrlInfo({kind: "playlist", playlistId: q.get("list"), videoId});
-        }
-
-        // 2. embed form of a list of videos: /embed/ID?playlist=b,c
-        const extra = (q.get("playlist") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-        if (extra.length) {
-            return new UrlInfo({
-                kind: "videoList",
-                videoIds: [videoId, ...extra].filter(Boolean),
-                index: toInt(q.get("index"))
-            });
-        }
-
-        // 3. only now: a single video needs an id
-        if (!videoId) throw new Error(`Invalid URL: no video or playlist id in '${url}'`);
-        return new UrlInfo({
-            kind: "video",
-            videoId,
-            startSeconds: this.parseTime(q.get("t") ?? q.get("start"))
-        });
-    }
-
-    parseDefinition(def) {
-        const urlInfos = this.parseUrl(def.url);
-        if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
-
-        const videos = def.videos ?? [];
-        if (!Array.isArray(videos)) throw new Error("videos must be an array");
-
-        switch (urlInfos.kind) {
-            case "video":
-                return new VideoInfo({
-                    provider: "youtube",
-                    target: def.target,
-                    videoId: urlInfos.videoId,
-                    autoplay: toAutoplayMode(def.autoplay),
-                    startSeconds: this.parseTime(def.start) ?? urlInfos.startSeconds,
-                    title: def.title ?? "",
-                    description: def.description ?? "",
-                    channel: def.channel ?? "",
-                    channelUrl: def.channelUrl ?? "",
-                    duration: this.parseTime(def.duration),
-                    thumbnail: def.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(urlInfos.videoId),
-                    showOnInit: def.showOnInit,
-                    key: def.key,
-                    extra: def.extra
-                });
-            case "videoList": {
-                const index = urlInfos.index ?? def.index;
-                const list = new VideoListInfo(
-                    "youtube", def.target, urlInfos.videoIds, index, def.showOnInit, def.key
-                );
-                urlInfos.videoIds.forEach((videoId, i) => {
-                    const v = videos[i] ?? {};
-                    list.addVideo(new VideoInfo({
-                        provider: "youtube",
-                        target: def.target,
-                        videoId,
-                        autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),   // repli sur l'autoplay du lien (comme Okru)
-                        startSeconds: this.parseTime(v.start),       // plus de def.start sur toutes les vidéos
-                        title: v.title ?? "",
-                        description: v.description ?? "",
-                        channel: v.channel ?? "",
-                        channelUrl: v.channelUrl ?? "",
-                        duration: this.parseTime(v.duration),
-                        thumbnail: v.thumbnail ?? this.#thumbnailUrlBuilder.getThumbnailUrl(videoId),
-                        key: v.key,
-                        extra: v.extra
-                    }));
-                });
-                return list;
-            }
-            case "playlist": {
-                const playlist = new PlaylistInfo(
-                    "youtube", def.target, urlInfos.playlistId, urlInfos.videoId, def.showOnInit, def.key
-                );
-                const items = videos.length ? videos : [];
-
-                items.forEach((v, i) => {
-                    playlist.addVideo(new VideoInfo({
-                        provider: "youtube",
-                        target: def.target,
-                        videoId: v.videoId,
-                        autoplay: toAutoplayMode(v.autoplay),
-                        startSeconds: this.parseTime(v.start),
-                        title: v.title ?? "",
-                        description: v.description ?? "",
-                        channel: v.channel ?? "",
-                        channelUrl: v.channelUrl ?? "",
-                        thumbnail: v.thumbnail ?? (v.videoId ? this.#thumbnailUrlBuilder.getThumbnailUrl(v.videoId) : ""),
-                        duration: this.parseTime(v.duration),
-                        key: v.key,
-                        extra: v.extra
-                    }));
-                });
-                return playlist;
-            }
-        }
     }
 }

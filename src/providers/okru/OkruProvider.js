@@ -16,8 +16,8 @@ export class OkruProvider extends MediaProvider {
         this.#embedBaseUrl = embedBaseUrl;
     }
 
-    getInfoFromElement(link) {
-        return this.#infoParser.parseFromElement(link);
+    getInfoFromLink(link) {
+        return this.#infoParser.parseFromLink(link);
     }
 
     getInfoFromDefinition(definition) {
