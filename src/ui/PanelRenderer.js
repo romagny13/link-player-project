@@ -135,7 +135,7 @@ export class PanelRenderer {
         if (this.#host && this.#host !== host) this.clear(); // the host changed: clean the old one
         iframe = iframe ?? this.#iframe; // render() rappelé sans iframe : on garde l'ancre
 
-        injectStyles("lp-panel-styles", PANEL_CSS);
+        this.injectPanelStyles();
 
         const items = info.videos ?? [info];
         this.#host = host;
@@ -157,6 +157,10 @@ export class PanelRenderer {
         this.#ensureToggle(togglePosition);
         this.#setOpen(this.#open ?? this.#options.open);
         this.#placeAfterIframe();
+    }
+
+    injectPanelStyles() {
+        injectStyles("lp-panel-styles", PANEL_CSS);
     }
 
     /** Marks the item that is playing, without drawing the panel again. */

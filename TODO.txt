@@ -1,0 +1,6 @@
+
+shorts youtube
+provider tiktok + panel playlist
+
+
+voir pour injectstyles de panel renderer qui peut s'injecter avec un custom renderer

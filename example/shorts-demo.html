@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LinkPlayer : shorts 9/16</title>
+    <style>
+        :root { color-scheme: light dark; --accent: #f7931e; }
+        body { font: 16px/1.5 system-ui, sans-serif; max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+        h2 { margin: 2.5rem 0 .25rem; }
+        .note { margin: 0 0 1rem; font-size: 14px; opacity: .7; }
+
+        /* L'iframe est créée en 560x315 par la lib : le CSS impose le 9/16 */
+        .short iframe, .short-playlist iframe {
+            display: block; height: auto; aspect-ratio: 9 / 16; border: 0; border-radius: 12px; background: #000;
+        }
+        .short { width: min(100%, 360px); }
+        .short iframe { width: 100%; }
+
+        /* Playlist : l'hôte est plus large que l'iframe, le panneau se place à côté (pas sur la vidéo) */
+        .short-playlist { width: min(100%, 560px); }
+        .short-playlist iframe { width: min(100%, 360px); }
+        @media (min-width: 600px) {
+            .short-playlist .lp-panel { top: 0; bottom: 0; right: 0; left: auto; }
+        }
+
+        .picker { display: flex; gap: 8px; margin-top: 10px; width: min(100%, 360px); }
+        .picker button, .toggle-link {
+            flex: 1; padding: 8px 0; border: 1px solid #8884; border-radius: 8px; background: none; color: inherit;
+            font: inherit; cursor: pointer; text-align: center; text-decoration: none;
+        }
+        .picker .is-active { background: var(--accent); border-color: var(--accent); color: #000; }
+        .toggle-link { display: inline-block; flex: none; padding: 6px 14px; margin-top: 10px; }
+
+        #log { margin-top: 2.5rem; padding: 10px; border-radius: 8px; background: #8881; font-size: 12px; white-space: pre-wrap; }
+    </style>
+</head>
+<body data-lp-theme="light">
+<h1>Shorts (9/16) avec LinkPlayer</h1>
+<p class="note">À ouvrir via un serveur (<code>http://localhost</code>), pas en <code>file://</code> : YouTube refuse l'embed sans origine.</p>
+
+<!-- 1. Playlist de shorts -->
+<section id="demo-playlist">
+    <h2>1. Playlist de shorts</h2>
+    <p class="note">Liste <code>watch_videos</code> : l'embed est piloté par <code>playlist=</code>, le panneau liste les 4 shorts.</p>
+    <div id="shorts-playlist" class="short-playlist"></div>
+    <a class="toggle-link" href="https://www.youtube.com/watch_videos?video_ids=YaD3rhtEN8s,9il-nAvoNcM,WS4BzgZJ4Zg,9njrYP7FOZw"
+       data-link data-target="shorts-playlist" data-show-on-init
+       data-videos='[{"title":"Short 1","thumbnail":""},{"title":"Short 2","thumbnail":""},{"title":"Short 3","thumbnail":""},{"title":"Short 4","thumbnail":""}]'>
+        Afficher / masquer
+    </a>
+</section>
+
+<!-- 2. Un conteneur 9/16 et des boutons -->
+<section id="demo-buttons">
+    <h2>2. Un conteneur, quatre boutons</h2>
+    <p class="note">Chaque bouton est une vidéo seule : un clic remplace le short du conteneur.</p>
+    <div id="shorts-single" class="short"></div>
+    <div class="picker">
+        <button type="button" data-link data-target="shorts-single" data-title="Short 1" data-autoplay="click" data-show-on-init
+                data-url="https://www.youtube.com/watch?v=YaD3rhtEN8s">1</button>
+        <button type="button" data-link data-target="shorts-single" data-title="Short 2" data-autoplay="click"
+                data-url="https://www.youtube.com/watch?v=9il-nAvoNcM">2</button>
+        <button type="button" data-link data-target="shorts-single" data-title="Short 3" data-autoplay="click"
+                data-url="https://www.youtube.com/watch?v=WS4BzgZJ4Zg">3</button>
+        <button type="button" data-link data-target="shorts-single" data-title="Short 4" data-autoplay="click"
+                data-url="https://www.youtube.com/watch?v=9njrYP7FOZw">4</button>
+    </div>
+</section>
+
+<pre id="log">Journal des évènements…</pre>
+
+
+<script type="module">
+    import { LinkPlayer } from "../src/LinkPlayer.js";
+
+    const playlist = new LinkPlayer({scope: "demo-playlist", useStorage: false, autoScan: false});
+    const buttons  = new LinkPlayer({scope: "demo-buttons", useStorage: false, autoScan: false, currentBehavior: "skip"});
+
+    const log = document.getElementById("log");
+    const say = (text) => {
+        const lines = log.textContent.startsWith("Journal") ? [] : log.textContent.split("\n");
+        log.textContent = [`${new Date().toLocaleTimeString()}  ${text}`, ...lines].slice(0, 8).join("\n");
+    };
+    for (const [name, lp] of [["liste", playlist], ["boutons", buttons]]) {
+        lp.on("change", (e) => e.reason !== "visibility" && say(`${name} : ${e.reason}, item ${e.index}, ${e.info.key}`));
+        lp.on("error", (e) => say(`${name} : ERREUR ${e.error?.message ?? e.error}`));
+        lp.scan(); // après l'abonnement, pour ne pas manquer les erreurs du premier scan
+    }
+</script>
+</body>
+</html>
