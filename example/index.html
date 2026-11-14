@@ -99,7 +99,7 @@
                data-title="Maldives (vidéo simple)">Vidéo simple</a>
 
             <!-- autoplay au clic + start dans l'URL (t=2712s) -->
-            <a data-link href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s" data-target="player-link"
+            <a data-link href="https://www.youtube.com/watch?v=YCfcg9gzCYc&t=2712s" data-target="player-link"
                data-autoplay="click" data-title="Bahamas" data-channel="Me"
                data-thumbnail="https://i.ytimg.com/vi/z2sv_RsNwM4/mqdefault.jpg">Autoplay au clic + start 45:12 (URL)</a>
 
@@ -172,7 +172,7 @@
             <code>youtube:playlist:PL…</code>, <code>okru:ID</code>, ou <code>data-key</code>). Survole les liens : l'infobulle montre la définition.
         </p>
         <div class="links" id="mixed-links">
-            <a data-link href="https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s"><span class="chip yt">YT</span>Bahamas (vidéo + start)</a>
+            <a data-link href="https://www.youtube.com/watch?v=YCfcg9gzCYc&t=2712s"><span class="chip yt">YT</span>Bahamas (vidéo + start)</a>
             <a data-link data-key="maldives" href="https://www.youtube.com/watch?v=69iUWLA0oVc"><span class="chip yt">YT</span>Maldives (key personnalisée)</a>
             <a data-link href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=2"><span class="chip yt">YT</span>Liste de vidéos</a>
             <a data-link href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ"><span class="chip yt">YT</span>Playlist</a>
@@ -333,6 +333,7 @@
 <script type="module">
     // Adapte ce chemin à ton projet (LinkPlayer.js exporte aussi DefaultRegionHost).
     import {LinkPlayer} from "../src/LinkPlayer.js";
+    import {bindView} from "../src/bindView.js";
 
     // Rendus personnalisés : à décommenter si tu veux les essayer (chemins et classes = les tiens).
     // import {SimpleTipRenderer} from "./ui/SimpleTipRenderer.js";
@@ -461,7 +462,7 @@
     const OLD_OK_URL = `https://ok.ru/video/${OK_IDS[0]}?video_ids=${OK_IDS.join(",")}&labels=${OK_LABELS.map(encodeURIComponent).join(",")}`;
 
     const codeDefs = [
-        destination({title: "Bahamas", videoId: "z2sv_RsNwM4", startSeconds: 2712, showOnInit: true,
+        destination({title: "Bahamas", videoId: "YCfcg9gzCYc", startSeconds: 2712, showOnInit: true,
             description: "Un archipel de plus de 700 îles : eaux turquoise…"}),
         destination({title: "Maldives", videoId: "69iUWLA0oVc"}),
         destination({title: "Tahiti", videoId: "5drmgVauSMg"}),
@@ -535,7 +536,11 @@
                 details.append(a);
             }
         };
-        region.registerDependentView("details", render); // item d'une liste / playlist
+
+        bindView(region, "#details", (el, {info, params}) => {
+            render(info);
+        });
+
         region.on("change", (e) => render(e.info));      // changement d'info
         render(region.current);
     }
@@ -545,7 +550,7 @@
     $('a[data-old-okru]').href = OLD_OK_URL; // même URL que la définition, donc même key
 
     const mixedDefs = [
-        {url: "https://www.youtube.com/watch?v=z2sv_RsNwM4&t=2712s", target: T_MIXED, title: "Bahamas", channel: "Me",
+        {url: "https://www.youtube.com/watch?v=YCfcg9gzCYc&t=2712s", target: T_MIXED, title: "Bahamas", channel: "Me",
             thumbnail: "https://i.ytimg.com/vi/z2sv_RsNwM4/mqdefault.jpg", autoplay: "click"},
         {url: "https://www.youtube.com/watch?v=69iUWLA0oVc", target: T_MIXED, key: "maldives", title: "Maldives", channel: "Me", autoplay: "click"},
         {url: "https://www.youtube.com/watch?v=5drmgVauSMg", target: T_MIXED, title: "Tahiti (ajouté par scan())"},

@@ -16,7 +16,7 @@ export class VideoInfo {
     #duration;
     #showOnInit;
     #extra;
-    #source; //  { url?, element? }
+    #source; //  { url?, element?, kind }
 
     constructor({
                     provider,

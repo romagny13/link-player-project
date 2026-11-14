@@ -1,5 +1,5 @@
 import {InfoParser} from "../InfoParser.js";
-import {timeToSeconds, toAutoplayMode, toBool01, toInt} from "../../utils/helpers.js";
+import {SOURCE_KINDS, timeToSeconds, toAutoplayMode, toBool01, toInt,describe} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
@@ -86,7 +86,8 @@ export class OkruInfoParser extends InfoParser {
     }
 
     parseFromFrame(frame) {
-        if (frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: <${frame.tagName.toLowerCase()}>`);
+        if (!frame || frame.tagName !== "IFRAME")
+            throw new Error(`Expected an IFRAME element, but received: ${describe(frame)}`);
 
         const urlInfos = this.parseSrc(frame.src);
         if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || '(empty)'}"`);
@@ -102,7 +103,7 @@ export class OkruInfoParser extends InfoParser {
                     target,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(urlInfos.autoplay),
-                    source: {url: urlInfos.source, element: frame}
+                    source: {url: urlInfos.source, element: frame, kind: SOURCE_KINDS.FRAME}
                 });
         }
     }
@@ -125,6 +126,11 @@ export class OkruInfoParser extends InfoParser {
         const videos = def.videos ?? [];
         if (!Array.isArray(videos)) throw new Error("videos must be an array");
 
+        const source = {
+            url: urlInfos.source,
+            element,
+            kind: element ? SOURCE_KINDS.LINK : SOURCE_KINDS.DEFINITION
+        };
         switch (urlInfos.kind) {
             case "video":
                 return new VideoInfo({
@@ -142,7 +148,7 @@ export class OkruInfoParser extends InfoParser {
                     showOnInit: def.showOnInit,
                     key: def.key,
                     extra: def.extra,
-                    source: {url: def.url, element}
+                    source
                 });
             case "videoList": {
                 const labels = urlInfos.labels;
@@ -163,7 +169,7 @@ export class OkruInfoParser extends InfoParser {
                     autoplay: toAutoplayMode(def.autoplay),
                     key: def.key,
                     extra: def.extra,
-                    source: {url: def.url, element}
+                    source
                 });
 
                 videoIds.forEach((videoId, i) => {

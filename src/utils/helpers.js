@@ -46,13 +46,16 @@ export const AUTOPLAY_MODES = Object.freeze({
 export function toAutoplayMode(value) {
     if (value === undefined || value === null) return AUTOPLAY_MODES.NONE;
     const v = String(value).trim().toLowerCase();
-    if (v === "" || v === "true") return AUTOPLAY_MODES.INIT;
+    if (v === "" || v === "true" || v === "init") return AUTOPLAY_MODES.INIT;
     if (v === "click") return AUTOPLAY_MODES.CLICK;
     return AUTOPLAY_MODES.NONE;
 }
 
-/** `<iframe#main>`: what `${element}` should have shown instead of "[object HTMLIFrameElement]". */
 export function describe(el) {
     if (!el) return String(el);
-    return `<${el.localName ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
+    const name = el.localName ?? el.tagName?.toLowerCase() ?? typeof el;
+    return `<${name}${el.id ? `#${el.id}` : ""}>`;
 }
+
+export const SOURCE_KINDS = Object.freeze({LINK: "link", FRAME: "frame", DEFINITION: "definition"});
+
