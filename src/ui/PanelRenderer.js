@@ -175,7 +175,8 @@ export class PanelRenderer {
                 const group = row.closest(".lp-group");
                 if (group?.hasAttribute("data-collapsed"))
                     this.#setCollapsed(group, false);
-                row.scrollIntoView?.({block: "nearest"});
+               // row.scrollIntoView?.({block: "nearest"});
+                this.#reveal(row);
             } else {
                 row.removeAttribute("aria-current");
             }
@@ -448,6 +449,22 @@ export class PanelRenderer {
             ?.setAttribute("aria-expanded", String(!collapsed));
         if (collapsed) this.#collapsed?.add(group.dataset.label);
         else this.#collapsed?.delete(group.dataset.label);
+    }
+
+    /**
+     * Scrolls the LIST so that the row is visible. Not scrollIntoView(): it also scrolls every scrollable
+     * ancestor, the page included, and jumps to the iframe whenever a panel updates (several frames on the page).
+     */
+    #reveal(row) {
+        const scroll = this.#scroll;
+        const box = scroll.getBoundingClientRect();
+        if (!box.height) return; // hidden (host hidden, display:none): nothing to measure
+        const rect = row.getBoundingClientRect();
+        const head = scroll.querySelector(".lp-head")?.offsetHeight ?? 0; // sticky: it covers the top of the list
+        const top = box.top + head;
+
+        if (rect.top < top) scroll.scrollTop -= top - rect.top;
+        else if (rect.bottom > box.bottom) scroll.scrollTop += rect.bottom - box.bottom;
     }
 
     // ─── Toggle ───
