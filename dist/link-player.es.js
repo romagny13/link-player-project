@@ -77,7 +77,7 @@ function toAutoplayMode(value) {
 	if (v === "click") return AUTOPLAY_MODES.CLICK;
 	return AUTOPLAY_MODES.NONE;
 }
-function describe$1(el) {
+function describe(el) {
 	if (!el) return String(el);
 	return `<${el.localName ?? el.tagName?.toLowerCase() ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
 }
@@ -350,6 +350,11 @@ var PANEL_CSS = `
 :where(.lp-title){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.3;color:var(--_text)}
 :where(.lp-item[data-current] .lp-title){color:var(--_text-on);font-weight:500}
 :where(.lp-chan,.lp-dur){margin-top:2px;font-size:10px;color:var(--_muted)}
+
+/* Styles spécifiques pour le lien de la chaîne */
+:where(a.lp-chan){text-decoration:none;display:inline-block}
+:where(a.lp-chan:hover){color:var(--_text-on);text-decoration:underline}
+
 :where(.lp-thumb){position:relative;width:80px;height:45px;flex-shrink:0;border-radius:3px;overflow:hidden;background:#1a1a1a}
 :where(.lp-thumb img){display:block;width:100%;height:100%;object-fit:cover}
 :where(.lp-tn){position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:2px;background:rgba(0,0,0,.7);color:#fff;font-size:9px}
@@ -363,8 +368,6 @@ var PANEL_CSS = `
 :where(.lp-host:hover .lp-toggle,.lp-toggle:focus-visible){opacity:1}
 @media(hover:none){:where(.lp-toggle){opacity:1}}
 
-/* Anchor positioning: the panel and the toggle follow the box of the iframe, whatever its size or class.
-   Without support, the rules above (panel fitted to the host) stay in force. */
 @supports (anchor-name:--a){
   :where(.lp-host[data-lp-anchored] .lp-panel){
     position-anchor:var(--lp-anchor);
@@ -779,9 +782,15 @@ var ItemRenderer = class {
 		titleEl.textContent = title;
 		text.append(titleEl);
 		if (item.channel) {
-			const chan = document.createElement("div");
+			const chan = document.createElement(item.channelUrl ? "a" : "div");
 			chan.className = "lp-chan";
 			chan.textContent = item.channel;
+			if (item.channelUrl) {
+				chan.href = item.channelUrl;
+				chan.target = "_blank";
+				chan.rel = "noopener noreferrer";
+				chan.addEventListener("click", (e) => e.stopPropagation());
+			}
 			text.append(chan);
 		}
 		if (item.thumbnail) {
@@ -904,6 +913,9 @@ var Region = class {
 	#currentBehavior;
 	#boundaryBehavior;
 	#pending = [];
+	#activeClass;
+	#links = /* @__PURE__ */ new Map();
+	#activeLinks = /* @__PURE__ */ new Set();
 	/**
 	* @param {object} options
 	* @param {"toggle"|"skip"|string} [options.currentBehavior] What navigate() does on the info already shown.
@@ -913,13 +925,15 @@ var Region = class {
 	*   of an info (items of a playlist, title / channel of a single video...): true when it changed something. Called the
 	*   first time each info is shown (force: false) and by refreshMeta(); it decides by itself what is worth fetching.
 	*/
-	constructor({ target, registry, currentBehavior = "toggle", boundaryBehavior = "stop", resolveMeta = null, panelRenderer = null, itemRenderer = null, headerRenderer = null, toggleRenderer = null, groupRenderer = null, thumbnails = null }) {
+	constructor({ target, registry, currentBehavior = "toggle", boundaryBehavior = "stop", activeClass = "is-active", resolveMeta = null, panelRenderer = null, itemRenderer = null, headerRenderer = null, toggleRenderer = null, groupRenderer = null, thumbnails = null }) {
 		this.#target = target;
 		this.#host = document.getElementById(target);
 		this.#registry = registry;
 		this.#currentBehavior = currentBehavior;
 		if (boundaryBehavior !== "stop" && boundaryBehavior !== "loop") throw new TypeError(`Invalid boundaryBehavior '${boundaryBehavior}': expected "stop" or "loop".`);
 		this.#boundaryBehavior = boundaryBehavior;
+		const names = Array.isArray(activeClass) ? activeClass.join(" ") : activeClass ?? "";
+		this.#activeClass = String(names).split(/\s+/).filter(Boolean);
 		this.#resolveMeta = resolveMeta;
 		this.#panel = panelRenderer ?? new PanelRenderer({
 			itemRenderer,
@@ -931,6 +945,9 @@ var Region = class {
 	}
 	get target() {
 		return this.#target;
+	}
+	get host() {
+		return this.#host;
 	}
 	get infos() {
 		return Object.freeze([...this.#infos.values()]);
@@ -1008,6 +1025,17 @@ var Region = class {
 	hasPending() {
 		return this.#pending.length > 0;
 	}
+	addLink(key, element) {
+		let set = this.#links.get(key);
+		if (!set) this.#links.set(key, set = /* @__PURE__ */ new Set());
+		set.add(element);
+		if (this.current?.key === key) this.#markActive();
+		return () => {
+			set.delete(element);
+			if (!set.size && this.#links.get(key) === set) this.#links.delete(key);
+			this.#unmark(element);
+		};
+	}
 	isCurrent(key) {
 		const info = this.get(key);
 		return !!(info && this.#journal.current?.info === info);
@@ -1072,12 +1100,16 @@ var Region = class {
 		return true;
 	}
 	goBack() {
-		if (!this.#host) return false;
-		return this.#restore(this.#journal.back(), "back");
+		return this.#run(() => this.#restore(this.#journal.back(), "back"));
 	}
 	goForward() {
-		if (!this.#host) return false;
-		return this.#restore(this.#journal.forward(), "forward");
+		return this.#run(() => this.#restore(this.#journal.forward(), "forward"));
+	}
+	nextItem() {
+		this.#whenReady(() => this.#player?.next());
+	}
+	previousItem() {
+		this.#whenReady(() => this.#player?.previous());
 	}
 	/** @param {{autoplay?: boolean, params?: object}} [options] autoplay is true by default. */
 	nextInfo(options) {
@@ -1086,18 +1118,15 @@ var Region = class {
 	previousInfo(options) {
 		return this.#step(-1, options);
 	}
-	nextItem() {
-		this.#player?.next();
-	}
-	previousItem() {
-		this.#player?.previous();
-	}
 	playAt(index) {
-		this.#playerIndex = index;
-		this.#player?.playAt(index);
-		this.#journal.updateCurrent({ index });
-		this.#panel.setCurrent(index);
-		this.#changed("item");
+		this.#whenReady(() => {
+			if (!this.#player) return;
+			this.#playerIndex = index;
+			this.#player.playAt(index);
+			this.#journal.updateCurrent({ index });
+			this.#panel.setCurrent(index);
+			this.#changed("item");
+		});
 	}
 	/**
 	* Takes over an iframe that is already in the page (and inside the target): the player drives it
@@ -1124,22 +1153,25 @@ var Region = class {
 		this.#resolveMetaLater(info);
 	}
 	toggle() {
-		if (!this.#host) return;
-		if (this.#host.hidden) this.show();
-		else this.hide();
+		this.#whenReady(() => this.#host.hidden ? this.show() : this.hide());
 	}
 	show() {
-		if (!this.#host) return;
-		this.#host.hidden = false;
-		this.#changed("visibility");
+		this.#whenReady(() => {
+			this.#host.hidden = false;
+			this.#changed("visibility");
+		});
 	}
 	hide() {
-		if (!this.#host) return;
-		this.#player?.pause();
-		this.#host.hidden = true;
-		this.#changed("visibility");
+		this.#whenReady(() => {
+			this.#player?.pause();
+			this.#host.hidden = true;
+			this.#changed("visibility");
+		});
 	}
 	dispose() {
+		for (const el of this.#activeLinks) el.classList.remove(...this.#activeClass);
+		this.#activeLinks.clear();
+		this.#links.clear();
 		this.#disposePlayer();
 		this.#panel.destroy();
 		this.#pending.length = 0;
@@ -1182,6 +1214,14 @@ var Region = class {
 		this.#resolved.add(info);
 		return this.#completeMeta(info, { force });
 	}
+	/** Comme #whenReady, mais rend le résultat de l'action ; false tant qu'elle est différée. */
+	#run(action) {
+		let result = false;
+		this.#whenReady(() => {
+			result = action();
+		});
+		return result;
+	}
 	/** Runs now when the container is known, otherwise when it is registered. */
 	#whenReady(action) {
 		if (this.#host) return action();
@@ -1220,14 +1260,15 @@ var Region = class {
 		return true;
 	}
 	#step(delta, options = {}) {
-		if (!this.#host) return false;
-		const target = this.#stepTarget(delta);
-		if (!target) return false;
-		this.#navigate(target, {
-			autoplay: true,
-			...options
+		return this.#run(() => {
+			const target = this.#stepTarget(delta);
+			if (!target) return false;
+			this.#navigate(target, {
+				autoplay: true,
+				...options
+			});
+			return true;
 		});
-		return true;
 	}
 	/** The info `delta` (1 or -1) away from the current one; at an end: the other end when looping, else undefined. */
 	#stepTarget(delta) {
@@ -1361,7 +1402,10 @@ var Region = class {
 			params: this.currentParams,
 			visible: this.isVisible
 		});
-		if (reason !== "visibility") this.#runAfterHooks(reason);
+		if (reason !== "visibility") {
+			this.#markActive();
+			this.#runAfterHooks(reason);
+		}
 	}
 	#state(reason) {
 		const entry = this.#journal.current;
@@ -1422,6 +1466,17 @@ var Region = class {
 		this.#rendered = null;
 		this.#panelInfo = null;
 		this.#panel.clear();
+	}
+	#markActive() {
+		if (!this.#activeClass.length) return;
+		const next = new Set(this.#links.get(this.current?.key));
+		for (const el of this.#activeLinks) if (!next.has(el)) el.classList.remove(...this.#activeClass);
+		for (const el of next) el.classList.add(...this.#activeClass);
+		this.#activeLinks = next;
+	}
+	#unmark(element) {
+		this.#activeLinks.delete(element);
+		element.classList.remove(...this.#activeClass);
 	}
 };
 // src/providers/ProviderRegistry.js
@@ -1970,7 +2025,7 @@ var YouTubeInfoParser = class extends InfoParser {
 		});
 	}
 	parseFromFrame(frame) {
-		if (!frame || frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: ${describe$1(frame)}`);
+		if (!frame || frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: ${describe(frame)}`);
 		const urlInfos = this.parseSrc(frame.src);
 		if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || "(empty)"}"`);
 		const host = frame.parentElement;
@@ -2731,7 +2786,7 @@ var OkruInfoParser = class extends InfoParser {
 		});
 	}
 	parseFromFrame(frame) {
-		if (!frame || frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: ${describe$1(frame)}`);
+		if (!frame || frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: ${describe(frame)}`);
 		const urlInfos = this.parseSrc(frame.src);
 		if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || "(empty)"}"`);
 		const host = frame.parentElement;
@@ -3749,10 +3804,12 @@ var LinkPlayer = class {
 	#isGlobal;
 	#currentBehavior;
 	#boundaryBehavior;
+	#activeClass;
 	#useStorage;
 	#scanEmbeds;
 	#regions = /* @__PURE__ */ new Map();
 	#initialized = /* @__PURE__ */ new WeakSet();
+	#explicit = /* @__PURE__ */ new WeakSet();
 	#regionHost;
 	#defaultTarget;
 	#store;
@@ -3765,7 +3822,7 @@ var LinkPlayer = class {
 	#panelOptions;
 	#events = new Emitter();
 	#detachers = /* @__PURE__ */ new Set();
-	constructor({ scope = null, definitions = null, autoScan = true, useStorage = true, tooltip = true, currentBehavior = "toggle", boundaryBehavior = "stop", scanEmbeds = true, youtubeApiKey = null, youtubeMeta = null, youtubeMetaScope = "playlists", youtubeMetaRequired = void 0, fallbackTitle = void 0, okruEmbedBaseUrl = null, store = null, registry = null, regionHost = null, defaultTarget = null, panelRenderer = null, itemRenderer = null, headerRenderer = null, toggleRenderer = null, groupRenderer = null, tooltipRenderer = null, thumbnails = null, onChange = noop, onState = noop, onError = (e) => console.warn("[LinkPlayer]", e.error ?? e) } = {}) {
+	constructor({ scope = null, definitions = null, autoScan = true, useStorage = true, tooltip = true, currentBehavior = "toggle", boundaryBehavior = "stop", activeClass = "is-active", scanEmbeds = true, youtubeApiKey = null, youtubeMeta = null, youtubeMetaScope = "playlists", youtubeMetaRequired = void 0, fallbackTitle = void 0, okruEmbedBaseUrl = null, store = null, registry = null, regionHost = null, defaultTarget = null, panelRenderer = null, itemRenderer = null, headerRenderer = null, toggleRenderer = null, groupRenderer = null, tooltipRenderer = null, thumbnails = null, onChange = noop, onState = noop, onError = (e) => console.warn("[LinkPlayer]", e.error ?? e) } = {}) {
 		this.#scopeEl = resolveScope(scope);
 		this.#isGlobal = this.#scopeEl === null;
 		this.#id = this.#isGlobal ? `lp-global` : `lp-${scope}`;
@@ -3795,6 +3852,7 @@ var LinkPlayer = class {
 			fallbackTitle,
 			required: youtubeMetaRequired
 		});
+		this.#activeClass = activeClass;
 		this.#panelOptions = {
 			panelRenderer,
 			itemRenderer,
@@ -3847,6 +3905,7 @@ var LinkPlayer = class {
 			registry: this.#registry,
 			currentBehavior: this.#currentBehavior,
 			boundaryBehavior: this.#boundaryBehavior,
+			activeClass: this.#activeClass,
 			resolveMeta: (info, options) => this.#enrich(info, options),
 			thumbnails: this.#thumbnails,
 			...this.#panelOptions
@@ -3867,6 +3926,66 @@ var LinkPlayer = class {
 		this.#regionHost.clear();
 		this.#tooltip?.dispose();
 		this.#events.clear();
+	}
+	canGoBack(target) {
+		return this.getRegion(target).canGoBack;
+	}
+	canGoForward(target) {
+		return this.getRegion(target).canGoForward;
+	}
+	canGoPreviousInfo(target) {
+		return this.getRegion(target).canGoPreviousInfo;
+	}
+	canGoNextInfo(target) {
+		return this.getRegion(target).canGoNextInfo;
+	}
+	canGoPreviousItem(target) {
+		return this.getRegion(target).canGoPreviousItem;
+	}
+	canGoNextItem(target) {
+		return this.getRegion(target).canGoNextItem;
+	}
+	/** @param {string} target Id du conteneur de la région. */
+	navigate(target, key, options) {
+		return this.#navigating(target).navigate(key, options);
+	}
+	replace(target, key, options) {
+		return this.#navigating(target).replace(key, options);
+	}
+	goBack(target) {
+		return this.getRegion(target).goBack();
+	}
+	goForward(target) {
+		return this.getRegion(target).goForward();
+	}
+	nextInfo(target, options) {
+		return this.#navigating(target).nextInfo(options);
+	}
+	previousInfo(target, options) {
+		return this.#navigating(target).previousInfo(options);
+	}
+	nextItem(target) {
+		return this.getRegion(target).nextItem();
+	}
+	previousItem(target) {
+		return this.getRegion(target).previousItem();
+	}
+	playAt(target, index) {
+		return this.getRegion(target).playAt(index);
+	}
+	toggle(target) {
+		return this.getRegion(target).toggle();
+	}
+	show(target) {
+		return this.getRegion(target).show();
+	}
+	hide(target) {
+		return this.getRegion(target).hide();
+	}
+	#navigating(target) {
+		const region = this.getRegion(target);
+		this.#explicit.add(region);
+		return region;
 	}
 	#registerDefs(definitions) {
 		if (!definitions) return;
@@ -3909,6 +4028,7 @@ var LinkPlayer = class {
 		const key = parsed.key;
 		region.add(parsed);
 		const info = region.get(key);
+		const unlink = region.addLink(key, element);
 		const onClick = (e) => {
 			e.preventDefault();
 			region.navigate(key, {
@@ -3926,6 +4046,7 @@ var LinkPlayer = class {
 		this.#detachers.add(() => {
 			element.removeEventListener("click", onClick);
 			detachTip();
+			unlink();
 			release();
 		});
 	}
@@ -3981,6 +4102,7 @@ var LinkPlayer = class {
 		});
 	}
 	#init(region) {
+		if (this.#explicit.has(region)) return;
 		const saved = this.getSavedState(region);
 		if (saved && region.restore(saved.key, { index: saved.index ?? 0 })) return;
 		const first = region.infos.find((info) => info.showOnInit);
@@ -4005,11 +4127,6 @@ var LinkPlayer = class {
 		});
 	}
 };
-/** `<iframe#main>`: what `${element}` should have shown instead of "[object HTMLIFrameElement]". */
-function describe(el) {
-	if (!el) return String(el);
-	return `<${el.localName ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
-}
 export { LinkPlayer as default };
 
 //# sourceMappingURL=link-player.es.js.map
