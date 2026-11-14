@@ -73,10 +73,19 @@ var AUTOPLAY_MODES = Object.freeze({
 function toAutoplayMode(value) {
 	if (value === void 0 || value === null) return AUTOPLAY_MODES.NONE;
 	const v = String(value).trim().toLowerCase();
-	if (v === "" || v === "true") return AUTOPLAY_MODES.INIT;
+	if (v === "" || v === "true" || v === "init") return AUTOPLAY_MODES.INIT;
 	if (v === "click") return AUTOPLAY_MODES.CLICK;
 	return AUTOPLAY_MODES.NONE;
 }
+function describe$1(el) {
+	if (!el) return String(el);
+	return `<${el.localName ?? el.tagName?.toLowerCase() ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
+}
+var SOURCE_KINDS = Object.freeze({
+	LINK: "link",
+	FRAME: "frame",
+	DEFINITION: "definition"
+});
 // src/utils/Emitter.js
 /**
 * Minimal event emitter. Handlers receive `{type, ...data}`.
@@ -1932,7 +1941,7 @@ var YouTubeInfoParser = class extends InfoParser {
 		if (host.startsWith("www.")) host = host.slice(4);
 		if (host !== "youtube.com" && !host.endsWith(".youtube.com") && host !== "youtube-nocookie.com") throw new Error("Invalid embed host");
 		const path = u.pathname.replace(/\/+$/, "");
-		if (!path.startsWith("/embed")) throw new Error("Invalid embed URL");
+		if (path !== "/embed" && !path.startsWith("/embed/")) throw new Error("Invalid embed URL");
 		const p = u.searchParams;
 		const seg = path.split("/").filter(Boolean)[1] || null;
 		const videoId = seg && seg !== "videoseries" && this.isValidVideoId(seg) ? seg : null;
@@ -1961,12 +1970,17 @@ var YouTubeInfoParser = class extends InfoParser {
 		});
 	}
 	parseFromFrame(frame) {
-		if (frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: <${frame.tagName.toLowerCase()}>`);
+		if (!frame || frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: ${describe$1(frame)}`);
 		const urlInfos = this.parseSrc(frame.src);
 		if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || "(empty)"}"`);
 		const host = frame.parentElement;
 		if (!host) throw new Error(`Iframe has no parent element (src: "${frame.src || "(empty)"}")`);
 		const target = host.id ||= `host:${crypto.randomUUID()}`;
+		const source = {
+			url: urlInfos.source,
+			element: frame,
+			kind: SOURCE_KINDS.FRAME
+		};
 		switch (urlInfos.kind) {
 			case "video": return new VideoInfo({
 				provider: "youtube",
@@ -1974,10 +1988,7 @@ var YouTubeInfoParser = class extends InfoParser {
 				videoId: urlInfos.videoId,
 				autoplay: toAutoplayMode(urlInfos.autoplay),
 				startSeconds: urlInfos.startSeconds,
-				source: {
-					url: urlInfos.source,
-					element: frame
-				}
+				source
 			});
 			case "videoList": return new VideoListInfo({
 				provider: "youtube",
@@ -1985,20 +1996,16 @@ var YouTubeInfoParser = class extends InfoParser {
 				videoId: urlInfos.videoId,
 				videoIds: urlInfos.videoIds,
 				index: urlInfos.index,
-				source: {
-					url: urlInfos.source,
-					element: frame
-				}
+				autoplay: toAutoplayMode(urlInfos.autoplay),
+				source
 			});
 			case "playlist": return new PlaylistInfo({
 				provider: "youtube",
 				target,
 				playlistId: urlInfos.playlistId,
 				videoId: urlInfos.videoId,
-				source: {
-					url: urlInfos.source,
-					element: frame
-				}
+				autoplay: toAutoplayMode(urlInfos.autoplay),
+				source
 			});
 		}
 	}
@@ -2007,6 +2014,11 @@ var YouTubeInfoParser = class extends InfoParser {
 		if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
 		const videos = def.videos ?? [];
 		if (!Array.isArray(videos)) throw new Error("videos must be an array");
+		const source = {
+			url: urlInfos.source,
+			element,
+			kind: element ? SOURCE_KINDS.LINK : SOURCE_KINDS.DEFINITION
+		};
 		switch (urlInfos.kind) {
 			case "video": return new VideoInfo({
 				provider: "youtube",
@@ -2023,10 +2035,7 @@ var YouTubeInfoParser = class extends InfoParser {
 				showOnInit: def.showOnInit,
 				key: def.key,
 				extra: def.extra,
-				source: {
-					url: urlInfos.source,
-					element
-				}
+				source
 			});
 			case "videoList": {
 				const index = urlInfos.index ?? def.index;
@@ -2039,10 +2048,7 @@ var YouTubeInfoParser = class extends InfoParser {
 					autoplay: toAutoplayMode(def.autoplay),
 					key: def.key,
 					extra: def.extra,
-					source: {
-						url: urlInfos.source,
-						element
-					}
+					source
 				});
 				urlInfos.videoIds.forEach((videoId, i) => {
 					const v = videos[i] ?? {};
@@ -2074,17 +2080,14 @@ var YouTubeInfoParser = class extends InfoParser {
 					autoplay: toAutoplayMode(def.autoplay),
 					key: def.key,
 					extra: def.extra,
-					source: {
-						url: urlInfos.source,
-						element
-					}
+					source
 				});
 				(videos.length ? videos : []).forEach((v, i) => {
 					playlist.addVideo(new VideoInfo({
 						provider: "youtube",
 						target: def.target,
 						videoId: v.videoId,
-						autoplay: toAutoplayMode(v.autoplay),
+						autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),
 						startSeconds: timeToSeconds(v.start),
 						title: v.title ?? "",
 						description: v.description ?? "",
@@ -2728,7 +2731,7 @@ var OkruInfoParser = class extends InfoParser {
 		});
 	}
 	parseFromFrame(frame) {
-		if (frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: <${frame.tagName.toLowerCase()}>`);
+		if (!frame || frame.tagName !== "IFRAME") throw new Error(`Expected an IFRAME element, but received: ${describe$1(frame)}`);
 		const urlInfos = this.parseSrc(frame.src);
 		if (!urlInfos) throw new Error(`Invalid iframe src: "${frame.src || "(empty)"}"`);
 		const host = frame.parentElement;
@@ -2742,7 +2745,8 @@ var OkruInfoParser = class extends InfoParser {
 				autoplay: toAutoplayMode(urlInfos.autoplay),
 				source: {
 					url: urlInfos.source,
-					element: frame
+					element: frame,
+					kind: SOURCE_KINDS.FRAME
 				}
 			});
 		}
@@ -2759,6 +2763,11 @@ var OkruInfoParser = class extends InfoParser {
 		if (!urlInfos) throw new Error(`Invalid URL: '${def.url}'`);
 		const videos = def.videos ?? [];
 		if (!Array.isArray(videos)) throw new Error("videos must be an array");
+		const source = {
+			url: urlInfos.source,
+			element,
+			kind: element ? SOURCE_KINDS.LINK : SOURCE_KINDS.DEFINITION
+		};
 		switch (urlInfos.kind) {
 			case "video": return new VideoInfo({
 				provider: "okru",
@@ -2775,10 +2784,7 @@ var OkruInfoParser = class extends InfoParser {
 				showOnInit: def.showOnInit,
 				key: def.key,
 				extra: def.extra,
-				source: {
-					url: def.url,
-					element
-				}
+				source
 			});
 			case "videoList": {
 				const labels = urlInfos.labels;
@@ -2794,10 +2800,7 @@ var OkruInfoParser = class extends InfoParser {
 					autoplay: toAutoplayMode(def.autoplay),
 					key: def.key,
 					extra: def.extra,
-					source: {
-						url: def.url,
-						element
-					}
+					source
 				});
 				videoIds.forEach((videoId, i) => {
 					const v = videos.length ? videos[i] : { title: labels[i] };
