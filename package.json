@@ -6,9 +6,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build": "vite build && vite build --mode min"
   },
   "keywords": [],
   "author": "",

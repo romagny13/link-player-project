@@ -5,7 +5,6 @@ modules/
 
 # Build / distribution
 
-dist/
 build/
 coverage/
 
@@ -34,6 +33,7 @@ pnpm-debug.log*
 
 .vscode/
 .idea/
+.vs/
 *.swp
 *.swo
 
