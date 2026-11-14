@@ -546,6 +546,7 @@ export class Region {
             iframe,
             info,
             current: index,
+            togglePosition: this.#registry.get(info.provider)?.togglePosition,
             onSelectItem: (i) => this.playAt(i)
         });
     }

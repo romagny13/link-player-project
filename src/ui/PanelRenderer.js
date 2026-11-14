@@ -125,7 +125,8 @@ export class PanelRenderer {
                info,
                current = null,
                onSelectItem = null,
-               widths = null
+               widths = null,
+               togglePosition = this.#options.togglePosition
            }) {
         host = host ?? iframe?.parentElement; // no container to create
         if (!host) {
@@ -153,7 +154,7 @@ export class PanelRenderer {
         this.#ensureResizeHandle(widths);
         this.#fillPanel(items);
 
-        this.#ensureToggle();
+        this.#ensureToggle(togglePosition);
         this.#setOpen(this.#open ?? this.#options.open);
         this.#placeAfterIframe();
     }
@@ -469,12 +470,13 @@ export class PanelRenderer {
 
     // ─── Toggle ───
 
-    #ensureToggle() {
-        if (this.#toggle) return;
-
-        const toggle = this.#toggleRenderer.render({
-            position: this.#options.togglePosition
-        });
+    #ensureToggle(position) {
+        if (this.#toggle) {
+            // le provider a changé sans clear() (adopt) : on met simplement la position à jour
+            if (typeof position === "string") this.#toggle.dataset.pos = position;
+            return;
+        }
+        const toggle = this.#toggleRenderer.render({position});
         toggle.addEventListener("click", () => this.#setOpen(true));
 
         this.#toggle = toggle;

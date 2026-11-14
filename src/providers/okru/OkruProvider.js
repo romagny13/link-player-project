@@ -6,6 +6,7 @@ import {makeIframe} from "../../utils/dom.js";
 export class OkruProvider extends MediaProvider {
     id = "okru";
     hosts = ["ok.ru"];
+    togglePosition = "top-right";
     #infoParser;
     #embedBaseUrl;
 

@@ -7,6 +7,7 @@ import {MediaProvider} from "../MediaProvider.js";
 export class YouTubeProvider extends MediaProvider {
     id = "youtube";
     hosts = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
+    togglePosition = "bottom-left";
     #infoParser;
     #embedSrcBuilder;
 
