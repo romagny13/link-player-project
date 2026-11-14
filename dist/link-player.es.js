@@ -421,7 +421,7 @@ var PanelRenderer = class {
 		this.#toggleRenderer = toggleRenderer ?? new ToggleRenderer();
 		this.#groupRenderer = groupRenderer ?? new GroupRenderer();
 	}
-	render({ host = null, iframe = null, info, current = null, onSelectItem = null, widths = null }) {
+	render({ host = null, iframe = null, info, current = null, onSelectItem = null, widths = null, togglePosition = this.#options.togglePosition }) {
 		host = host ?? iframe?.parentElement;
 		if (!host) throw new Error("[PanelRenderer] host or an attached iframe is required");
 		if (this.#host && this.#host !== host) this.clear();
@@ -440,7 +440,7 @@ var PanelRenderer = class {
 		this.#ensurePanel();
 		this.#ensureResizeHandle(widths);
 		this.#fillPanel(items);
-		this.#ensureToggle();
+		this.#ensureToggle(togglePosition);
 		this.#setOpen(this.#open ?? this.#options.open);
 		this.#placeAfterIframe();
 	}
@@ -672,9 +672,12 @@ var PanelRenderer = class {
 		if (rect.top < top) scroll.scrollTop -= top - rect.top;
 		else if (rect.bottom > box.bottom) scroll.scrollTop += rect.bottom - box.bottom;
 	}
-	#ensureToggle() {
-		if (this.#toggle) return;
-		const toggle = this.#toggleRenderer.render({ position: this.#options.togglePosition });
+	#ensureToggle(position) {
+		if (this.#toggle) {
+			if (typeof position === "string") this.#toggle.dataset.pos = position;
+			return;
+		}
+		const toggle = this.#toggleRenderer.render({ position });
 		toggle.addEventListener("click", () => this.#setOpen(true));
 		this.#toggle = toggle;
 		this.#host.appendChild(toggle);
@@ -1363,6 +1366,7 @@ var Region = class {
 			iframe,
 			info,
 			current: index,
+			togglePosition: this.#registry.get(info.provider)?.togglePosition,
 			onSelectItem: (i) => this.playAt(i)
 		});
 	}
@@ -2706,6 +2710,7 @@ var YouTubeProvider = class extends MediaProvider {
 		"youtu.be",
 		"youtube-nocookie.com"
 	];
+	togglePosition = "bottom-left";
 	#infoParser;
 	#embedSrcBuilder;
 	constructor({ infoParser = null, embedSrcBuilder = null, thumbnailUrlBuilder = null } = {}) {
@@ -3269,6 +3274,7 @@ var OkruPlayer = class {
 var OkruProvider = class extends MediaProvider {
 	id = "okru";
 	hosts = ["ok.ru"];
+	togglePosition = "top-right";
 	#infoParser;
 	#embedBaseUrl;
 	constructor({ infoParser = null, embedBaseUrl = null } = {}) {
