@@ -31,6 +31,11 @@ export const PANEL_CSS = `
 :where(.lp-title){display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;line-height:1.3;color:var(--_text)}
 :where(.lp-item[data-current] .lp-title){color:var(--_text-on);font-weight:500}
 :where(.lp-chan,.lp-dur){margin-top:2px;font-size:10px;color:var(--_muted)}
+
+/* Styles spécifiques pour le lien de la chaîne */
+:where(a.lp-chan){text-decoration:none;display:inline-block}
+:where(a.lp-chan:hover){color:var(--_text-on);text-decoration:underline}
+
 :where(.lp-thumb){position:relative;width:80px;height:45px;flex-shrink:0;border-radius:3px;overflow:hidden;background:#1a1a1a}
 :where(.lp-thumb img){display:block;width:100%;height:100%;object-fit:cover}
 :where(.lp-tn){position:absolute;right:3px;bottom:2px;padding:1px 4px;border-radius:2px;background:rgba(0,0,0,.7);color:#fff;font-size:9px}
@@ -44,8 +49,6 @@ export const PANEL_CSS = `
 :where(.lp-host:hover .lp-toggle,.lp-toggle:focus-visible){opacity:1}
 @media(hover:none){:where(.lp-toggle){opacity:1}}
 
-/* Anchor positioning: the panel and the toggle follow the box of the iframe, whatever its size or class.
-   Without support, the rules above (panel fitted to the host) stay in force. */
 @supports (anchor-name:--a){
   :where(.lp-host[data-lp-anchored] .lp-panel){
     position-anchor:var(--lp-anchor);
@@ -172,7 +175,7 @@ export class PanelRenderer {
                 const group = row.closest(".lp-group");
                 if (group?.hasAttribute("data-collapsed"))
                     this.#setCollapsed(group, false);
-                row.scrollIntoView?.({ block: "nearest" });
+                row.scrollIntoView?.({block: "nearest"});
             } else {
                 row.removeAttribute("aria-current");
             }
@@ -276,7 +279,7 @@ export class PanelRenderer {
 
         handle.onpointerdown = (e) => {
             if (e.button !== 0) return;
-            drag = { startX: e.clientX, startWidth: this.#width };
+            drag = {startX: e.clientX, startWidth: this.#width};
             handle.setPointerCapture?.(e.pointerId);
             this.#host.dataset.lpResizing = "";
             this.#host.style.userSelect = "none";
@@ -385,7 +388,7 @@ export class PanelRenderer {
 
         if (this.#options.header) {
             scroll.appendChild(
-                this.#headerRenderer.render({ count: items.length, canClose: true })
+                this.#headerRenderer.render({count: items.length, canClose: true})
             );
         }
 
@@ -409,7 +412,7 @@ export class PanelRenderer {
             );
         }
 
-        for (const { label, start, end } of groups) {
+        for (const {label, start, end} of groups) {
             const collapsed = this.#collapsed.has(label);
 
             const group = document.createElement("div");
@@ -423,7 +426,7 @@ export class PanelRenderer {
                 body.appendChild(this.#renderItem(items, index));
 
             group.append(
-                this.#groupRenderer.render({ label, count: end - start, collapsed }),
+                this.#groupRenderer.render({label, count: end - start, collapsed}),
                 body
             );
             scroll.appendChild(group);
@@ -590,9 +593,17 @@ export class ItemRenderer {
         text.append(titleEl);
 
         if (item.channel) {
-            const chan = document.createElement("div");
+            const chan = document.createElement(item.channelUrl ? "a" : "div");
             chan.className = "lp-chan";
             chan.textContent = item.channel;
+
+            if (item.channelUrl) {
+                chan.href = item.channelUrl;
+                chan.target = "_blank";
+                chan.rel = "noopener noreferrer";
+                chan.addEventListener("click", (e) => e.stopPropagation());
+            }
+
             text.append(chan);
         }
 

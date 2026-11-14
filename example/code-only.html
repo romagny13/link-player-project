@@ -222,7 +222,7 @@
     const TARGET = "footage-gp1";
     const LOREM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit…";
 
-    const createDestination = ({shortTitle, videoId, description, link, startSeconds}) => ({
+    const createDestination = ({shortTitle, videoId, description, link, startSeconds, channel, channelUrl}) => ({
         key: shortTitle.toLowerCase(),
         provider: "youtube",
         // target: TARGET,
@@ -230,6 +230,8 @@
         videoId,
         start: startSeconds,
         autoplay: "click",
+        channel,
+        channelUrl,
         extra: {
             description: description || LOREM,
             link: link || {href: `https://example.com/${shortTitle}`, text: `Guide de ${shortTitle}`}
@@ -241,7 +243,9 @@
             shortTitle: "Bahamas",
             videoId: "YCfcg9gzCYc",
             startSeconds: 2712,
-            description: "Un archipel de plus de 700 îles : eaux turquoise…"
+            description: "Un archipel de plus de 700 îles : eaux turquoise…",
+            channel:"MyTranquilitee",
+            channelUrl: "https://www.youtube.com/channel/UCMSSWlp1I2UhKl3dwfdyV7g"
         }),
         createDestination({shortTitle: "Maldives", videoId: "69iUWLA0oVc"}),
         createDestination({shortTitle: "Tahiti", videoId: "5drmgVauSMg"}),
@@ -257,7 +261,10 @@
         definitions: DESTINATIONS,
         youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
         youtubeMetaScope: "all",
-        youtubeMetaRequired: ["title", "description", "channel", "channelUrl"]
+        youtubeMetaRequired: ["title", "description", "channel", "channelUrl"],
+        onChange: (state) => {
+            console.log("onChange", state);
+        }
     });
 
     const region = lp.getRegion(TARGET);

@@ -134,6 +134,8 @@
         // tooltipRenderer: new SimpleTipRenderer(),
         // itemRenderer: new GoldItemRenderer(),
         youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
+        youtubeMetaScope: "all",
+        youtubeMetaRequired: ["title", "description", "channel", "thumbnail", "channelUrl"],
         fallbackTitle: (i) => `Épisode ${i + 1}`,
     });
 
@@ -144,6 +146,8 @@
         useStorage: true,
         currentBehavior: "skip",
         youtubeApiKey: "AIzaSyDGgMOJkyudMYOyKRoTqbFVpcTLJKvOk4M",
+        youtubeMetaScope: "all",
+        youtubeMetaRequired: ["title", "description", "channel", "thumbnail", "channelUrl"],
     });
 </script>
 </body>

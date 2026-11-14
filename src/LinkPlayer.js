@@ -1,5 +1,5 @@
 import {resolveScope} from "./utils/dom.js";
-import {AUTOPLAY_MODES, isTouch} from "./utils/helpers.js";
+import {AUTOPLAY_MODES, isTouch,describe} from "./utils/helpers.js";
 import {Emitter} from "./utils/Emitter.js";
 import {defaultStore, MemoryStore} from "./storage.js";
 import {DefaultRegionHost} from "./DefaultRegionHost.js";
@@ -22,10 +22,12 @@ export class LinkPlayer {
     #isGlobal;
     #currentBehavior;
     #boundaryBehavior;
+    #activeClass;
     #useStorage;
     #scanEmbeds;
     #regions = new Map();
     #initialized = new WeakSet();
+    #explicit = new WeakSet();
     #regionHost;
     #defaultTarget;
     #store;
@@ -47,6 +49,7 @@ export class LinkPlayer {
                     tooltip = true,
                     currentBehavior = "toggle",
                     boundaryBehavior = "stop",
+                    activeClass = "is-active",
                     scanEmbeds = true,
                     youtubeApiKey = null,
                     youtubeMeta = null,
@@ -115,6 +118,7 @@ export class LinkPlayer {
                 required: youtubeMetaRequired
             });
 
+        this.#activeClass = activeClass;
         this.#panelOptions = {
             panelRenderer,
             itemRenderer,
@@ -180,6 +184,7 @@ export class LinkPlayer {
             registry: this.#registry,
             currentBehavior: this.#currentBehavior,
             boundaryBehavior: this.#boundaryBehavior,
+            activeClass: this.#activeClass,
             resolveMeta: (info, options) => this.#enrich(info, options),
             thumbnails: this.#thumbnails,
             ...this.#panelOptions
@@ -205,7 +210,88 @@ export class LinkPlayer {
         this.#events.clear();
     }
 
+    // ───────── facade ─────────
+
+    canGoBack(target) {
+        return this.getRegion(target).canGoBack;
+    }
+
+    canGoForward(target) {
+        return this.getRegion(target).canGoForward;
+    }
+
+    canGoPreviousInfo(target) {
+        return this.getRegion(target).canGoPreviousInfo;
+    }
+
+    canGoNextInfo(target) {
+        return this.getRegion(target).canGoNextInfo;
+    }
+
+    canGoPreviousItem(target) {
+        return this.getRegion(target).canGoPreviousItem;
+    }
+
+    canGoNextItem(target) {
+        return this.getRegion(target).canGoNextItem;
+    }
+
+    /** @param {string} target Id du conteneur de la région. */
+    navigate(target, key, options) {
+        return this.#navigating(target).navigate(key, options);
+    }
+
+    replace(target, key, options) {
+        return this.#navigating(target).replace(key, options);
+    }
+
+    goBack(target) {
+        return this.getRegion(target).goBack();
+    }
+
+    goForward(target) {
+        return this.getRegion(target).goForward();
+    }
+
+    nextInfo(target, options) {
+        return this.#navigating(target).nextInfo(options);
+    }
+
+    previousInfo(target, options) {
+        return this.#navigating(target).previousInfo(options);
+    }
+
+    nextItem(target) {
+        return this.getRegion(target).nextItem();
+    }
+
+    previousItem(target) {
+        return this.getRegion(target).previousItem();
+    }
+
+    playAt(target, index) {
+        return this.getRegion(target).playAt(index);
+    }
+
+    toggle(target) {
+        return this.getRegion(target).toggle();
+    }
+
+    show(target) {
+        return this.getRegion(target).show();
+    }
+
+    hide(target) {
+        return this.getRegion(target).hide();
+    }
+
     // ───────── internals ─────────
+
+    #navigating(target) {
+        const region = this.getRegion(target);
+        this.#explicit.add(region);
+        return region;
+    }
 
     #registerDefs(definitions) {
         if (!definitions) return;
@@ -266,6 +352,7 @@ export class LinkPlayer {
         // (a definition added before, or the first link with the same key)
         region.add(parsed);
         const info = region.get(key);
+        const unlink = region.addLink(key, element);
 
         const onClick = (e) => {
             e.preventDefault();
@@ -288,6 +375,7 @@ export class LinkPlayer {
         this.#detachers.add(() => {
             element.removeEventListener("click", onClick);
             detachTip();
+            unlink();
             release();
         });
     }
@@ -356,6 +444,8 @@ export class LinkPlayer {
     }
 
     #init(region) {
+        if (this.#explicit.has(region)) return;
+
         const saved = this.getSavedState(region);
         if (saved && region.restore(saved.key, {index: saved.index ?? 0})) return;
 
@@ -385,10 +475,4 @@ export class LinkPlayer {
             {id: provider.id, name: provider.name ?? provider.id}
         );
     }
-}
-
-/** `<iframe#main>`: what `${element}` should have shown instead of "[object HTMLIFrameElement]". */
-function describe(el) {
-    if (!el) return String(el);
-    return `<${el.localName ?? typeof el}${el.id ? `#${el.id}` : ""}>`;
 }

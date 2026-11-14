@@ -41,6 +41,9 @@ export class Region {
     #currentBehavior;
     #boundaryBehavior;
     #pending = []; // navigation actions waiting for the container
+    #activeClass;
+    #links = new Map();       // key -> Set<element>
+    #activeLinks = new Set();
 
     /**
      * @param {object} options
@@ -56,6 +59,7 @@ export class Region {
                     registry,
                     currentBehavior = "toggle",
                     boundaryBehavior = "stop",
+                    activeClass = "is-active",
                     resolveMeta = null,
                     panelRenderer = null,
                     itemRenderer = null,
@@ -71,6 +75,10 @@ export class Region {
         if (boundaryBehavior !== "stop" && boundaryBehavior !== "loop")
             throw new TypeError(`Invalid boundaryBehavior '${boundaryBehavior}': expected "stop" or "loop".`);
         this.#boundaryBehavior = boundaryBehavior;
+
+        const names = Array.isArray(activeClass) ? activeClass.join(" ") : (activeClass ?? "");
+        this.#activeClass = String(names).split(/\s+/).filter(Boolean);
+
         this.#resolveMeta = resolveMeta;
         this.#panel = panelRenderer ?? new PanelRenderer({
             itemRenderer,
@@ -85,6 +93,10 @@ export class Region {
 
     get target() {
         return this.#target;
+    }
+
+    get host() {
+        return this.#host;
     }
 
     get infos() {
@@ -191,6 +203,21 @@ export class Region {
         return this.#pending.length > 0;
     }
 
+    // ───────── active link ─────────
+
+    addLink(key, element) {
+        let set = this.#links.get(key);
+        if (!set) this.#links.set(key, (set = new Set()));
+        set.add(element);
+        if (this.current?.key === key) this.#markActive(); // lien découvert après coup
+
+        return () => {
+            set.delete(element);
+            if (!set.size && this.#links.get(key) === set) this.#links.delete(key);
+            this.#unmark(element);
+        };
+    }
+
     // ───────── navigation ─────────
 
     isCurrent(key) {
@@ -249,13 +276,19 @@ export class Region {
     }
 
     goBack() {
-        if (!this.#host) return false;
-        return this.#restore(this.#journal.back(), "back");
+        return this.#run(() => this.#restore(this.#journal.back(), "back"));
     }
 
     goForward() {
-        if (!this.#host) return false;
-        return this.#restore(this.#journal.forward(), "forward");
+        return this.#run(() => this.#restore(this.#journal.forward(), "forward"));
+    }
+
+    nextItem() {
+        this.#whenReady(() => this.#player?.next());
+    }
+
+    previousItem() {
+        this.#whenReady(() => this.#player?.previous());
     }
 
     /** @param {{autoplay?: boolean, params?: object}} [options] autoplay is true by default. */
@@ -267,20 +300,16 @@ export class Region {
         return this.#step(-1, options);
     }
 
-    nextItem() {
-        this.#player?.next();
-    }
-
-    previousItem() {
-        this.#player?.previous();
-    }
 
     playAt(index) {
-        this.#playerIndex = index; // BEFORE the command: a player that answers synchronously (Ok.ru) is then ignored as already known
-        this.#player?.playAt(index);
-        this.#journal.updateCurrent({index});
-        this.#panel.setCurrent(index); // immediate feedback; the player confirms with "itemChange"
-        this.#changed("item");
+        this.#whenReady(() => {
+            if (!this.#player) return; // rien n'est affiché : ni commande, ni « change » fantôme
+            this.#playerIndex = index; // AVANT la commande (voir le commentaire d'origine)
+            this.#player.playAt(index);
+            this.#journal.updateCurrent({index});
+            this.#panel.setCurrent(index);
+            this.#changed("item");
+        });
     }
 
     /**
@@ -309,25 +338,28 @@ export class Region {
     // ───────── visibility ─────────
 
     toggle() {
-        if (!this.#host) return;
-        if (this.#host.hidden) this.show();
-        else this.hide();
+        this.#whenReady(() => (this.#host.hidden ? this.show() : this.hide()));
     }
 
     show() {
-        if (!this.#host) return;
-        this.#host.hidden = false;
-        this.#changed("visibility");
+        this.#whenReady(() => {
+            this.#host.hidden = false;
+            this.#changed("visibility");
+        });
     }
 
     hide() {
-        if (!this.#host) return;
-        this.#player?.pause();
-        this.#host.hidden = true;
-        this.#changed("visibility");
+        this.#whenReady(() => {
+            this.#player?.pause();
+            this.#host.hidden = true;
+            this.#changed("visibility");
+        });
     }
 
     dispose() {
+        for (const el of this.#activeLinks) el.classList.remove(...this.#activeClass);
+        this.#activeLinks.clear();
+        this.#links.clear();
         this.#disposePlayer();
         this.#panel.destroy();
         this.#pending.length = 0;
@@ -379,6 +411,15 @@ export class Region {
 
     // ───────── internals ─────────
 
+    /** Comme #whenReady, mais rend le résultat de l'action ; false tant qu'elle est différée. */
+    #run(action) {
+        let result = false;
+        this.#whenReady(() => {
+            result = action();
+        });
+        return result;
+    }
+
     /** Runs now when the container is known, otherwise when it is registered. */
     #whenReady(action) {
         if (this.#host) return action();
@@ -414,11 +455,12 @@ export class Region {
     }
 
     #step(delta, options = {}) {
-        if (!this.#host) return false;
-        const target = this.#stepTarget(delta);
-        if (!target) return false;
-        this.#navigate(target, {autoplay: true, ...options});
-        return true;
+        return this.#run(() => {
+            const target = this.#stepTarget(delta); // calculée à l'exécution : tient compte des actions différées avant
+            if (!target) return false;
+            this.#navigate(target, {autoplay: true, ...options});
+            return true;
+        });
     }
 
     /** The info `delta` (1 or -1) away from the current one; at an end: the other end when looping, else undefined. */
@@ -567,7 +609,10 @@ export class Region {
             params: this.currentParams,
             visible: this.isVisible
         });
-        if (reason !== "visibility") this.#runAfterHooks(reason);
+        if (reason !== "visibility") {
+            this.#markActive();
+            this.#runAfterHooks(reason);
+        }
     }
 
     // ───────── hooks (internals) ─────────
@@ -629,5 +674,20 @@ export class Region {
         this.#rendered = null;
         this.#panelInfo = null;
         this.#panel.clear();
+    }
+
+    #markActive() {
+        if (!this.#activeClass.length) return;
+        const next = new Set(this.#links.get(this.current?.key));
+        for (const el of this.#activeLinks) {
+            if (!next.has(el)) el.classList.remove(...this.#activeClass);
+        }
+        for (const el of next) el.classList.add(...this.#activeClass);
+        this.#activeLinks = next;
+    }
+
+    #unmark(element) {
+        this.#activeLinks.delete(element);
+        element.classList.remove(...this.#activeClass);
     }
 }
