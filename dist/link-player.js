@@ -429,7 +429,7 @@
 			if (!host) throw new Error("[PanelRenderer] host or an attached iframe is required");
 			if (this.#host && this.#host !== host) this.clear();
 			iframe = iframe ?? this.#iframe;
-			injectStyles("lp-panel-styles", PANEL_CSS);
+			this.injectPanelStyles();
 			const items = info.videos ?? [info];
 			this.#host = host;
 			this.#info = info;
@@ -446,6 +446,9 @@
 			this.#ensureToggle(togglePosition);
 			this.#setOpen(this.#open ?? this.#options.open);
 			this.#placeAfterIframe();
+		}
+		injectPanelStyles() {
+			injectStyles("lp-panel-styles", PANEL_CSS);
 		}
 		/** Marks the item that is playing, without drawing the panel again. */
 		setCurrent(index, iframe = this.#iframe) {
@@ -1071,6 +1074,7 @@
 			this.#whenReady(() => {
 				if (this.isCurrent(key)) {
 					if (this.#currentBehavior === "skip") return;
+					if (this.#currentBehavior === "play") return this.#resume(this.get(key));
 					if (this.#currentBehavior === "toggle") return this.toggle();
 				}
 				this.#navigate(this.get(key), options);
@@ -1269,6 +1273,27 @@
 				autoplay,
 				index
 			}, reason);
+		}
+		/**
+		* "play": the info is already the current one. Make sure it is visible and playing, without a new
+		* history entry and without reloading the iframe. The player's own "state" event reports the result.
+		*/
+		#resume(info) {
+			try {
+				if (!this.#player || this.#rendered !== info) {
+					this.#show(info, {
+						autoplay: true,
+						index: this.currentIndex
+					}, "restore");
+					return;
+				}
+				const wasHidden = this.#host.hidden;
+				this.#host.hidden = false;
+				this.#player.play?.();
+				if (wasHidden) this.#changed("visibility");
+			} catch (error) {
+				this.#fail(error, { info });
+			}
 		}
 		/** The history entry carries its params: the hooks get the same ones as the first time. */
 		#restore(entry, reason) {

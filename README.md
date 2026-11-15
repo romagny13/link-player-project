@@ -174,7 +174,7 @@ new LinkPlayer({ /* all optional */ })
 | `definitions` | Array of code definitions |
 | `autoScan` | Scan at construction (default `true`; call `scan()` yourself otherwise) |
 | `defaultTarget` | Target for links and definitions without one |
-| `currentBehavior` | Navigating to the info already shown: `"toggle"` (default, shows / hides the container), `"skip"` (nothing), anything else navigates again |
+| `currentBehavior` | Navigating to the info already shown: `"toggle"` (default, shows / hides the container), `"skip"` (nothing), `"play"` (shows the container if hidden, then starts or resumes playback, without reloading or adding a history entry), anything else navigates again |
 | `boundaryBehavior` | `nextInfo()` / `previousInfo()` at the ends of the list: `"stop"` (default) or `"loop"` (needs 2 infos or more) |
 | `activeClass` | Class (or array / space-separated list) put on the links of the info being shown. Default `"is-active"`; `null` or `""` disables |
 | `useStorage`, `store` | Persist `{key, index}` per region under `state:<target>`. `store` replaces the default storage (`get(key)`, `set(key, value, ttlMs)`) |

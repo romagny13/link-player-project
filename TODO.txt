@@ -4,3 +4,7 @@ provider tiktok + panel playlist
 
 
 voir pour injectstyles de panel renderer qui peut s'injecter avec un custom renderer
+
+option pour passer auto à l'info suivante, comme une playlist mais entre infos
+
+un mode play pour navigate, si on clique sur le meme link, on s'assure de lancer play

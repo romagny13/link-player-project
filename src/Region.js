@@ -237,6 +237,7 @@ export class Region {
         this.#whenReady(() => {
             if (this.isCurrent(key)) {
                 if (this.#currentBehavior === "skip") return;
+                if (this.#currentBehavior === "play") return this.#resume(this.get(key));
                 if (this.#currentBehavior === "toggle") return this.toggle();
             }
             this.#navigate(this.get(key), options);
@@ -445,6 +446,26 @@ export class Region {
     #navigate(info, {autoplay = false, index = 0, params} = {}, reason = "navigate") {
         this.#journal.push({info, index, params: freezeParams(params)});
         this.#show(info, {autoplay, index}, reason);
+    }
+
+    /**
+     * "play": the info is already the current one. Make sure it is visible and playing, without a new
+     * history entry and without reloading the iframe. The player's own "state" event reports the result.
+     */
+    #resume(info) {
+        try {
+            if (!this.#player || this.#rendered !== info) {
+                // nothing is drawn for this info (container replaced, earlier failure): draw it, playing
+                this.#show(info, {autoplay: true, index: this.currentIndex}, "restore");
+                return;
+            }
+            const wasHidden = this.#host.hidden;
+            this.#host.hidden = false;
+            this.#player.play?.();
+            if (wasHidden) this.#changed("visibility");
+        } catch (error) {
+            this.#fail(error, {info});
+        }
     }
 
     /** The history entry carries its params: the hooks get the same ones as the first time. */
