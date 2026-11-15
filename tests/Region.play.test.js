@@ -20,7 +20,7 @@ const playlist = (key, nb = 5) =>
     makeInfo(key, {isPlaylist: true, videoIds: Array.from({length: nb}, (_, i) => `v${i}`)});
 
 function makePlayer() {
-    return {
+    const player = {
         kind: "yt",
         iframe: document.createElement("iframe"),
         load: vi.fn(),
@@ -30,8 +30,15 @@ function makePlayer() {
         previous: vi.fn(),
         playAt: vi.fn(),
         dispose: vi.fn(),
-        subscribe: vi.fn(() => vi.fn())
+        listener: null,
+        subscribe: vi.fn((cb) => {
+            player.listener = cb;
+            return vi.fn();
+        }),
+        /** Le lecteur annonce son état, comme YouTubePlayer et OkruPlayer le font. */
+        emit: (state) => player.listener({type: "state", state})
     };
+    return player;
 }
 
 function createEnv({withHost = true, ...options} = {}) {
@@ -54,7 +61,7 @@ function createEnv({withHost = true, ...options} = {}) {
         target: "zone",
         registry: {get: vi.fn(() => provider)},
         panelRenderer: panel,
-        currentBehavior: "play",
+        currentBehavior: "playPause",
         ...options
     });
 
@@ -77,55 +84,97 @@ const listen = (region, type = "change") => {
     return handler;
 };
 
+/** Une info affichée, dont le lecteur annonce l'état donné (null : aucun état connu). */
+function shown(state = null, options = {}) {
+    const env = createEnv(options);
+    env.region.add(video("A"));
+    env.region.navigate("A");
+    if (state) env.lastPlayer().emit(state);
+    return env;
+}
+
 // ───────── tests ─────────
 
-describe("Region : currentBehavior « play »", () => {
-    describe("navigation vers l'info déjà affichée", () => {
-        it("lance la lecture du lecteur existant", () => {
-            const {region, lastPlayer} = createEnv();
-            region.add(video("A"));
+describe("Region : currentBehavior « playPause »", () => {
+    describe("selon l'état du lecteur", () => {
+        it("met en pause quand la vidéo joue", () => {
+            const {region, lastPlayer} = shown("playing");
             region.navigate("A");
+
+            expect(lastPlayer().pause).toHaveBeenCalledTimes(1);
+            expect(lastPlayer().play).not.toHaveBeenCalled();
+        });
+
+        it("lance la lecture quand la vidéo est en pause", () => {
+            const {region, lastPlayer} = shown("paused");
+            region.navigate("A");
+
+            expect(lastPlayer().play).toHaveBeenCalledTimes(1);
+            expect(lastPlayer().pause).not.toHaveBeenCalled();
+        });
+
+        it("lance la lecture quand la vidéo est terminée", () => {
+            const {region, lastPlayer} = shown("ended");
             region.navigate("A");
 
             expect(lastPlayer().play).toHaveBeenCalledTimes(1);
         });
 
-        it("relance la lecture à chaque clic", () => {
-            const {region, lastPlayer} = createEnv();
-            region.add(video("A"));
+        it("lance la lecture quand l'état est encore inconnu (vidéo affichée à l'arrêt)", () => {
+            const {region, lastPlayer} = shown();
             region.navigate("A");
-            region.navigate("A");
+
+            expect(lastPlayer().play).toHaveBeenCalledTimes(1);
+            expect(lastPlayer().pause).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("clics successifs", () => {
+        it("alterne lecture et pause sans attendre la confirmation du lecteur", () => {
+            const {region, lastPlayer} = shown();
+            region.navigate("A"); // lecture
+            region.navigate("A"); // pause
+            region.navigate("A"); // lecture
+
+            expect(lastPlayer().play).toHaveBeenCalledTimes(2);
+            expect(lastPlayer().pause).toHaveBeenCalledTimes(1);
+        });
+
+        it("se recale sur l'état réel quand le lecteur le corrige (pause faite avec les contrôles YouTube)", () => {
+            const {region, lastPlayer} = shown();
+            region.navigate("A");        // lecture demandée : l'état supposé est « playing »
+            lastPlayer().emit("paused"); // l'utilisateur met en pause depuis le lecteur
             region.navigate("A");
 
             expect(lastPlayer().play).toHaveBeenCalledTimes(2);
+            expect(lastPlayer().pause).not.toHaveBeenCalled();
         });
 
-        it("ne recrée pas le lecteur ni l'iframe", () => {
-            const {region, provider, lastPlayer, host} = createEnv();
-            region.add(video("A"));
+        it("oublie l'état quand le lecteur est recréé pour une autre info", () => {
+            const {region, players} = shown("playing");
+            region.add(video("B"));
+            region.navigate("B");
+            region.navigate("B"); // le nouveau lecteur n'a encore rien annoncé : lecture, pas pause
+
+            expect(players[1].play).toHaveBeenCalledTimes(1);
+            expect(players[1].pause).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("ce qui ne change pas", () => {
+        it("ne recrée ni le lecteur ni l'iframe, et n'ajoute pas d'entrée de journal", () => {
+            const {region, provider, lastPlayer} = shown("playing");
             region.navigate("A");
-            const iframe = lastPlayer().iframe;
             region.navigate("A");
 
             expect(provider.createPlayer).toHaveBeenCalledTimes(1);
-            expect(lastPlayer().dispose).not.toHaveBeenCalled();
             expect(lastPlayer().load).toHaveBeenCalledTimes(1);
-            expect(host.contains(iframe)).toBe(true);
-        });
-
-        it("n'ajoute pas d'entrée au journal", () => {
-            const {region} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
-            region.navigate("A");
-
+            expect(lastPlayer().dispose).not.toHaveBeenCalled();
             expect(region.canGoBack).toBe(false);
         });
 
-        it("n'émet ni « change » ni hook quand le conteneur est déjà visible", () => {
-            const {region} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
+        it("n'émet ni « change » ni hook quand le conteneur est visible", () => {
+            const {region} = shown("playing");
             const onChange = listen(region);
             const hook = vi.fn();
             region.afterNavigate(hook);
@@ -135,68 +184,7 @@ describe("Region : currentBehavior « play »", () => {
             expect(hook).not.toHaveBeenCalled();
         });
 
-        it("ne met pas le lecteur en pause (contrairement au mode « toggle »)", () => {
-            const {region, lastPlayer} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
-            region.navigate("A");
-
-            expect(lastPlayer().pause).not.toHaveBeenCalled();
-        });
-    });
-
-    describe("conteneur masqué", () => {
-        it("le réaffiche puis lance la lecture", () => {
-            const {region, host, lastPlayer} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
-            region.hide();
-            region.navigate("A");
-
-            expect(host.hidden).toBe(false);
-            expect(lastPlayer().play).toHaveBeenCalledTimes(1);
-        });
-
-        it("émet « change » avec la raison « visibility »", () => {
-            const {region} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
-            region.hide();
-            const handler = listen(region);
-            region.navigate("A");
-
-            expect(handler).toHaveBeenCalledTimes(1);
-            expect(handler.mock.calls[0][0]).toMatchObject({reason: "visibility", visible: true});
-        });
-
-        it("ne recrée pas le lecteur pour autant", () => {
-            const {region, provider} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
-            region.hide();
-            region.navigate("A");
-
-            expect(provider.createPlayer).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe("autre info", () => {
-        it("navigue normalement : nouvelle entrée de journal et chargement", () => {
-            const {region, lastPlayer} = createEnv();
-            region.add(video("A"));
-            region.add(video("B"));
-            region.navigate("A");
-            region.navigate("B");
-
-            expect(region.current.key).toBe("B");
-            expect(region.canGoBack).toBe(true);
-            expect(lastPlayer().load).toHaveBeenCalledWith(region.get("B"), {autoplay: false, index: 0});
-            expect(lastPlayer().play).not.toHaveBeenCalled();
-        });
-    });
-
-    describe("playlist", () => {
-        it("ne change pas l'item courant", () => {
+        it("ne change pas l'item courant d'une playlist", () => {
             const {region, lastPlayer} = createEnv();
             region.add(playlist("P"));
             region.navigate("P", {index: 3});
@@ -208,22 +196,39 @@ describe("Region : currentBehavior « play »", () => {
         });
     });
 
-    describe("rien n'est dessiné pour cette info", () => {
-        it("redessine l'info en lecture automatique (conteneur remplacé)", () => {
-            const {region, provider, players} = createEnv();
-            const a = video("A");
-            region.add(a);
+    describe("conteneur masqué", () => {
+        it("le réaffiche et lance la lecture, même si le dernier état connu est « playing »", () => {
+            const {region, host, lastPlayer} = shown("playing");
+            region.hide();
             region.navigate("A");
 
-            const autre = document.createElement("div");
-            document.body.append(autre);
-            region.register(autre); // l'ancien contenu est réinitialisé
+            expect(host.hidden).toBe(false);
+            expect(lastPlayer().play).toHaveBeenCalledTimes(1);
+            expect(lastPlayer().pause).toHaveBeenCalledTimes(1); // celui de hide(), pas un second
+        });
+
+        it("émet « change » avec la raison « visibility »", () => {
+            const {region} = shown("playing");
+            region.hide();
             const handler = listen(region);
             region.navigate("A");
 
-            expect(players[0].dispose).toHaveBeenCalled();
+            expect(handler).toHaveBeenCalledTimes(1);
+            expect(handler.mock.calls[0][0]).toMatchObject({reason: "visibility", visible: true});
+        });
+    });
+
+    describe("rien n'est dessiné pour cette info", () => {
+        it("redessine l'info en lecture automatique (conteneur remplacé)", () => {
+            const {region, provider, players} = shown("playing");
+            const autre = document.createElement("div");
+            document.body.append(autre);
+            region.register(autre);
+            const handler = listen(region);
+            region.navigate("A");
+
             expect(provider.createPlayer).toHaveBeenCalledTimes(2);
-            expect(players[1].load).toHaveBeenCalledWith(a, {autoplay: true, index: 0});
+            expect(players[1].load).toHaveBeenCalledWith(region.get("A"), {autoplay: true, index: 0});
             expect(handler.mock.calls[0][0].reason).toBe("restore");
         });
     });
@@ -245,21 +250,21 @@ describe("Region : currentBehavior « play »", () => {
     });
 
     describe("erreurs et cas limites", () => {
-        it("tolère un lecteur sans méthode play()", () => {
-            const {region, lastPlayer} = createEnv();
-            region.add(video("A"));
-            region.navigate("A");
+        it("tolère un lecteur sans play() ni pause()", () => {
+            const {region, lastPlayer} = shown();
             delete lastPlayer().play;
+            delete lastPlayer().pause;
 
-            expect(() => region.navigate("A")).not.toThrow();
+            expect(() => {
+                region.navigate("A");
+                region.navigate("A");
+            }).not.toThrow();
         });
 
-        it("signale l'erreur d'un lecteur dont play() échoue, sans la propager", () => {
-            const {region, lastPlayer} = createEnv();
-            const erreur = new Error("lecture impossible");
-            region.add(video("A"));
-            region.navigate("A");
-            lastPlayer().play.mockImplementation(() => {
+        it("signale l'erreur d'un lecteur dont pause() échoue, sans la propager", () => {
+            const {region, lastPlayer} = shown("playing");
+            const erreur = new Error("pause impossible");
+            lastPlayer().pause.mockImplementation(() => {
                 throw erreur;
             });
             const onError = listen(region, "error");
@@ -271,10 +276,8 @@ describe("Region : currentBehavior « play »", () => {
     });
 
     describe("les autres comportements ne changent pas", () => {
-        it("« toggle » (défaut) masque la vidéo au lieu de la relancer", () => {
-            const {region, host, lastPlayer} = createEnv({currentBehavior: "toggle"});
-            region.add(video("A"));
-            region.navigate("A");
+        it("« toggle » masque la vidéo au lieu de la mettre en pause ou en lecture", () => {
+            const {region, host, lastPlayer} = shown("playing", {currentBehavior: "toggle"});
             region.navigate("A");
 
             expect(host.hidden).toBe(true);
@@ -282,12 +285,11 @@ describe("Region : currentBehavior « play »", () => {
         });
 
         it("« skip » ne fait rien", () => {
-            const {region, host, lastPlayer} = createEnv({currentBehavior: "skip"});
-            region.add(video("A"));
-            region.navigate("A");
+            const {region, host, lastPlayer} = shown("playing", {currentBehavior: "skip"});
             region.navigate("A");
 
             expect(host.hidden).toBe(false);
+            expect(lastPlayer().pause).not.toHaveBeenCalled();
             expect(lastPlayer().play).not.toHaveBeenCalled();
         });
     });

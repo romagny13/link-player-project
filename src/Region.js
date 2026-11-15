@@ -44,6 +44,7 @@ export class Region {
     #activeClass;
     #links = new Map();       // key -> Set<element>
     #activeLinks = new Set();
+    #playerState = null; // last state announced by the player: "playing" | "paused" | "ended" | null (unknown)
 
     /**
      * @param {object} options
@@ -237,7 +238,7 @@ export class Region {
         this.#whenReady(() => {
             if (this.isCurrent(key)) {
                 if (this.#currentBehavior === "skip") return;
-                if (this.#currentBehavior === "play") return this.#resume(this.get(key));
+                if (this.#currentBehavior === "playPause") return this.#togglePlayback(this.get(key));
                 if (this.#currentBehavior === "toggle") return this.toggle();
             }
             this.#navigate(this.get(key), options);
@@ -449,10 +450,10 @@ export class Region {
     }
 
     /**
-     * "play": the info is already the current one. Make sure it is visible and playing, without a new
-     * history entry and without reloading the iframe. The player's own "state" event reports the result.
+     * "playPause": the info is already the current one. Hidden container: show it and play. Otherwise pause when
+     * the player is playing, play when it is not. No history entry, no iframe reload, no afterNavigate hook.
      */
-    #resume(info) {
+    #togglePlayback(info) {
         try {
             if (!this.#player || this.#rendered !== info) {
                 // nothing is drawn for this info (container replaced, earlier failure): draw it, playing
@@ -461,7 +462,13 @@ export class Region {
             }
             const wasHidden = this.#host.hidden;
             this.#host.hidden = false;
-            this.#player.play?.();
+            if (!wasHidden && this.#playerState === "playing") {
+                this.#player.pause?.();
+                this.#playerState = "paused";   // assumed at once: the player confirms with its own "state" event
+            } else {
+                this.#player.play?.();
+                this.#playerState = "playing";
+            }
             if (wasHidden) this.#changed("visibility");
         } catch (error) {
             this.#fail(error, {info});
@@ -616,6 +623,7 @@ export class Region {
             this.#panel.setCurrent(event.index);
             this.#changed("item");
         } else if (event.type === "state") {
+            this.#playerState = event.state;
             this.#events.emit("state", {region: this, state: event.state, index: event.index ?? this.currentIndex});
         } else if (event.type === "error") {
             this.#fail(event.error, {info: this.current});
@@ -678,6 +686,7 @@ export class Region {
         this.#unsubscribe = null;
         this.#player = null;
         this.#rendered = null;
+        this.#playerState = null;
         try {
             unsubscribe?.();
         } catch (error) {

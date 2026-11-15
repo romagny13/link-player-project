@@ -939,6 +939,7 @@
 		#activeClass;
 		#links = /* @__PURE__ */ new Map();
 		#activeLinks = /* @__PURE__ */ new Set();
+		#playerState = null;
 		/**
 		* @param {object} options
 		* @param {"toggle"|"skip"|string} [options.currentBehavior] What navigate() does on the info already shown.
@@ -1074,7 +1075,7 @@
 			this.#whenReady(() => {
 				if (this.isCurrent(key)) {
 					if (this.#currentBehavior === "skip") return;
-					if (this.#currentBehavior === "play") return this.#resume(this.get(key));
+					if (this.#currentBehavior === "playPause") return this.#togglePlayback(this.get(key));
 					if (this.#currentBehavior === "toggle") return this.toggle();
 				}
 				this.#navigate(this.get(key), options);
@@ -1275,10 +1276,10 @@
 			}, reason);
 		}
 		/**
-		* "play": the info is already the current one. Make sure it is visible and playing, without a new
-		* history entry and without reloading the iframe. The player's own "state" event reports the result.
+		* "playPause": the info is already the current one. Hidden container: show it and play. Otherwise pause when
+		* the player is playing, play when it is not. No history entry, no iframe reload, no afterNavigate hook.
 		*/
-		#resume(info) {
+		#togglePlayback(info) {
 			try {
 				if (!this.#player || this.#rendered !== info) {
 					this.#show(info, {
@@ -1289,7 +1290,13 @@
 				}
 				const wasHidden = this.#host.hidden;
 				this.#host.hidden = false;
-				this.#player.play?.();
+				if (!wasHidden && this.#playerState === "playing") {
+					this.#player.pause?.();
+					this.#playerState = "paused";
+				} else {
+					this.#player.play?.();
+					this.#playerState = "playing";
+				}
 				if (wasHidden) this.#changed("visibility");
 			} catch (error) {
 				this.#fail(error, { info });
@@ -1432,12 +1439,14 @@
 				this.#journal.updateCurrent({ index: event.index });
 				this.#panel.setCurrent(event.index);
 				this.#changed("item");
-			} else if (event.type === "state") this.#events.emit("state", {
-				region: this,
-				state: event.state,
-				index: event.index ?? this.currentIndex
-			});
-			else if (event.type === "error") this.#fail(event.error, { info: this.current });
+			} else if (event.type === "state") {
+				this.#playerState = event.state;
+				this.#events.emit("state", {
+					region: this,
+					state: event.state,
+					index: event.index ?? this.currentIndex
+				});
+			} else if (event.type === "error") this.#fail(event.error, { info: this.current });
 		}
 		#changed(reason) {
 			this.#events.emit("change", {
@@ -1495,6 +1504,7 @@
 			this.#unsubscribe = null;
 			this.#player = null;
 			this.#rendered = null;
+			this.#playerState = null;
 			try {
 				unsubscribe?.();
 			} catch (error) {
