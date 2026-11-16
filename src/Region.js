@@ -117,6 +117,11 @@ export class Region {
         return this.#journal.current?.params ?? NO_PARAMS;
     }
 
+    /** Last known player state: "playing" | "paused" | "ended", null when unknown (player just created). */
+    get playerState() {
+        return this.#playerState;
+    }
+
     get isVisible() {
         return this.#host !== null && !this.#host.hidden;
     }
@@ -464,10 +469,10 @@ export class Region {
             this.#host.hidden = false;
             if (!wasHidden && this.#playerState === "playing") {
                 this.#player.pause?.();
-                this.#playerState = "paused";   // assumed at once: the player confirms with its own "state" event
+                this.#assumeState("paused"); 
             } else {
                 this.#player.play?.();
-                this.#playerState = "playing";
+                this.#assumeState("playing"); 
             }
             if (wasHidden) this.#changed("visibility");
         } catch (error) {
@@ -480,6 +485,12 @@ export class Region {
         if (!entry) return false;
         this.#show(entry.info, {autoplay: false, index: entry.index}, reason); // restore the state, do not start playing
         return true;
+    }
+
+    #assumeState(state) {
+        if (this.#playerState === state) return;
+        this.#playerState = state;
+        this.#events.emit("state", {region: this, state, index: this.currentIndex});
     }
 
     #step(delta, options = {}) {

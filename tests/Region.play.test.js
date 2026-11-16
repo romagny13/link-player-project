@@ -293,4 +293,37 @@ describe("Region : currentBehavior « playPause »", () => {
             expect(lastPlayer().play).not.toHaveBeenCalled();
         });
     });
+
+    describe("Region : playerState", () => {
+        it("vaut null tant que le lecteur n'a rien annoncé", () => {
+            const {region} = shown();
+            expect(region.playerState).toBeNull();
+        });
+
+        it("reprend l'état annoncé par le lecteur", () => {
+            const {region, lastPlayer} = shown();
+            lastPlayer().emit("playing");
+            expect(region.playerState).toBe("playing");
+            lastPlayer().emit("ended");
+            expect(region.playerState).toBe("ended");
+        });
+
+        it("annonce l'état supposé quand un clic lance puis met en pause", () => {
+            const {region} = shown();
+            const onState = listen(region, "state");
+            region.navigate("A");   // lecture
+            region.navigate("A");   // pause
+
+            expect(onState.mock.calls.map(([e]) => e.state)).toEqual(["playing", "paused"]);
+            expect(region.playerState).toBe("paused");
+        });
+
+        it("repasse à null quand le lecteur est recréé", () => {
+            const {region, lastPlayer} = shown("playing");
+            region.add(video("B"));
+            region.navigate("B");
+            expect(region.playerState).toBeNull();
+            expect(lastPlayer().play).not.toHaveBeenCalled();
+        });
+    });
 });
