@@ -986,6 +986,10 @@
 		get currentParams() {
 			return this.#journal.current?.params ?? NO_PARAMS;
 		}
+		/** Last known player state: "playing" | "paused" | "ended", null when unknown (player just created). */
+		get playerState() {
+			return this.#playerState;
+		}
 		get isVisible() {
 			return this.#host !== null && !this.#host.hidden;
 		}
@@ -1292,10 +1296,10 @@
 				this.#host.hidden = false;
 				if (!wasHidden && this.#playerState === "playing") {
 					this.#player.pause?.();
-					this.#playerState = "paused";
+					this.#assumeState("paused");
 				} else {
 					this.#player.play?.();
-					this.#playerState = "playing";
+					this.#assumeState("playing");
 				}
 				if (wasHidden) this.#changed("visibility");
 			} catch (error) {
@@ -1310,6 +1314,15 @@
 				index: entry.index
 			}, reason);
 			return true;
+		}
+		#assumeState(state) {
+			if (this.#playerState === state) return;
+			this.#playerState = state;
+			this.#events.emit("state", {
+				region: this,
+				state,
+				index: this.currentIndex
+			});
 		}
 		#step(delta, options = {}) {
 			return this.#run(() => {
