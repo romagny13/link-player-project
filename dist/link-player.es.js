@@ -903,6 +903,15 @@ var NO_PARAMS = Object.freeze({});
 * and a hook cannot alter what the next one sees.
 */
 var freezeParams = (params) => params ? Object.freeze({ ...params }) : NO_PARAMS;
+/** Seconds from a number, "90", "1:02:03", "4:46" or "1h2m3s"; NaN when it is none of them. */
+function toSeconds(value) {
+	if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : NaN;
+	const s = String(value ?? "").trim();
+	if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+	if (/^\d+(:\d{1,2}){1,2}$/.test(s)) return s.split(":").reduce((t, n) => t * 60 + Number(n), 0);
+	const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(s);
+	return m && (m[1] || m[2] || m[3]) ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : NaN;
+}
 /**
 * What an afterNavigate hook receives.
 * @typedef {Object} NavigationState
@@ -1152,6 +1161,30 @@ var Region = class {
 			this.#journal.updateCurrent({ index });
 			this.#panel.setCurrent(index);
 			this.#changed("item");
+		});
+	}
+	/**
+	* Moves the video that is shown to `seconds`: no navigation, no history entry, no afterNavigate hook.
+	* Announces a "seek" event ({ region, time, index }). Does nothing when nothing is shown.
+	* @param {number|string} seconds Seconds, "1:02:03", "4:46" or "1m30s".
+	* @param {{play?: boolean}} [options] play (default true): also start playing, a click on a timestamp expects to watch.
+	* @throws {TypeError} when `seconds` is not a time.
+	*/
+	seekTo(seconds, { play = true } = {}) {
+		const time = toSeconds(seconds);
+		if (Number.isNaN(time)) throw new TypeError(`seekTo(): '${seconds}' is not a time`);
+		this.#whenReady(() => {
+			if (!this.#player) return;
+			const wasHidden = this.#host.hidden;
+			this.#host.hidden = false;
+			this.#player.seekTo?.(time, { play });
+			if (play) this.#assumeState("playing");
+			if (wasHidden) this.#changed("visibility");
+			this.#events.emit("seek", {
+				region: this,
+				time,
+				index: this.currentIndex
+			});
 		});
 	}
 	/**
@@ -2587,6 +2620,10 @@ var YouTubePlayer = class {
 	playAt(index) {
 		this.#bridge?.command("playVideoAt", [index]);
 	}
+	seekTo(seconds, { play = true } = {}) {
+		this.#bridge?.command("seekTo", [seconds, true]);
+		if (play) this.#bridge?.command("playVideo");
+	}
 	/**
 	* Another item of the list / playlist that is already loaded: one postMessage, the iframe is kept.
 	* Without autoplay the item is only cued.
@@ -3249,6 +3286,15 @@ var OkruPlayer = class {
 	}
 	playAt(index) {
 		this.#show(index, true);
+	}
+	seekTo(seconds, { play = true } = {}) {
+		const item = this.#items[this.#index];
+		if (!item || !this.#iframe) return;
+		this.#iframe.src = this.#urlBuilder.build({
+			videoId: item.id,
+			autoplay: play,
+			startSeconds: seconds
+		});
 	}
 	dispose() {
 		this.#bridge?.disconnect();

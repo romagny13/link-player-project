@@ -69,6 +69,12 @@ export class OkruPlayer {
         this.#show(index, true);
     }
 
+    seekTo(seconds, {play = true} = {}) {
+        const item = this.#items[this.#index];
+        if (!item || !this.#iframe) return;
+        this.#iframe.src = this.#urlBuilder.build({videoId: item.id, autoplay: play, startSeconds: seconds});
+    }
+
     dispose() {
         this.#bridge?.disconnect();
         if (this.#owned) this.#iframe?.remove();

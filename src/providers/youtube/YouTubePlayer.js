@@ -142,6 +142,11 @@ export class YouTubePlayer {
         this.#bridge?.command("playVideoAt", [index]);
     }
 
+    seekTo(seconds, {play = true} = {}) {
+        this.#bridge?.command("seekTo", [seconds, true]);
+        if (play) this.#bridge?.command("playVideo");
+    }
+
     /**
      * Another item of the list / playlist that is already loaded: one postMessage, the iframe is kept.
      * Without autoplay the item is only cued.
