@@ -1,16 +1,18 @@
 import {InfoParser} from "../InfoParser.js";
-import {SOURCE_KINDS, timeToSeconds, toAutoplayMode, toBool01, toInt,describe} from "../../utils/helpers.js";
+import {SOURCE_KINDS, timeToSeconds, toAutoplayMode, toBool01, toInt, describe} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
 
 export class OkruInfoParser extends InfoParser {
 
-    #rawQueryParam(url, name) {
-        for (const pair of url.search.slice(1).split("&")) {
+    #rawQueryParam(parsedUrl, name) {
+        for (const pair of parsedUrl.search.slice(1).split("&")) {
             const separator = pair.indexOf("=");
             const key = separator === -1 ? pair : pair.slice(0, separator);
-            if (key === name) return separator === -1 ? "" : pair.slice(separator + 1);
+            if (key === name) {
+                return separator === -1 ? "" : pair.slice(separator + 1);
+            }
         }
         return null;
     }
@@ -46,6 +48,7 @@ export class OkruInfoParser extends InfoParser {
             const videoIds = this.#splitIds(rawIds);
             if (!videoIds.length) return null;
 
+            const x = u.searchParams.get("index");
             return new UrlInfo({
                 kind: "videoList",
                 videoIds,
@@ -109,14 +112,22 @@ export class OkruInfoParser extends InfoParser {
     }
 
     buildUrl(def) {
-        if (!def) throw new TypeError("buildUrl(): definition is required");
+        if (!def) throw new TypeError("buildUrl(): a definition object is required");
+        if (def.playlistId) throw new TypeError("buildUrl(): playlists are not supported");
 
-        if (def.playlistId) throw new TypeError("buildUrl(): playlist not supported");
+        if (Array.isArray(def.videoIds)) {
+            if (def.videoIds.length === 0) throw new TypeError("buildUrl(): videoIds array cannot be empty");
 
-        const id = def.videoId ?? def.videoIds?.[0];
-        if (!id) throw new TypeError("buildUrl(): need videoId or videoIds");
+            const videoId = def.videoIds[0];
+            if (!videoId) throw new TypeError("buildUrl(): the first videoId in videoIds is invalid");
+            if (def.index)
+                return `https://ok.ru/video/${videoId}?video_ids=${def.videoIds.join(",")}&index=${def.index}`;
+            return `https://ok.ru/video/${videoId}?video_ids=${def.videoIds.join(",")}`;
+        }
 
-        return `https://ok.ru/video/${id}`;
+        const videoId = def.videoId;
+        if (!videoId) throw new TypeError("buildUrl(): either videoId or a non-empty videoIds array is required");
+        return `https://ok.ru/video/${videoId}`;
     }
 
     parseDefinition(def, element) {

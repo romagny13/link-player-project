@@ -299,6 +299,9 @@ export class LinkPlayer {
             throw new TypeError(`Invalid definitions: expected an Array, but received type '${typeof definitions}' (${JSON.stringify(definitions)}).`);
 
         definitions.forEach((def, index) => {
+            if (!def.url && !def.provider)
+                throw new Error('Provider definition must have either "url" or "provider"');
+
             const provider = def.url
                 ? this.#registry.resolve(def.url)
                 : this.#registry.get(def.provider);

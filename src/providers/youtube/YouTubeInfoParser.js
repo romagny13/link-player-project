@@ -303,10 +303,11 @@ export class YouTubeInfoParser extends InfoParser {
                 return list;
             }
             case "playlist": {
+                const playlistId = urlInfos.playlistId;
                 const playlist = new PlaylistInfo({
                     provider: "youtube",
                     target: def.target,
-                    playlistId: urlInfos.playlistId,
+                    playlistId: playlistId,
                     videoId: urlInfos.videoId,
                     showOnInit: def.showOnInit,
                     autoplay: toAutoplayMode(def.autoplay),
@@ -321,7 +322,7 @@ export class YouTubeInfoParser extends InfoParser {
                         new VideoInfo({
                             provider: "youtube",
                             target: def.target,
-                            videoId: v.videoId,
+                            videoId: v.videoId ?? `${playlistId}#${i}`,
                             autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),
                             startSeconds: timeToSeconds(v.start),
                             title: v.title ?? "",

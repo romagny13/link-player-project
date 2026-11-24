@@ -1,6 +1,7 @@
 import {PanelRenderer} from "./ui/PanelRenderer.js";
 import {NavigationJournal} from "./NavigationJournal.js";
 import {Emitter} from "./utils/Emitter.js";
+import {toSeconds} from "./utils/helpers.js";
 
 const NO_PARAMS = Object.freeze({});
 
@@ -9,16 +10,6 @@ const NO_PARAMS = Object.freeze({});
  * and a hook cannot alter what the next one sees.
  */
 const freezeParams = (params) => (params ? Object.freeze({...params}) : NO_PARAMS);
-
-/** Seconds from a number, "90", "1:02:03", "4:46" or "1h2m3s"; NaN when it is none of them. */
-function toSeconds(value) {
-    if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : NaN;
-    const s = String(value ?? "").trim();
-    if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
-    if (/^\d+(:\d{1,2}){1,2}$/.test(s)) return s.split(":").reduce((t, n) => t * 60 + Number(n), 0);
-    const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(s);
-    return m && (m[1] || m[2] || m[3]) ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : NaN;
-}
 
 /**
  * What an afterNavigate hook receives.
@@ -317,7 +308,6 @@ export class Region {
         return this.#step(-1, options);
     }
 
-
     playAt(index) {
         this.#whenReady(() => {
             if (!this.#player) return; // rien n'est affiché : ni commande, ni « change » fantôme
@@ -341,7 +331,7 @@ export class Region {
         if (Number.isNaN(time)) throw new TypeError(`seekTo(): '${seconds}' is not a time`);
 
         this.#whenReady(() => {
-            if (!this.#player) return; // rien n'est affiché : rien à déplacer
+            if (!this.#player) return;
             const wasHidden = this.#host.hidden;
             this.#host.hidden = false;
             this.#player.seekTo?.(time, {play});
@@ -592,18 +582,6 @@ export class Region {
         this.#syncPanel(info, iframe, index);
     }
 
-    /** Same info: no new frame, only a command. */
-    #select(info, {autoplay, index}) {
-        if (info.isPlaylist && index !== this.#playerIndex) {
-            this.#playerIndex = index;
-            if (this.#player.selectItem) this.#player.selectItem(info, index, {autoplay});
-            else this.#player.playAt(index);
-            this.#panel.setCurrent(index);
-        } else if (autoplay) {
-            this.#player.play?.();
-        }
-    }
-
     #syncPanel(info, iframe, index) {
         if (!info.isPlaylist) {
             this.#panelInfo = null;
@@ -620,6 +598,18 @@ export class Region {
             togglePosition: this.#registry.get(info.provider)?.togglePosition,
             onSelectItem: (i) => this.playAt(i)
         });
+    }
+
+    /** Same info: no new frame, only a command. */
+    #select(info, {autoplay, index}) {
+        if (info.isPlaylist && index !== this.#playerIndex) {
+            this.#playerIndex = index;
+            if (this.#player.selectItem) this.#player.selectItem(info, index, {autoplay});
+            else this.#player.playAt(index);
+            this.#panel.setCurrent(index);
+        } else if (autoplay) {
+            this.#player.play?.();
+        }
     }
 
     /** Metadata may come from an API: what is shown first is drawn again once it is known. Asked once per info. */

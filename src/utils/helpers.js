@@ -22,6 +22,10 @@ export function toBoolean(value) {
     return !["false", "0", "no"].includes(String(value).trim().toLowerCase());
 }
 
+/**
+ * Seconds from an integer string ("90") or "1h2m3s" style;
+ * returns null when it is none of them.
+ */
 export const timeToSeconds = (v) => {
     if (v == null || v === '') return null;
     if (/^\d+$/.test(v)) return parseInt(v, 10);
@@ -30,6 +34,16 @@ export const timeToSeconds = (v) => {
     if (!m || (!m[1] && !m[2] && !m[3])) return null;
 
     return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
+}
+
+/** Seconds from a number, "90", "1:02:03", "4:46" or "1h2m3s"; NaN when it is none of them. */
+export function toSeconds(value) {
+    if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : NaN;
+    const s = String(value ?? "").trim();
+    if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+    if (/^\d+(:\d{1,2}){1,2}$/.test(s)) return s.split(":").reduce((t, n) => t * 60 + Number(n), 0);
+    const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(s);
+    return m && (m[1] || m[2] || m[3]) ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : NaN;
 }
 
 export const isEmpty = (v) => v === "" || v == null;

@@ -59,6 +59,10 @@
 			"no"
 		].includes(String(value).trim().toLowerCase());
 	}
+	/**
+	* Seconds from an integer string ("90") or "1h2m3s" style;
+	* returns null when it is none of them.
+	*/
 	var timeToSeconds = (v) => {
 		if (v == null || v === "") return null;
 		if (/^\d+$/.test(v)) return parseInt(v, 10);
@@ -66,6 +70,15 @@
 		if (!m || !m[1] && !m[2] && !m[3]) return null;
 		return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
 	};
+	/** Seconds from a number, "90", "1:02:03", "4:46" or "1h2m3s"; NaN when it is none of them. */
+	function toSeconds(value) {
+		if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : NaN;
+		const s = String(value ?? "").trim();
+		if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
+		if (/^\d+(:\d{1,2}){1,2}$/.test(s)) return s.split(":").reduce((t, n) => t * 60 + Number(n), 0);
+		const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(s);
+		return m && (m[1] || m[2] || m[3]) ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : NaN;
+	}
 	var isEmpty = (v) => v === "" || v == null;
 	var isTouch = () => !!globalThis.matchMedia?.("(hover: none) and (pointer: coarse)").matches;
 	var AUTOPLAY_MODES = Object.freeze({
@@ -654,6 +667,14 @@
 				}), body);
 				scroll.appendChild(group);
 			}
+			if (this.#current != null) {
+				const row = this.#scroll.querySelector(`[data-index="${this.#current}"]`);
+				if (row) {
+					const group = row.closest(".lp-group");
+					if (group?.hasAttribute("data-collapsed")) this.#setCollapsed(group, false);
+					requestAnimationFrame(() => this.#reveal(row));
+				}
+			}
 		}
 		#renderItem(items, index) {
 			return this.#itemRenderer.render(items[index], index, index === this.#current);
@@ -906,15 +927,6 @@
 	* and a hook cannot alter what the next one sees.
 	*/
 	var freezeParams = (params) => params ? Object.freeze({ ...params }) : NO_PARAMS;
-	/** Seconds from a number, "90", "1:02:03", "4:46" or "1h2m3s"; NaN when it is none of them. */
-	function toSeconds(value) {
-		if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : NaN;
-		const s = String(value ?? "").trim();
-		if (/^\d+(\.\d+)?$/.test(s)) return Number(s);
-		if (/^\d+(:\d{1,2}){1,2}$/.test(s)) return s.split(":").reduce((t, n) => t * 60 + Number(n), 0);
-		const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i.exec(s);
-		return m && (m[1] || m[2] || m[3]) ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : NaN;
-	}
 	/**
 	* What an afterNavigate hook receives.
 	* @typedef {Object} NavigationState
@@ -1426,15 +1438,6 @@
 			this.#rendered = info;
 			this.#syncPanel(info, iframe, index);
 		}
-		/** Same info: no new frame, only a command. */
-		#select(info, { autoplay, index }) {
-			if (info.isPlaylist && index !== this.#playerIndex) {
-				this.#playerIndex = index;
-				if (this.#player.selectItem) this.#player.selectItem(info, index, { autoplay });
-				else this.#player.playAt(index);
-				this.#panel.setCurrent(index);
-			} else if (autoplay) this.#player.play?.();
-		}
 		#syncPanel(info, iframe, index) {
 			if (!info.isPlaylist) {
 				this.#panelInfo = null;
@@ -1450,6 +1453,15 @@
 				togglePosition: this.#registry.get(info.provider)?.togglePosition,
 				onSelectItem: (i) => this.playAt(i)
 			});
+		}
+		/** Same info: no new frame, only a command. */
+		#select(info, { autoplay, index }) {
+			if (info.isPlaylist && index !== this.#playerIndex) {
+				this.#playerIndex = index;
+				if (this.#player.selectItem) this.#player.selectItem(info, index, { autoplay });
+				else this.#player.playAt(index);
+				this.#panel.setCurrent(index);
+			} else if (autoplay) this.#player.play?.();
 		}
 		/** Metadata may come from an API: what is shown first is drawn again once it is known. Asked once per info. */
 		#resolveMetaLater(info) {
@@ -2228,10 +2240,11 @@
 					return list;
 				}
 				case "playlist": {
+					const playlistId = urlInfos.playlistId;
 					const playlist = new PlaylistInfo({
 						provider: "youtube",
 						target: def.target,
-						playlistId: urlInfos.playlistId,
+						playlistId,
 						videoId: urlInfos.videoId,
 						showOnInit: def.showOnInit,
 						autoplay: toAutoplayMode(def.autoplay),
@@ -2243,7 +2256,7 @@
 						playlist.addVideo(new VideoInfo({
 							provider: "youtube",
 							target: def.target,
-							videoId: v.videoId,
+							videoId: v.videoId ?? `${playlistId}#${i}`,
 							autoplay: toAutoplayMode(v.autoplay ?? def.autoplay),
 							startSeconds: timeToSeconds(v.start),
 							title: v.title ?? "",
@@ -2574,10 +2587,12 @@
 		#load(info, { autoplay, index }) {
 			const verb = autoplay ? "load" : "cue";
 			if (!this.#iframe) {
-				this.#attach(this.#createIframe(this.#src(info, {
+				const src = this.#src(info, {
 					autoplay,
 					index
-				})), true);
+				});
+				const iframe = this.#createIframe(src);
+				this.#attach(iframe, true);
 				if (index > 0) {
 					if (info instanceof VideoListInfo) this.#bridge.command(`${verb}Playlist`, [
 						info.videoIds,
@@ -2835,8 +2850,8 @@
 	};
 	// src/providers/okru/OkruInfoParser.js
 	var OkruInfoParser = class extends InfoParser {
-		#rawQueryParam(url, name) {
-			for (const pair of url.search.slice(1).split("&")) {
+		#rawQueryParam(parsedUrl, name) {
+			for (const pair of parsedUrl.search.slice(1).split("&")) {
 				const separator = pair.indexOf("=");
 				if ((separator === -1 ? pair : pair.slice(0, separator)) === name) return separator === -1 ? "" : pair.slice(separator + 1);
 			}
@@ -2863,6 +2878,7 @@
 			if (rawIds !== null) {
 				const videoIds = this.#splitIds(rawIds);
 				if (!videoIds.length) return null;
+				u.searchParams.get("index");
 				return new UrlInfo({
 					kind: "videoList",
 					videoIds,
@@ -2914,11 +2930,18 @@
 			}
 		}
 		buildUrl(def) {
-			if (!def) throw new TypeError("buildUrl(): definition is required");
-			if (def.playlistId) throw new TypeError("buildUrl(): playlist not supported");
-			const id = def.videoId ?? def.videoIds?.[0];
-			if (!id) throw new TypeError("buildUrl(): need videoId or videoIds");
-			return `https://ok.ru/video/${id}`;
+			if (!def) throw new TypeError("buildUrl(): a definition object is required");
+			if (def.playlistId) throw new TypeError("buildUrl(): playlists are not supported");
+			if (Array.isArray(def.videoIds)) {
+				if (def.videoIds.length === 0) throw new TypeError("buildUrl(): videoIds array cannot be empty");
+				const videoId = def.videoIds[0];
+				if (!videoId) throw new TypeError("buildUrl(): the first videoId in videoIds is invalid");
+				if (def.index) return `https://ok.ru/video/${videoId}?video_ids=${def.videoIds.join(",")}&index=${def.index}`;
+				return `https://ok.ru/video/${videoId}?video_ids=${def.videoIds.join(",")}`;
+			}
+			const videoId = def.videoId;
+			if (!videoId) throw new TypeError("buildUrl(): either videoId or a non-empty videoIds array is required");
+			return `https://ok.ru/video/${videoId}`;
 		}
 		parseDefinition(def, element) {
 			const urlInfos = this.parseUrl(def.url);
@@ -3515,10 +3538,10 @@
 		"duration"
 	];
 	var fieldsOf = (source = {}) => Object.fromEntries(FIELDS.map((f) => [f, source[f]]));
-	var fillEmpty = (meta, extra = {}) => {
-		const out = { ...meta };
-		for (const f of FIELDS) if (isEmpty(out[f]) && !isEmpty(extra[f])) out[f] = extra[f];
-		return out;
+	var fillMeta = (metaBase, metaFetched = {}) => {
+		const result = { ...metaBase };
+		for (const f of FIELDS) if (!isEmpty(metaFetched[f])) result[f] = metaFetched[f];
+		return result;
 	};
 	/** "PL123#3": the id given to a playlist item whose id is unknown (see applyItems). */
 	var isPlaceholder = (id) => typeof id === "string" && id.includes("#");
@@ -3584,7 +3607,7 @@
 			}
 			return meta ? [{
 				id: info.videoId,
-				...fillEmpty(declared, meta)
+				...fillMeta(declared, meta)
 			}] : null;
 		}
 		async #resolveList(info, force) {
@@ -3651,7 +3674,7 @@
 					id,
 					meta: byId.get(id)
 				} : isPlaceholder(id) ? fetched[index] : null;
-				const filled = fillEmpty(meta, entry?.meta);
+				const filled = fillMeta(meta, entry?.meta);
 				return {
 					id: entry?.id ?? id,
 					...filled,
@@ -4108,6 +4131,7 @@
 			if (!definitions) return;
 			if (!Array.isArray(definitions)) throw new TypeError(`Invalid definitions: expected an Array, but received type '${typeof definitions}' (${JSON.stringify(definitions)}).`);
 			definitions.forEach((def, index) => {
+				if (!def.url && !def.provider) throw new Error("Provider definition must have either \"url\" or \"provider\"");
 				const provider = def.url ? this.#registry.resolve(def.url) : this.#registry.get(def.provider);
 				if (!def.target && this.#defaultTarget) def.target = this.#defaultTarget;
 				const info = provider.getInfoFromDefinition(def);

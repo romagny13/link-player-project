@@ -7,10 +7,12 @@ const FIELDS = ["title", "description", "channel", "channelUrl", "thumbnail", "d
 
 const fieldsOf = (source = {}) => Object.fromEntries(FIELDS.map((f) => [f, source[f]]));
 
-const fillEmpty = (meta, extra = {}) => {
-    const out = {...meta};
-    for (const f of FIELDS) if (isEmpty(out[f]) && !isEmpty(extra[f])) out[f] = extra[f];
-    return out;
+const fillMeta = (metaBase, metaFetched = {}) => {
+    const result = {...metaBase};
+    for (const f of FIELDS)
+        if (!isEmpty(metaFetched[f]))
+            result[f] = metaFetched[f];
+    return result;
 };
 
 /** "PL123#3": the id given to a playlist item whose id is unknown (see applyItems). */
@@ -87,7 +89,7 @@ export class YouTubeMetaResolver {
             console.warn("[YouTubeMetaResolver] API failed:", error.message);
             return null;
         }
-        return meta ? [{id: info.videoId, ...fillEmpty(declared, meta)}] : null; // private / deleted video: absent
+        return meta ? [{id: info.videoId, ...fillMeta(declared, meta)}] : null; // private / deleted video: absent
     }
 
     async #resolveList(info, force) {
@@ -151,11 +153,11 @@ export class YouTubeMetaResolver {
 
     #merge(base, fetched) {
         const byId = new Map(fetched.map((entry) => [entry.id, entry.meta]));
-
         return base.map(({id, meta}, index) => {
+            // console.log("fetched", base, fetched,byId);
             // a placeholder id (a playlist defined without ids) is matched by position
             const entry = byId.has(id) ? {id, meta: byId.get(id)} : isPlaceholder(id) ? fetched[index] : null;
-            const filled = fillEmpty(meta, entry?.meta);
+            const filled = fillMeta(meta, entry?.meta);
             return {id: entry?.id ?? id, ...filled, title: filled.title || this.#fallbackTitle(index)};
         });
     }

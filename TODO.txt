@@ -8,3 +8,81 @@ voir pour injectstyles de panel renderer qui peut s'injecter avec un custom rend
 option pour passer auto à l'info suivante, comme une playlist mais entre infos
 
 un mode play pour navigate, si on clique sur le meme link, on s'assure de lancer play
+
+
+Player (youtube / okru)
+
+creer l'iframe
+... Et send message si besoin pour avoir le comportmeent attendu
+
+
+https://www.youtube.com/embed/YCfcg9gzCYc?enablejsapi=1&origin=http%3A%2F%2Flocalhost%3A63342&autoplay=1&start=120
+
+VideoInfo
+DataSet ou Def
+    #provider;
+    #videoId;
+
+    #key;
+    #target;
+    #showOnInit;
+
+    #autoplay;
+    #startSeconds;
+
+    #title;
+    #description;
+    #channel;
+    #channelUrl;
+    #thumbnail;
+    #duration;
+    #extra;
+
+DataSet
+    // URL or HREF => provider + url infos (video id)
+
+    key: data.key,
+    target: data.target ?? (element.tagName === "IFRAME" ? element.parentElement?.id : undefined),
+
+    autoplay: data.autoplay,       // true or false
+    start: data.start,            // raw: reads "90" and "1m30s"
+    showOnInit: toBoolean(data.showOnInit), // true or false
+
+    title: data.title,
+    description: data.description,
+    channel: data.channel,
+    channelUrl: data.channelUrl,
+    thumbnail: data.thumbnail,
+    duration: data.duration,
+    extra: data.extra
+
+    videos: this.parseJsonAttribute(data.videos, "data-videos") ?? [], // fallback
+    index: toNumber(data.index),
+
+
+ Liste
+     #provider;
+     #videoIds;
+
+     #key;
+     #target;
+
+     #index;
+     #showOnInit;
+     #autoplay;
+     #videos = []; // fallback
+     #extra;
+
+ Playslist info
+     #provider;
+     #playlistId;
+
+     #key;
+     #target;
+
+     #videoId;
+     #showOnInit;
+     #autoplay;
+     #videos = [];
+     #extra;
+     #source;

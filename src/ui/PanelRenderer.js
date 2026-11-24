@@ -133,7 +133,7 @@ export class PanelRenderer {
             throw new Error("[PanelRenderer] host or an attached iframe is required");
         }
         if (this.#host && this.#host !== host) this.clear(); // the host changed: clean the old one
-        iframe = iframe ?? this.#iframe; // render() rappelé sans iframe : on garde l'ancre
+        iframe = iframe ?? this.#iframe;
 
         this.injectPanelStyles();
 
@@ -180,7 +180,7 @@ export class PanelRenderer {
                 const group = row.closest(".lp-group");
                 if (group?.hasAttribute("data-collapsed"))
                     this.#setCollapsed(group, false);
-               // row.scrollIntoView?.({block: "nearest"});
+                // row.scrollIntoView?.({block: "nearest"});
                 this.#reveal(row);
             } else {
                 row.removeAttribute("aria-current");
@@ -436,6 +436,17 @@ export class PanelRenderer {
                 body
             );
             scroll.appendChild(group);
+        }
+
+        if (this.#current != null) {
+            const row = this.#scroll.querySelector(`[data-index="${this.#current}"]`);
+            if (row) {
+                const group = row.closest(".lp-group");
+                if (group?.hasAttribute("data-collapsed")) {
+                    this.#setCollapsed(group, false);
+                }
+                requestAnimationFrame(() => this.#reveal(row));
+            }
         }
     }
 

@@ -584,9 +584,9 @@ describe("YouTubeInfoParser", () => {
                 expect(p.videos[1].autoplay).toBe(AUTOPLAY_MODES.INIT);
             });
 
-            it("une vidéo de playlist sans videoId lève une erreur", () => {
-                expect(() => parser.parseDefinition(def(urlPlaylist, {videos: [{title: "sans id"}]}))).toThrow(/videoId/);
-            });
+            // it("une vidéo de playlist sans videoId lève une erreur", () => {
+            //     expect(() => parser.parseDefinition(def(urlPlaylist, {videos: [{title: "sans id"}]}))).toThrow(/videoId/);
+            // });
 
             it("sans videoId de départ : playlist seule, vignette vide si l'id est inconnu", () => {
                 const p = parser.parseDefinition(def("https://www.youtube.com/watch?list=PL1"));
@@ -935,17 +935,13 @@ describe("OkruInfoParser", () => {
         });
 
         it("liste : utilise la première vidéo (OK.ru ne gère qu'une vidéo par URL)", () => {
-            expect(parser.buildUrl({videoIds: ["5", "6"]})).toBe("https://ok.ru/video/5");
-        });
-
-        it("videoId prime sur videoIds", () => {
-            expect(parser.buildUrl({videoId: "1", videoIds: ["2"]})).toBe("https://ok.ru/video/1");
+            expect(parser.buildUrl({videoIds: ["5", "6"]})).toBe("https://ok.ru/video/5?video_ids=5,6");
         });
 
         it("playlist non supportée, définition absente ou sans vidéo => erreur", () => {
-            expect(() => parser.buildUrl({playlistId: "PL1"})).toThrow("playlist not supported");
-            expect(() => parser.buildUrl(undefined)).toThrow("definition is required");
-            expect(() => parser.buildUrl({})).toThrow("need videoId or videoIds");
+            expect(() => parser.buildUrl({playlistId: "PL1"})).toThrow("buildUrl(): playlists are not supported");
+            expect(() => parser.buildUrl(undefined)).toThrow("buildUrl(): a definition object is required");
+            expect(() => parser.buildUrl({})).toThrow("buildUrl(): either videoId or a non-empty videoIds array is required");
         });
 
         it("aller-retour : parseUrl relit l'URL construite", () => {

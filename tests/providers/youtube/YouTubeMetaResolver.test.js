@@ -58,14 +58,14 @@ describe("YouTubeMetaResolver : vidéo seule", () => {
         expect(items[0]).toEqual(expect.objectContaining({id: "vid1", ...apiMeta}));
     });
 
-    it("force : interroge l'API même si le titre est déclaré, sans jamais l'écraser", async () => {
+    it("force : interroge l'API même si le titre est déclaré, en l'écrasant", async () => {
         const api = fakeApi();
         const resolver = new YouTubeMetaResolver({api});
 
         const items = await resolver.resolve(video({title: "Mon titre"}), {force: true});
 
         expect(api.videos).toHaveBeenCalledTimes(1);
-        expect(items[0].title).toBe("Mon titre");
+        expect(items[0].title).toBe("Vrai titre");
         expect(items[0].channel).toBe("Ma chaîne");
         expect(items[0].description).toBe("Une description");
     });

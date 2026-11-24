@@ -86,7 +86,9 @@ export class YouTubePlayer {
 
         // 1. create the iframe
         if (!this.#iframe) {
-            this.#attach(this.#createIframe(this.#src(info, {autoplay, index})), true);
+            const src = this.#src(info, {autoplay, index});
+            const iframe = this.#createIframe(src);
+            this.#attach(iframe, true);
             // index applied only for videoList
             if (index > 0) {
                 if (info instanceof VideoListInfo) {
