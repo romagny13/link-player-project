@@ -1,7 +1,7 @@
-import {YouTubeBridgeEvent, YouTubeIframeBridge} from "./YouTubeIframeBridge.js";
-import {VideoInfo} from "../../models/VideoInfo.js";
-import {VideoListInfo} from "../../models/VideoListInfo.js";
-import {PlaylistInfo} from "../../models/PlaylistInfo.js";
+import { YouTubeBridgeEvent, YouTubeIframeBridge } from "./YouTubeIframeBridge.js";
+import { VideoInfo } from "../../models/VideoInfo.js";
+import { VideoListInfo } from "../../models/VideoListInfo.js";
+import { PlaylistInfo } from "../../models/PlaylistInfo.js";
 
 /**
  * One YouTube iframe + its bridge. The iframe is created once (src), then driven with API
@@ -25,7 +25,6 @@ export class YouTubePlayer {
     #bridge = null;
     #owned = false; // true when this player created the iframe (and so removes it)
     #listeners = new Set();
-    #loading = false;
 
     /**
      * @param {Object} options
@@ -33,7 +32,7 @@ export class YouTubePlayer {
      * @param {(src: string) => HTMLIFrameElement} [options.createIframe] Required unless an iframe is adopted.
      * @param {HTMLIFrameElement} [options.iframe] An existing iframe to adopt.
      */
-    constructor({builder, createIframe = null, iframe = null}) {
+    constructor({ builder, createIframe = null, iframe = null }) {
         this.#builder = builder;
         this.#createIframe = createIframe;
         if (iframe) {
@@ -72,21 +71,12 @@ export class YouTubePlayer {
      * @param {VideoInfo|VideoListInfo|PlaylistInfo} info
      * @param {{autoplay?: boolean, index?: number}} [options] `index`: starting item of a list / playlist.
      */
-    load(info, {autoplay = false, index = 0} = {}) {
-        this.#loading = true;
-        try {
-            this.#load(info, {autoplay, index});
-        } finally {
-            this.#loading = false; // was left to true after reusing an existing iframe: every later event was dropped
-        }
-    }
-
-    #load(info, {autoplay, index}) {
+    load(info, { autoplay = false, index = 0 } = {}) {
         const verb = autoplay ? "load" : "cue"; // load* starts playing, cue* does not
 
         // 1. create the iframe
         if (!this.#iframe) {
-            const src = this.#src(info, {autoplay, index});
+            const src = this.#src(info, { autoplay, index });
             const iframe = this.#createIframe(src);
             this.#attach(iframe, true);
             // index applied only for videoList
@@ -144,7 +134,7 @@ export class YouTubePlayer {
         this.#bridge?.command("playVideoAt", [index]);
     }
 
-    seekTo(seconds, {play = true} = {}) {
+    seekTo(seconds, { play = true } = {}) {
         this.#bridge?.command("seekTo", [seconds, true]);
         if (play) this.#bridge?.command("playVideo");
     }
@@ -153,7 +143,7 @@ export class YouTubePlayer {
      * Another item of the list / playlist that is already loaded: one postMessage, the iframe is kept.
      * Without autoplay the item is only cued.
      */
-    selectItem(info, index, {autoplay = true} = {}) {
+    selectItem(info, index, { autoplay = true } = {}) {
         if (autoplay) return this.playAt(index);
         if (info instanceof VideoListInfo) {
             this.#bridge?.command("cuePlaylist", [info.videoIds, index, 0]);
@@ -194,20 +184,17 @@ export class YouTubePlayer {
     }
 
     #onBridgeEvent(e) {
-        if (this.#loading)
-            return;
-
         switch (e.type) {
             case YouTubeBridgeEvent.PlaylistIndexChange:
-                return this.#emit({type: "itemChange", index: e.index});
+                return this.#emit({ type: "itemChange", index: e.index });
             case YouTubeBridgeEvent.VideoPlay:
-                return this.#emit({type: "state", state: "playing"});
+                return this.#emit({ type: "state", state: "playing" });
             case YouTubeBridgeEvent.VideoPause:
-                return this.#emit({type: "state", state: "paused"});
+                return this.#emit({ type: "state", state: "paused" });
             case YouTubeBridgeEvent.VideoEnded:
-                return this.#emit({type: "state", state: "ended", index: e.index});
+                return this.#emit({ type: "state", state: "ended" });
             case YouTubeBridgeEvent.Error:
-                return this.#emit({type: "error", error: new Error(`YouTube player error ${e.code}`)});
+                return this.#emit({ type: "error", error: new Error(`YouTube player error ${e.code}`) });
         }
     }
 
@@ -215,13 +202,13 @@ export class YouTubePlayer {
         for (const listener of [...this.#listeners]) listener(event);
     }
 
-    #src(info, {autoplay, index}) {
+    #src(info, { autoplay, index }) {
         if (info instanceof VideoInfo)
-            return this.#builder.buildVideoSrc(info.videoId, {autoplay, startSeconds: info.startSeconds});
+            return this.#builder.buildVideoSrc(info.videoId, { autoplay, startSeconds: info.startSeconds });
         if (info instanceof VideoListInfo)
-            return this.#builder.buildVideoListSrc(info.videoIds, {autoplay, index});
+            return this.#builder.buildVideoListSrc(info.videoIds, { autoplay, index });
         if (info instanceof PlaylistInfo)
-            return this.#builder.buildPlaylistSrc(info.playlistId, {autoplay, videoId: info.videoId});
+            return this.#builder.buildPlaylistSrc(info.playlistId, { autoplay, videoId: info.videoId });
         return this.#invalid();
     }
 

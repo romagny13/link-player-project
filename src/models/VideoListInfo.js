@@ -1,4 +1,4 @@
-import {ValueChecks} from "../utils/ValueChecks.js";
+import { ValueChecks } from "../utils/ValueChecks.js";
 
 export class VideoListInfo {
     #key;
@@ -13,22 +13,22 @@ export class VideoListInfo {
     #source;
 
     constructor({
-                    provider,
-                    target,
-                    videoIds,
-                    index,
-                    showOnInit,
-                    autoplay,
-                    key,
-                    extra,
-                    source
-                }) {
+        provider,
+        target,
+        videoIds,
+        index,
+        showOnInit,
+        autoplay,
+        key,
+        extra,
+        source
+    }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
         ValueChecks.requireNotNullOrEmpty(target, "target");
+        ValueChecks.requireNotNullOrEmpty(videoIds, "videoIds");
 
         this.#provider = provider;
         this.#target = target;
-        this.#videoIds = videoIds;
         this.#index = index;
         this.#showOnInit = showOnInit;
         this.#autoplay = autoplay;

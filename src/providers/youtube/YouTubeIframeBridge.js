@@ -28,12 +28,12 @@ export class YouTubeIframeBridge {
     #lastIndex = null;
     #known = {};
 
-    constructor(iframe, {window = globalThis} = {}) {
+    constructor(iframe, { window = globalThis } = {}) {
         this.#iframe = iframe;
         this.#window = window;
     }
 
-    subscribe(onEvent, {types} = {}) {
+    subscribe(onEvent, { types } = {}) {
         const wanted = types ? new Set(types) : null;
         this.#listeners.set(onEvent, wanted?.size ? wanted : null);
         return () => this.#listeners.delete(onEvent);
@@ -57,7 +57,7 @@ export class YouTubeIframeBridge {
     }
 
     command(func, args = []) {
-        const message = {event: "command", func, args};
+        const message = { event: "command", func, args };
         if (this.#ready) this.send(message);
         else this.#queue.push(message);
     }
@@ -69,11 +69,16 @@ export class YouTubeIframeBridge {
         );
     }
 
+    resetState() {
+        this.#known = {};
+        this.#lastIndex = null;
+    }
+
     // ───────── internals ─────────
 
     /** Tells the player to start sending messages to this page. */
     #handshake() {
-        this.send({event: "listening", id: 1, channel: "widget"});
+        this.send({ event: "listening", id: 1, channel: "widget" });
     }
 
     /** Arrow function: `this` must stay the bridge when used as an event listener. */
@@ -103,7 +108,7 @@ export class YouTubeIframeBridge {
                 this.#handleState(d.info);
                 break;
             case "onError":
-                this.#emit({type: YouTubeBridgeEvent.Error, code: d.info});
+                this.#emit({ type: YouTubeBridgeEvent.Error, code: d.info });
                 break;
         }
     };
@@ -114,16 +119,18 @@ export class YouTubeIframeBridge {
     };
 
     #handleState(state) {
-        this.#emit({type: YouTubeBridgeEvent.StateChange, state});
+        if (!this.#remember("state", state)) return;
+        
+        this.#emit({ type: YouTubeBridgeEvent.StateChange, state });
         switch (state) {
             case 1: // playing
-                this.#emit({type: YouTubeBridgeEvent.VideoPlay});
+                this.#emit({ type: YouTubeBridgeEvent.VideoPlay });
                 break;
             case 2: // paused
-                this.#emit({type: YouTubeBridgeEvent.VideoPause});
+                this.#emit({ type: YouTubeBridgeEvent.VideoPause });
                 break;
             case 3: // buffering
-                this.#emit({type: YouTubeBridgeEvent.VideoBuffering});
+                this.#emit({ type: YouTubeBridgeEvent.VideoBuffering });
                 break;
             case 0: // ended
                 this.#emit({
@@ -135,10 +142,10 @@ export class YouTubeIframeBridge {
     }
 
     #handleDelivery(info = {}) {
-        if (info.playerState)
+        if (info.playerState != null)
             this.#handleState(info.playerState);
 
-        if (info.currentTime) {
+        if (info.currentTime != null) {
             this.#emit({
                 type: YouTubeBridgeEvent.TimeUpdate,
                 time: info.currentTime,
@@ -146,7 +153,7 @@ export class YouTubeIframeBridge {
             });
         }
 
-        if (info.duration) {
+        if (info.duration != null) {
             this.#emit({
                 type: YouTubeBridgeEvent.DurationChange,
                 duration: info.duration
@@ -175,7 +182,7 @@ export class YouTubeIframeBridge {
     }
 
     /** Volume and mute come together in a delivery; each one is notified on its own change. */
-    #handleSound({volume, muted} = {}) {
+    #handleSound({ volume, muted } = {}) {
         const volumeChanged = this.#remember("volume", volume);
         const mutedChanged = this.#remember("muted", muted);
         const sound = {
@@ -183,19 +190,19 @@ export class YouTubeIframeBridge {
             muted: this.#known.muted ?? null
         };
         if (volumeChanged)
-            this.#emit({type: YouTubeBridgeEvent.VolumeChange, ...sound});
+            this.#emit({ type: YouTubeBridgeEvent.VolumeChange, ...sound });
         if (mutedChanged)
-            this.#emit({type: YouTubeBridgeEvent.MuteChange, ...sound});
+            this.#emit({ type: YouTubeBridgeEvent.MuteChange, ...sound });
     }
 
     #handleRate(rate) {
         if (this.#remember("rate", rate))
-            this.#emit({type: YouTubeBridgeEvent.RateChange, rate});
+            this.#emit({ type: YouTubeBridgeEvent.RateChange, rate });
     }
 
     #handleQuality(quality) {
         if (this.#remember("quality", quality))
-            this.#emit({type: YouTubeBridgeEvent.QualityChange, quality});
+            this.#emit({ type: YouTubeBridgeEvent.QualityChange, quality });
     }
 
     /** Marks the player as ready, sends the queued commands, then notifies `ready`. */
@@ -203,7 +210,7 @@ export class YouTubeIframeBridge {
         if (this.#ready) return;
         this.#ready = true;
         this.#queue.splice(0).forEach((m) => this.send(m));
-        this.#emit({type: YouTubeBridgeEvent.Ready});
+        this.#emit({ type: YouTubeBridgeEvent.Ready });
     }
 
     #remember(name, value) {

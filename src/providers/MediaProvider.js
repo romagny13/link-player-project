@@ -9,7 +9,7 @@ export class MediaProvider {
     }
 
     getInfoFromLink(link) {
-        throw new Error(`${this.constructor.name} must implement getInfoFromElement().`);
+        throw new Error(`${this.constructor.name} must implement getInfoFromLink().`);
     }
 
     getInfoFromFrame(frame) {

@@ -42,6 +42,7 @@ export class OkruIframeBridge {
     #connected = false;
     #ready = false;
     #readySrc = null;
+    #loading = false;
     #queue = [];
     #known = {}; // last notified volume and muted
 
@@ -79,15 +80,23 @@ export class OkruIframeBridge {
         this.#listeners.clear();
     }
 
+    resetState() {
+        this.#ready = false;
+        this.#readySrc = null;
+        this.#known = {};
+        this.#queue.length = 0;
+        this.#loading = true;
+    }
+
     #onIframeLoaded = () => {
-        // The player may have announced itself before the `load` event (nested iframes): keep ready unless the src changed.
+        this.#loading = false;
         if (this.#iframe.src === this.#readySrc) return;
         this.#ready = false;
         this.#known = {};
     };
 
     #onMessage = (e) => {
-        if (e.source !== this.#iframe.contentWindow) return;
+        if (e.source !== this.#iframe.contentWindow || this.#loading) return;
 
         const data = this.#parse(e.data);
         if (!data || !data.event) return;

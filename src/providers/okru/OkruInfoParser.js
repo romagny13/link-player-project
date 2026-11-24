@@ -48,7 +48,6 @@ export class OkruInfoParser extends InfoParser {
             const videoIds = this.#splitIds(rawIds);
             if (!videoIds.length) return null;
 
-            const x = u.searchParams.get("index");
             return new UrlInfo({
                 kind: "videoList",
                 videoIds,

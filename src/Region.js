@@ -1,7 +1,7 @@
-import {PanelRenderer} from "./ui/PanelRenderer.js";
-import {NavigationJournal} from "./NavigationJournal.js";
-import {Emitter} from "./utils/Emitter.js";
-import {toSeconds} from "./utils/helpers.js";
+import { PanelRenderer } from "./ui/PanelRenderer.js";
+import { NavigationJournal } from "./NavigationJournal.js";
+import { Emitter } from "./utils/Emitter.js";
+import { toSeconds } from "./utils/helpers.js";
 
 const NO_PARAMS = Object.freeze({});
 
@@ -9,7 +9,7 @@ const NO_PARAMS = Object.freeze({});
  * Navigation params are a SNAPSHOT: later changes of the caller's object do not leak into the history,
  * and a hook cannot alter what the next one sees.
  */
-const freezeParams = (params) => (params ? Object.freeze({...params}) : NO_PARAMS);
+const freezeParams = (params) => (params ? Object.freeze({ ...params }) : NO_PARAMS);
 
 /**
  * What an afterNavigate hook receives.
@@ -57,22 +57,24 @@ export class Region {
      *   first time each info is shown (force: false) and by refreshMeta(); it decides by itself what is worth fetching.
      */
     constructor({
-                    target,
-                    registry,
-                    currentBehavior = "toggle",
-                    boundaryBehavior = "stop",
-                    activeClass = "is-active",
-                    resolveMeta = null,
-                    panelRenderer = null,
-                    itemRenderer = null,
-                    headerRenderer = null,
-                    toggleRenderer = null,
-                    groupRenderer = null,
-                    thumbnails = null
-                }) {
+        target,
+        registry,
+        currentBehavior = "toggle",
+        boundaryBehavior = "stop",
+        activeClass = "is-active",
+        resolveMeta = null,
+        panelRenderer = null,
+        itemRenderer = null,
+        headerRenderer = null,
+        toggleRenderer = null,
+        groupRenderer = null,
+        thumbnails = null
+    }) {
         this.#target = target;
         this.#host = document.getElementById(target); // may be null: it will be registered when discovered
         this.#registry = registry;
+        if (currentBehavior !== "toggle" && currentBehavior !== "skip" && currentBehavior !== "playPause")
+            throw new TypeError(`Invalid currentBehavior '${currentBehavior}': expected "toggle" or "skip" or "playPause".`);
         this.#currentBehavior = currentBehavior;
         if (boundaryBehavior !== "stop" && boundaryBehavior !== "loop")
             throw new TypeError(`Invalid boundaryBehavior '${boundaryBehavior}': expected "stop" or "loop".`);
@@ -252,13 +254,13 @@ export class Region {
     }
 
     /** Like navigate(), but the current history entry is replaced (nothing is added). */
-    replace(key, {autoplay = false, index = 0, params} = {}) {
+    replace(key, { autoplay = false, index = 0, params } = {}) {
         if (!this.has(key))
             throw new Error(`No info found for key '${key}'`);
         this.#whenReady(() => {
             const info = this.get(key);
-            this.#journal.replace({info, index, params: freezeParams(params)});
-            this.#show(info, {autoplay, index}, "replace");
+            this.#journal.replace({ info, index, params: freezeParams(params) });
+            this.#show(info, { autoplay, index }, "replace");
         });
     }
 
@@ -267,18 +269,18 @@ export class Region {
      * current one (adopted iframe), only the item may change, with a single command.
      * @returns {boolean} false when the key is unknown (a saved key may have disappeared).
      */
-    restore(key, {index = 0, params} = {}) {
+    restore(key, { index = 0, params } = {}) {
         if (!this.has(key)) return false;
         this.#whenReady(() => {
             const info = this.get(key);
             if (this.isCurrent(key)) {
                 if (!info.isPlaylist || index === this.currentIndex) return;
-                this.#journal.updateCurrent({index});
-                this.#select(info, {autoplay: false, index});
+                this.#journal.updateCurrent({ index });
+                this.#select(info, { autoplay: false, index });
                 this.#changed("restore");
                 return;
             }
-            this.#navigate(info, {autoplay: false, index, params}, "restore");
+            this.#navigate(info, { autoplay: false, index, params }, "restore");
         });
         return true;
     }
@@ -313,7 +315,7 @@ export class Region {
             if (!this.#player) return; // rien n'est affiché : ni commande, ni « change » fantôme
             this.#playerIndex = index; // AVANT la commande (voir le commentaire d'origine)
             this.#player.playAt(index);
-            this.#journal.updateCurrent({index});
+            this.#journal.updateCurrent({ index });
             this.#panel.setCurrent(index);
             this.#changed("item");
         });
@@ -326,7 +328,7 @@ export class Region {
      * @param {{play?: boolean}} [options] play (default true): also start playing, a click on a timestamp expects to watch.
      * @throws {TypeError} when `seconds` is not a time.
      */
-    seekTo(seconds, {play = true} = {}) {
+    seekTo(seconds, { play = true } = {}) {
         const time = toSeconds(seconds);
         if (Number.isNaN(time)) throw new TypeError(`seekTo(): '${seconds}' is not a time`);
 
@@ -334,10 +336,10 @@ export class Region {
             if (!this.#player) return;
             const wasHidden = this.#host.hidden;
             this.#host.hidden = false;
-            this.#player.seekTo?.(time, {play});
+            this.#player.seekTo?.(time, { play });
             if (play) this.#assumeState("playing");
             if (wasHidden) this.#changed("visibility");
-            this.#events.emit("seek", {region: this, time, index: this.currentIndex});
+            this.#events.emit("seek", { region: this, time, index: this.currentIndex });
         });
     }
 
@@ -345,7 +347,7 @@ export class Region {
      * Takes over an iframe that is already in the page (and inside the target): the player drives it
      * and the panel is added for a playlist / list. `info` is parsed from the iframe src.
      */
-    adopt(iframe, info, {index = 0, params} = {}) {
+    adopt(iframe, info, { index = 0, params } = {}) {
         // the parent of the iframe is its container: usable even when the target was not discovered yet
         if (!this.#host) this.register(iframe.parentElement);
         // iframe region == region with single info
@@ -354,11 +356,11 @@ export class Region {
         info = this.get(info.key); // the canonical info (the one already known for this key)
         this.#disposePlayer();
         this.#panelInfo = null; // drawn again against the adopted iframe
-        this.#player = this.#registry.get(info.provider).createPlayer({iframe});
+        this.#player = this.#registry.get(info.provider).createPlayer({ iframe });
         this.#unsubscribe = this.#subscribe(this.#player);
         this.#rendered = info;
         this.#playerIndex = index;
-        this.#journal.push({info, index, params: freezeParams(params)});
+        this.#journal.push({ info, index, params: freezeParams(params) });
         this.#syncPanel(info, iframe, index);
         this.#changed("adopt");
         this.#resolveMetaLater(info);
@@ -379,7 +381,10 @@ export class Region {
 
     hide() {
         this.#whenReady(() => {
-            this.#player?.pause();
+            if (this.#player) {
+                this.#player.pause();
+                this.#assumeState("paused");
+            }
             this.#host.hidden = true;
             this.#changed("visibility");
         });
@@ -411,7 +416,7 @@ export class Region {
      *   (`from` is null, reason "immediate"): useful when the hook is registered after the first scan.
      * @returns {() => void} Function that removes the hook.
      */
-    afterNavigate(hook, {immediate = false} = {}) {
+    afterNavigate(hook, { immediate = false } = {}) {
         if (typeof hook !== "function") throw new TypeError("afterNavigate(): a function is expected");
         this.#afterHooks.add(hook);
         if (immediate) {
@@ -431,11 +436,11 @@ export class Region {
      * @param {{force?: boolean}} [options] force (default true): do not skip an info whose required fields are present.
      * @returns {Promise<boolean>} true when something changed; false too when there is nothing to resolve or it failed.
      */
-    refreshMeta(key = this.current?.key, {force = true} = {}) {
+    refreshMeta(key = this.current?.key, { force = true } = {}) {
         const info = key ? this.get(key) : null;
         if (!info || !this.#resolveMeta) return Promise.resolve(false);
         this.#resolved.add(info);
-        return this.#completeMeta(info, {force});
+        return this.#completeMeta(info, { force });
     }
 
     // ───────── internals ─────────
@@ -471,9 +476,9 @@ export class Region {
         return this.infos.indexOf(this.current);
     }
 
-    #navigate(info, {autoplay = false, index = 0, params} = {}, reason = "navigate") {
-        this.#journal.push({info, index, params: freezeParams(params)});
-        this.#show(info, {autoplay, index}, reason);
+    #navigate(info, { autoplay = false, index = 0, params } = {}, reason = "navigate") {
+        this.#journal.push({ info, index, params: freezeParams(params) });
+        this.#show(info, { autoplay, index }, reason);
     }
 
     /**
@@ -484,42 +489,42 @@ export class Region {
         try {
             if (!this.#player || this.#rendered !== info) {
                 // nothing is drawn for this info (container replaced, earlier failure): draw it, playing
-                this.#show(info, {autoplay: true, index: this.currentIndex}, "restore");
+                this.#show(info, { autoplay: true, index: this.currentIndex }, "restore");
                 return;
             }
             const wasHidden = this.#host.hidden;
             this.#host.hidden = false;
             if (!wasHidden && this.#playerState === "playing") {
                 this.#player.pause?.();
-                this.#assumeState("paused"); 
+                this.#assumeState("paused");
             } else {
                 this.#player.play?.();
-                this.#assumeState("playing"); 
+                this.#assumeState("playing");
             }
             if (wasHidden) this.#changed("visibility");
         } catch (error) {
-            this.#fail(error, {info});
+            this.#fail(error, { info });
         }
     }
 
     /** The history entry carries its params: the hooks get the same ones as the first time. */
     #restore(entry, reason) {
         if (!entry) return false;
-        this.#show(entry.info, {autoplay: false, index: entry.index}, reason); // restore the state, do not start playing
+        this.#show(entry.info, { autoplay: false, index: entry.index }, reason); // restore the state, do not start playing
         return true;
     }
 
     #assumeState(state) {
         if (this.#playerState === state) return;
         this.#playerState = state;
-        this.#events.emit("state", {region: this, state, index: this.currentIndex});
+        this.#events.emit("state", { region: this, state, index: this.currentIndex });
     }
 
     #step(delta, options = {}) {
         return this.#run(() => {
             const target = this.#stepTarget(delta); // calculée à l'exécution : tient compte des actions différées avant
             if (!target) return false;
-            this.#navigate(target, {autoplay: true, ...options});
+            this.#navigate(target, { autoplay: true, ...options });
             return true;
         });
     }
@@ -542,20 +547,20 @@ export class Region {
      * The frame is rewritten ONLY when the info changes (another video, another video list, another
      * playlist). Same info, other item of the list / playlist: a single command to the existing player.
      */
-    #show(info, {autoplay, index}, reason) {
+    #show(info, { autoplay, index }, reason) {
         try {
-            if (this.#player && this.#rendered === info) this.#select(info, {autoplay, index});
-            else this.#render(info, {autoplay, index});
+            if (this.#player && this.#rendered === info) this.#select(info, { autoplay, index });
+            else this.#render(info, { autoplay, index });
             this.#host.hidden = false;
         } catch (error) {
-            this.#fail(error, {info});
+            this.#fail(error, { info });
             return;
         }
         this.#changed(reason);
         this.#resolveMetaLater(info);
     }
 
-    #render(info, {autoplay, index}) {
+    #render(info, { autoplay, index }) {
         const provider = this.#registry.get(info.provider);
 
         // teardown of what was shown (another providers, another info): it must never block the new content
@@ -573,7 +578,7 @@ export class Region {
         this.#unsubscribe = this.#subscribe(this.#player);
 
         this.#playerIndex = index; // BEFORE load(): a player that notifies its item synchronously (Ok.ru) is then ignored
-        this.#player.load(info, {autoplay, index});
+        this.#player.load(info, { autoplay, index });
         const iframe = this.#player.iframe;
         iframe.dataset.lp ||= this.#target; // marks it as ours: the region host must not discover it as a frame to adopt
         if (!iframe.isConnected) this.#host.prepend(iframe); // iframe before the panel (CSS anchoring)
@@ -601,10 +606,10 @@ export class Region {
     }
 
     /** Same info: no new frame, only a command. */
-    #select(info, {autoplay, index}) {
+    #select(info, { autoplay, index }) {
         if (info.isPlaylist && index !== this.#playerIndex) {
             this.#playerIndex = index;
-            if (this.#player.selectItem) this.#player.selectItem(info, index, {autoplay});
+            if (this.#player.selectItem) this.#player.selectItem(info, index, { autoplay });
             else this.#player.playAt(index);
             this.#panel.setCurrent(index);
         } else if (autoplay) {
@@ -616,7 +621,7 @@ export class Region {
     #resolveMetaLater(info) {
         if (!this.#resolveMeta || this.#resolved.has(info)) return;
         this.#resolved.add(info);
-        this.#completeMeta(info, {force: false});
+        this.#completeMeta(info, { force: false });
     }
 
     #completeMeta(info, options) {
@@ -626,7 +631,7 @@ export class Region {
                 return Boolean(changed);
             },
             (error) => {
-                this.#fail(error, {info});
+                this.#fail(error, { info });
                 return false;
             }
         );
@@ -652,14 +657,14 @@ export class Region {
             // already known (playAt, select, first notification after a load): no second notification
             if (event.index === this.#playerIndex) return;
             this.#playerIndex = event.index;
-            this.#journal.updateCurrent({index: event.index}); // going back restores the item too
+            this.#journal.updateCurrent({ index: event.index }); // going back restores the item too
             this.#panel.setCurrent(event.index);
             this.#changed("item");
         } else if (event.type === "state") {
             this.#playerState = event.state;
-            this.#events.emit("state", {region: this, state: event.state, index: event.index ?? this.currentIndex});
+            this.#events.emit("state", { region: this, state: event.state, index: event.index ?? this.currentIndex });
         } else if (event.type === "error") {
-            this.#fail(event.error, {info: this.current});
+            this.#fail(event.error, { info: this.current });
         }
     }
 
@@ -683,9 +688,9 @@ export class Region {
     #state(reason) {
         const entry = this.#journal.current;
         if (!entry) return null;
-        const {info, index, params} = entry;
+        const { info, index, params } = entry;
         const item = info.isPlaylist ? (info.videos[index] ?? null) : info;
-        return Object.freeze({info, index, item, params: params ?? NO_PARAMS, reason});
+        return Object.freeze({ info, index, item, params: params ?? NO_PARAMS, reason });
     }
 
     #runAfterHooks(reason) {
@@ -708,7 +713,7 @@ export class Region {
     }
 
     #fail(error, context = {}) {
-        const handled = this.#events.emit("error", {region: this, error, ...context});
+        const handled = this.#events.emit("error", { region: this, error, ...context });
         if (!handled) console.error("[Region]", error);
     }
 

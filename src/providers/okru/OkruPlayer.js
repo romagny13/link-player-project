@@ -1,6 +1,6 @@
-import {OkruBridgeEvent, OkruIframeBridge} from "./OkruIframeBridge.js";
-import {OkruEmbedSrcBuilder} from "./OkruEmbedSrcBuilder.js";
-import {VideoListInfo} from "../../models/VideoListInfo.js";
+import { OkruBridgeEvent, OkruIframeBridge } from "./OkruIframeBridge.js";
+import { OkruEmbedSrcBuilder } from "./OkruEmbedSrcBuilder.js";
+import { VideoListInfo } from "../../models/VideoListInfo.js";
 
 /**
  * One Ok.ru iframe + its bridge. Ok.ru has no "load" command: loading = changing the src.
@@ -27,9 +27,9 @@ export class OkruPlayer {
      * @param {string} [options.embedBaseUrl] Relay page url (ignored if urlBuilder is given).
      * @param {OkruEmbedSrcBuilder} [options.urlBuilder]
      */
-    constructor({createIframe = null, iframe = null, embedBaseUrl = null, urlBuilder = null} = {}) {
+    constructor({ createIframe = null, iframe = null, embedBaseUrl = null, urlBuilder = null } = {}) {
         this.#createIframe = createIframe;
-        this.#urlBuilder = urlBuilder ?? new OkruEmbedSrcBuilder({relayBaseUrl: embedBaseUrl});
+        this.#urlBuilder = urlBuilder ?? new OkruEmbedSrcBuilder({ relayBaseUrl: embedBaseUrl });
         if (iframe) this.#attach(iframe, false);
     }
 
@@ -42,10 +42,10 @@ export class OkruPlayer {
         return () => this.#listeners.delete(onEvent);
     }
 
-    load(info, {autoplay = false, index = 0} = {}) {
+    load(info, { autoplay = false, index = 0 } = {}) {
         this.#items = info instanceof VideoListInfo
-            ? info.videoIds.map((id, i) => ({id, info: info.videos[i] ?? null}))
-            : [{id: info.videoId, info}];
+            ? info.videoIds.map((id, i) => ({ id, info: info.videos[i] ?? null }))
+            : [{ id: info.videoId, info }];
         this.#show(index, autoplay);
     }
 
@@ -69,10 +69,12 @@ export class OkruPlayer {
         this.#show(index, true);
     }
 
-    seekTo(seconds, {play = true} = {}) {
+    seekTo(seconds, { play = true } = {}) {
         const item = this.#items[this.#index];
         if (!item || !this.#iframe) return;
-        this.#iframe.src = this.#urlBuilder.build({videoId: item.id, autoplay: play, startSeconds: seconds});
+
+        this.#bridge.resetState();
+        this.#iframe.src = this.#urlBuilder.build({ videoId: item.id, autoplay: play, startSeconds: seconds });
     }
 
     dispose() {
@@ -97,6 +99,7 @@ export class OkruPlayer {
         });
 
         if (this.#iframe) {
+            this.#bridge.resetState();
             this.#iframe.src = src;
         } else {
             if (!this.#createIframe) {
@@ -105,7 +108,7 @@ export class OkruPlayer {
             this.#attach(this.#createIframe(src), true);
         }
 
-        if (this.#items.length > 1) this.#emit({type: "itemChange", index});
+        if (this.#items.length > 1) this.#emit({ type: "itemChange", index });
     }
 
     #attach(iframe, owned) {
@@ -120,13 +123,13 @@ export class OkruPlayer {
 
     #onBridgeEvent(e) {
         switch (e.type) {
-            case OkruBridgeEvent.VideoPlay: return this.#emit({type: "state", state: "playing", index: this.#index});
-            case OkruBridgeEvent.VideoPause: return this.#emit({type: "state", state: "paused", index: this.#index});
+            case OkruBridgeEvent.VideoPlay: return this.#emit({ type: "state", state: "playing", index: this.#index });
+            case OkruBridgeEvent.VideoPause: return this.#emit({ type: "state", state: "paused", index: this.#index });
             case OkruBridgeEvent.VideoEnded:
-                this.#emit({type: "state", state: "ended", index: this.#index});
+                this.#emit({ type: "state", state: "ended", index: this.#index });
                 if (this.#index + 1 < this.#items.length) this.next();
                 return;
-            case OkruBridgeEvent.Error: return this.#emit({type: "error", error: new Error(e.message ?? "Ok.ru player error")});
+            case OkruBridgeEvent.Error: return this.#emit({ type: "error", error: new Error(e.message ?? "Ok.ru player error") });
         }
     }
 

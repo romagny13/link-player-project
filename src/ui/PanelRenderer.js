@@ -1,5 +1,5 @@
-import {ThumbnailService} from "./ThumbnailService.js";
-import {injectStyles} from "../utils/dom.js";
+import { ThumbnailService } from "./ThumbnailService.js";
+import { injectStyles } from "../utils/dom.js";
 
 export const PANEL_CSS = `
 :where(.lp-panel){
@@ -120,14 +120,14 @@ export class PanelRenderer {
     }
 
     render({
-               host = null,
-               iframe = null,
-               info,
-               current = null,
-               onSelectItem = null,
-               widths = null,
-               togglePosition = this.#options.togglePosition
-           }) {
+        host = null,
+        iframe = null,
+        info,
+        current = null,
+        onSelectItem = null,
+        widths = null,
+        togglePosition = this.#options.togglePosition
+    }) {
         host = host ?? iframe?.parentElement; // no container to create
         if (!host) {
             throw new Error("[PanelRenderer] host or an attached iframe is required");
@@ -285,7 +285,7 @@ export class PanelRenderer {
 
         handle.onpointerdown = (e) => {
             if (e.button !== 0) return;
-            drag = {startX: e.clientX, startWidth: this.#width};
+            drag = { startX: e.clientX, startWidth: this.#width };
             handle.setPointerCapture?.(e.pointerId);
             this.#host.dataset.lpResizing = "";
             this.#host.style.userSelect = "none";
@@ -394,7 +394,7 @@ export class PanelRenderer {
 
         if (this.#options.header) {
             scroll.appendChild(
-                this.#headerRenderer.render({count: items.length, canClose: true})
+                this.#headerRenderer.render({ count: items.length, canClose: true })
             );
         }
 
@@ -418,7 +418,7 @@ export class PanelRenderer {
             );
         }
 
-        for (const {label, start, end} of groups) {
+        for (const { label, start, end } of groups) {
             const collapsed = this.#collapsed.has(label);
 
             const group = document.createElement("div");
@@ -432,7 +432,7 @@ export class PanelRenderer {
                 body.appendChild(this.#renderItem(items, index));
 
             group.append(
-                this.#groupRenderer.render({label, count: end - start, collapsed}),
+                this.#groupRenderer.render({ label, count: end - start, collapsed }),
                 body
             );
             scroll.appendChild(group);
@@ -491,7 +491,7 @@ export class PanelRenderer {
             if (typeof position === "string") this.#toggle.dataset.pos = position;
             return;
         }
-        const toggle = this.#toggleRenderer.render({position});
+        const toggle = this.#toggleRenderer.render({ position });
         toggle.addEventListener("click", () => this.#setOpen(true));
 
         this.#toggle = toggle;
@@ -528,7 +528,7 @@ export function groupBySeason(items, counts = null) {
                 start += count;
             }
         });
-        if (start < n) groups.push({label: "Other", start, end: n});
+        if (start < n) groups.push({ label: "Other", start, end: n });
         return groups.length > 1 ? groups : null;
     }
 
@@ -558,7 +558,7 @@ export function groupBySeason(items, counts = null) {
 
 /** The head of a season: the button that folds / unfolds it. */
 export class GroupRenderer {
-    render({label, count, collapsed}) {
+    render({ label, count, collapsed }) {
         const head = document.createElement("button");
         head.type = "button";
         head.className = "lp-group-head";
@@ -576,7 +576,7 @@ export class GroupRenderer {
  * and to `data-index` on an item (selects it).
  */
 export class HeaderRenderer {
-    render({count, canClose}) {
+    render({ count, canClose }) {
         const head = document.createElement("div");
         head.className = "lp-head";
 
@@ -597,6 +597,13 @@ export class HeaderRenderer {
         }
         return head;
     }
+}
+
+function safeHttpUrl(value) {
+    try {
+        const u = new URL(String(value).trim(), globalThis.location?.href);
+        return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+    } catch { return null; }
 }
 
 export class ItemRenderer {
@@ -627,17 +634,14 @@ export class ItemRenderer {
         text.append(titleEl);
 
         if (item.channel) {
-            const chan = document.createElement(item.channelUrl ? "a" : "div");
+            const href = safeHttpUrl(item.channelUrl);
+            const chan = document.createElement(href ? "a" : "div");
             chan.className = "lp-chan";
             chan.textContent = item.channel;
-
-            if (item.channelUrl) {
-                chan.href = item.channelUrl;
-                chan.target = "_blank";
-                chan.rel = "noopener noreferrer";
+            if (href) {
+                chan.href = href; chan.target = "_blank"; chan.rel = "noopener noreferrer";
                 chan.addEventListener("click", (e) => e.stopPropagation());
             }
-
             text.append(chan);
         }
 
@@ -673,11 +677,11 @@ export class ItemRenderer {
 
 export class ToggleRenderer {
     /** @param {{ position?: string | object }} options Default position, used when the panel does not give one. */
-    constructor({position = "top-right"} = {}) {
+    constructor({ position = "top-right" } = {}) {
         this.defaultPosition = position;
     }
 
-    render({position = this.defaultPosition} = {}) {
+    render({ position = this.defaultPosition } = {}) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "lp-toggle";

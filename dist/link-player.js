@@ -195,7 +195,10 @@
 	/** localStorage when reachable, memory otherwise (sandboxed iframes throw on access). */
 	function defaultStore() {
 		try {
-			return new JsonStore();
+			const s = globalThis.localStorage;
+			s.setItem("__lp_probe__", "1");
+			s.removeItem("__lp_probe__");
+			return new JsonStore({ storage: s });
 		} catch {
 			return new MemoryStore();
 		}
@@ -803,6 +806,14 @@
 			return head;
 		}
 	};
+	function safeHttpUrl(value) {
+		try {
+			const u = new URL(String(value).trim(), globalThis.location?.href);
+			return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+		} catch {
+			return null;
+		}
+	}
 	var ItemRenderer = class {
 		constructor(thumbnails = null) {
 			this._thumbnails = thumbnails ?? new ThumbnailService();
@@ -826,11 +837,12 @@
 			titleEl.textContent = title;
 			text.append(titleEl);
 			if (item.channel) {
-				const chan = document.createElement(item.channelUrl ? "a" : "div");
+				const href = safeHttpUrl(item.channelUrl);
+				const chan = document.createElement(href ? "a" : "div");
 				chan.className = "lp-chan";
 				chan.textContent = item.channel;
-				if (item.channelUrl) {
-					chan.href = item.channelUrl;
+				if (href) {
+					chan.href = href;
 					chan.target = "_blank";
 					chan.rel = "noopener noreferrer";
 					chan.addEventListener("click", (e) => e.stopPropagation());
@@ -974,6 +986,7 @@
 			this.#target = target;
 			this.#host = document.getElementById(target);
 			this.#registry = registry;
+			if (currentBehavior !== "toggle" && currentBehavior !== "skip" && currentBehavior !== "playPause") throw new TypeError(`Invalid currentBehavior '${currentBehavior}': expected "toggle" or "skip" or "playPause".`);
 			this.#currentBehavior = currentBehavior;
 			if (boundaryBehavior !== "stop" && boundaryBehavior !== "loop") throw new TypeError(`Invalid boundaryBehavior '${boundaryBehavior}': expected "stop" or "loop".`);
 			this.#boundaryBehavior = boundaryBehavior;
@@ -1237,7 +1250,10 @@
 		}
 		hide() {
 			this.#whenReady(() => {
-				this.#player?.pause();
+				if (this.#player) {
+					this.#player.pause();
+					this.#assumeState("paused");
+				}
 				this.#host.hidden = true;
 				this.#changed("visibility");
 			});
@@ -1905,9 +1921,9 @@
 		constructor({ provider, target, videoIds, index, showOnInit, autoplay, key, extra, source }) {
 			ValueChecks.requireNotNullOrEmpty(provider, "provider");
 			ValueChecks.requireNotNullOrEmpty(target, "target");
+			ValueChecks.requireNotNullOrEmpty(videoIds, "videoIds");
 			this.#provider = provider;
 			this.#target = target;
-			this.#videoIds = videoIds;
 			this.#index = index;
 			this.#showOnInit = showOnInit;
 			this.#autoplay = autoplay;
@@ -2356,6 +2372,10 @@
 		send(message) {
 			this.#iframe.contentWindow?.postMessage(JSON.stringify(message), this.#getTargetOrigin());
 		}
+		resetState() {
+			this.#known = {};
+			this.#lastIndex = null;
+		}
 		/** Tells the player to start sending messages to this page. */
 		#handshake() {
 			this.send({
@@ -2399,6 +2419,7 @@
 			this.#handshake();
 		};
 		#handleState(state) {
+			if (!this.#remember("state", state)) return;
 			this.#emit({
 				type: YouTubeBridgeEvent.StateChange,
 				state
@@ -2417,13 +2438,13 @@
 			}
 		}
 		#handleDelivery(info = {}) {
-			if (info.playerState) this.#handleState(info.playerState);
-			if (info.currentTime) this.#emit({
+			if (info.playerState != null) this.#handleState(info.playerState);
+			if (info.currentTime != null) this.#emit({
 				type: YouTubeBridgeEvent.TimeUpdate,
 				time: info.currentTime,
 				duration: info.duration
 			});
-			if (info.duration) this.#emit({
+			if (info.duration != null) this.#emit({
 				type: YouTubeBridgeEvent.DurationChange,
 				duration: info.duration
 			});
@@ -2533,7 +2554,6 @@
 		#bridge = null;
 		#owned = false;
 		#listeners = /* @__PURE__ */ new Set();
-		#loading = false;
 		/**
 		* @param {Object} options
 		* @param {YouTubeEmbedSrcBuilder} options.builder
@@ -2574,17 +2594,6 @@
 		* @param {{autoplay?: boolean, index?: number}} [options] `index`: starting item of a list / playlist.
 		*/
 		load(info, { autoplay = false, index = 0 } = {}) {
-			this.#loading = true;
-			try {
-				this.#load(info, {
-					autoplay,
-					index
-				});
-			} finally {
-				this.#loading = false;
-			}
-		}
-		#load(info, { autoplay, index }) {
 			const verb = autoplay ? "load" : "cue";
 			if (!this.#iframe) {
 				const src = this.#src(info, {
@@ -2681,7 +2690,6 @@
 			this.#bridge.connect();
 		}
 		#onBridgeEvent(e) {
-			if (this.#loading) return;
 			switch (e.type) {
 				case YouTubeBridgeEvent.PlaylistIndexChange: return this.#emit({
 					type: "itemChange",
@@ -2697,8 +2705,7 @@
 				});
 				case YouTubeBridgeEvent.VideoEnded: return this.#emit({
 					type: "state",
-					state: "ended",
-					index: e.index
+					state: "ended"
 				});
 				case YouTubeBridgeEvent.Error: return this.#emit({
 					type: "error",
@@ -2793,7 +2800,7 @@
 			if (new.target === MediaProvider) throw new Error("MediaProvider is an abstract class.");
 		}
 		getInfoFromLink(link) {
-			throw new Error(`${this.constructor.name} must implement getInfoFromElement().`);
+			throw new Error(`${this.constructor.name} must implement getInfoFromLink().`);
 		}
 		getInfoFromFrame(frame) {
 			throw new Error(`${this.constructor.name} must implement getInfoFromFrame().`);
@@ -2878,7 +2885,6 @@
 			if (rawIds !== null) {
 				const videoIds = this.#splitIds(rawIds);
 				if (!videoIds.length) return null;
-				u.searchParams.get("index");
 				return new UrlInfo({
 					kind: "videoList",
 					videoIds,
@@ -3054,6 +3060,7 @@
 		#connected = false;
 		#ready = false;
 		#readySrc = null;
+		#loading = false;
 		#queue = [];
 		#known = {};
 		constructor(iframe, { window = globalThis } = {}) {
@@ -3086,13 +3093,21 @@
 			this.#iframe.removeEventListener("load", this.#onIframeLoaded);
 			this.#listeners.clear();
 		}
+		resetState() {
+			this.#ready = false;
+			this.#readySrc = null;
+			this.#known = {};
+			this.#queue.length = 0;
+			this.#loading = true;
+		}
 		#onIframeLoaded = () => {
+			this.#loading = false;
 			if (this.#iframe.src === this.#readySrc) return;
 			this.#ready = false;
 			this.#known = {};
 		};
 		#onMessage = (e) => {
-			if (e.source !== this.#iframe.contentWindow) return;
+			if (e.source !== this.#iframe.contentWindow || this.#loading) return;
 			const data = this.#parse(e.data);
 			if (!data || !data.event) return;
 			this.#emit({
@@ -3316,6 +3331,7 @@
 		seekTo(seconds, { play = true } = {}) {
 			const item = this.#items[this.#index];
 			if (!item || !this.#iframe) return;
+			this.#bridge.resetState();
 			this.#iframe.src = this.#urlBuilder.build({
 				videoId: item.id,
 				autoplay: play,
@@ -3338,8 +3354,10 @@
 				autoplay,
 				startSeconds: item.info?.startSeconds
 			});
-			if (this.#iframe) this.#iframe.src = src;
-			else {
+			if (this.#iframe) {
+				this.#bridge.resetState();
+				this.#iframe.src = src;
+			} else {
 				if (!this.#createIframe) throw new Error("OkruPlayer: createIframe is required when no iframe is adopted");
 				this.#attach(this.#createIframe(src), true);
 			}
@@ -3393,7 +3411,7 @@
 	// src/providers/okru/OkruProvider.js
 	var OkruProvider = class extends MediaProvider {
 		id = "okru";
-		hosts = ["ok.ru"];
+		hosts = ["ok.ru", "odnoklassniki.ru"];
 		togglePosition = "top-right";
 		#infoParser;
 		#embedBaseUrl;
@@ -3401,6 +3419,9 @@
 			super();
 			this.#infoParser = infoParser ?? new OkruInfoParser();
 			this.#embedBaseUrl = embedBaseUrl;
+		}
+		getInfoFromFrame(frame) {
+			return this.#infoParser.parseFromFrame(frame);
 		}
 		getInfoFromLink(link) {
 			return this.#infoParser.parseFromLink(link);
@@ -3744,11 +3765,9 @@
 	// src/ui/Tooltip.js
 	var TOOLTIP_CSS = `
 @layer lp-tooltip {
-    .lp-tip{position:fixed;z-index:99999;display:none;width:280px;height:158px;border-radius:8px;overflow:hidden;pointer-events:none;background:linear-gradient(135deg,#222222,#111111);box-shadow:0 8px 24px rgba(0,0,0,.55);opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;font:500 14px var(--lp-font,system-ui,sans-serif);color:#fff}
+    .lp-tip{position:fixed;z-index:99999;display:none;width:280px;height:158px;border-radius:8px;overflow:hidden;pointer-events:none;background:radial-gradient(circle at 50% 30%, #1a1a1a 0%, #0d0d0d 70%);box-shadow:0 8px 24px rgba(0,0,0,.55);opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;font:500 14px var(--lp-font,system-ui,sans-serif);color:#fff}
     .lp-tip.lp-show{opacity:1;transform:none}
-     .lp-tip{background:radial-gradient(circle at 50% 30%, #1a1a1a 0%, #0d0d0d 70%)}
     .lp-tip[data-provider=youtube]{background:radial-gradient(circle at 50% 30%, #1c1111 0%, #0d0d0d 70%); --fa:#4d1414; --fb:#141414}
-    .lp-tip[data-provider=dailymotion]{background:radial-gradient(circle at 50% 30%, #11151c 0%, #0d0d0d 70%); --fa:#123a63; --fb:#101820}
     .lp-tip[data-provider=okru]{background:radial-gradient(circle at 50% 30%, #1c1510 0%, #0d0d0d 70%); --fa:#5a3508; --fb:#181108}
     
     .lp-tip img,.lp-tip-loader{display:block;width:100%;height:100%;object-fit:cover}

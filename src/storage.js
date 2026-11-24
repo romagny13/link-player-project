@@ -64,9 +64,10 @@ export class JsonStore {
 
 /** localStorage when reachable, memory otherwise (sandboxed iframes throw on access). */
 export function defaultStore() {
-    try {
-        return new JsonStore();
-    } catch {
-        return new MemoryStore();
-    }
+  try {
+    const s = globalThis.localStorage;
+    s.setItem("__lp_probe__", "1");
+    s.removeItem("__lp_probe__");
+    return new JsonStore({ storage: s });
+  } catch { return new MemoryStore(); }
 }

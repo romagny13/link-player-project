@@ -2,11 +2,9 @@ import {injectStyles} from "../utils/dom.js";
 
 const TOOLTIP_CSS = `
 @layer lp-tooltip {
-    .lp-tip{position:fixed;z-index:99999;display:none;width:280px;height:158px;border-radius:8px;overflow:hidden;pointer-events:none;background:linear-gradient(135deg,#222222,#111111);box-shadow:0 8px 24px rgba(0,0,0,.55);opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;font:500 14px var(--lp-font,system-ui,sans-serif);color:#fff}
+    .lp-tip{position:fixed;z-index:99999;display:none;width:280px;height:158px;border-radius:8px;overflow:hidden;pointer-events:none;background:radial-gradient(circle at 50% 30%, #1a1a1a 0%, #0d0d0d 70%);box-shadow:0 8px 24px rgba(0,0,0,.55);opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;font:500 14px var(--lp-font,system-ui,sans-serif);color:#fff}
     .lp-tip.lp-show{opacity:1;transform:none}
-     .lp-tip{background:radial-gradient(circle at 50% 30%, #1a1a1a 0%, #0d0d0d 70%)}
     .lp-tip[data-provider=youtube]{background:radial-gradient(circle at 50% 30%, #1c1111 0%, #0d0d0d 70%); --fa:#4d1414; --fb:#141414}
-    .lp-tip[data-provider=dailymotion]{background:radial-gradient(circle at 50% 30%, #11151c 0%, #0d0d0d 70%); --fa:#123a63; --fb:#101820}
     .lp-tip[data-provider=okru]{background:radial-gradient(circle at 50% 30%, #1c1510 0%, #0d0d0d 70%); --fa:#5a3508; --fb:#181108}
     
     .lp-tip img,.lp-tip-loader{display:block;width:100%;height:100%;object-fit:cover}

@@ -5,7 +5,7 @@ import {makeIframe} from "../../utils/dom.js";
 
 export class OkruProvider extends MediaProvider {
     id = "okru";
-    hosts = ["ok.ru"];
+    hosts = ["ok.ru","odnoklassniki.ru"];
     togglePosition = "top-right";
     #infoParser;
     #embedBaseUrl;
@@ -16,6 +16,8 @@ export class OkruProvider extends MediaProvider {
         this.#infoParser = infoParser ?? new OkruInfoParser();
         this.#embedBaseUrl = embedBaseUrl;
     }
+
+    getInfoFromFrame(frame) { return this.#infoParser.parseFromFrame(frame); }
 
     getInfoFromLink(link) {
         return this.#infoParser.parseFromLink(link);
