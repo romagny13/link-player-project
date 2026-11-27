@@ -211,23 +211,48 @@ new LinkPlayer({ /* all optional */ })
 |---|---|
 | `scan()` | Discover what is new in the page (see below) |
 | `getRegion(name)` | The region of a target; **created when it does not exist yet** |
+| `navigate(name, key, options)` | Shortcut for `getRegion(name).navigate(key, options)` |
+| `nextInfo(name, options)` | Shortcut for `getRegion(name).nextInfo(options)` → `boolean` |
+| `previousInfo(name, options)` | Shortcut for `getRegion(name).previousInfo(options)` → `boolean` |
 | `refreshMeta(name, key?, {force})` | Ask the metadata of an info again (default: the current info, forced) → `Promise<boolean>` |
 | `on(type, handler)` / `off(type, handler)` | Events of every region (`change`, `state`, `sound`, `before`, `error`, or `"*"`). `on` returns an unsubscribe function |
 | `dispose()` | Remove listeners, regions, views and tooltips |
 | `id`, `isGlobal`, `regions` | Read-only state |
 
-`LinkPlayer` does not wrap the region commands. To navigate, play, mute... get the region of a target and use it:
+### Facade methods
+
+`navigate`, `nextInfo` and `previousInfo` are the only region commands wrapped by `LinkPlayer`. Each one takes the **target name** (the container id) first, then forwards the rest to the region. They are meant for buttons and code that do not hold the region.
+
+```js
+lp.navigate("main", "youtube:ID");                          // go to an info by key
+lp.navigate("main", "youtube:list:a,b,c", {index: 2});      // start a list at its 3rd item
+lp.navigate("main", "youtube:ID", {autoplay: true, params: {from: "menu"}});
+
+lp.nextInfo("main");                                        // autoplay is on by default
+lp.previousInfo("main", {autoplay: false});
+```
+
+- `options` are the ones of the region: `navigate` takes `{autoplay, index, params}`, `nextInfo` / `previousInfo` take `{autoplay, params}`.
+- `navigate` always navigates, even toward the info already shown. What a *click* on the current info does (`currentBehavior`) belongs to links, not to this call.
+- `nextInfo` / `previousInfo` return `false` when there is no info in that direction (see `boundaryBehavior`).
+- An unknown **key** throws (a typo stays visible). An unknown **target** is fine: the region is created and waits for its container.
+
+### Everything else goes through the region
+
+History, items inside a list, player, sound and visibility have no shortcut. Get the region and use it:
 
 ```js
 const region = lp.getRegion("main");
-region.navigate("youtube:ID");
+
+region.back();
 region.nextItem();
+region.selectItem(3);
+region.play();
 region.toggleMute();
+region.toggle();
 ```
 
-`region.navigate()` throws for an unknown **key** (a typo stays visible). An unknown **target** is fine: `getRegion()` creates the region and it waits for its container.
-
----
+See [Region API](#region-api) for the full list.
 
 ## Region API
 

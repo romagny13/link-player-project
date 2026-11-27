@@ -381,6 +381,7 @@
 		#bindings = /* @__PURE__ */ new Map();
 		/** @returns {boolean} false when the element is already a command (of this binder or of another owner). */
 		bind(element, region, key, { autoplay = false, index, params } = {}) {
+			if (this.#bindings.has(element) || !claim(element, this)) return false;
 			if (!claim(element, this)) return false;
 			const onClick = (event) => {
 				event.preventDefault();
@@ -4491,6 +4492,15 @@
 		}
 		getRegion(name) {
 			return this.#catalog.get(name);
+		}
+		navigate(name, key, options) {
+			return this.getRegion(name).navigate(key, options);
+		}
+		nextInfo(name, options) {
+			return this.getRegion(name).nextInfo(options);
+		}
+		previousInfo(name, options) {
+			return this.getRegion(name).previousInfo(options);
 		}
 		/** Asks the metadata of an info again (e.g. after the API key changed). */
 		async refreshMeta(name, key = this.getRegion(name).current?.key, { force = true } = {}) {
