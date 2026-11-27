@@ -23,10 +23,15 @@ export class ValueChecks {
             throw new Error(`${name} must not be empty`);
         }
 
-        // Object
-        if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+        // Object (plain only)
+        if (
+            typeof value === 'object' &&
+            !Array.isArray(value) &&
+            !(value instanceof Map) &&
+            !(value instanceof Set) &&
+            Object.keys(value).length === 0
+        ) {
             throw new Error(`${name} must not be empty`);
         }
-
     }
 }

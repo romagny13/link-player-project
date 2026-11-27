@@ -10,6 +10,8 @@ export class CommandBinder {
 
     /** @returns {boolean} false when the element is already a command (of this binder or of another owner). */
     bind(element, region, key, {autoplay = false, index, params} = {}) {
+        if (this.#bindings.has(element) || !claim(element, this)) return false;
+
         if (!claim(element, this)) return false;
         const onClick = (event) => {
             event.preventDefault();

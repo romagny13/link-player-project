@@ -85,7 +85,7 @@ const lp = new LinkPlayer({
     {url: "https://www.youtube.com/watch?list=PLxxxx", target: "side", key: "my-playlist"}
   ]
 });
-lp.navigate("main", "youtube:ID");
+lp.getRegion("main").navigate("youtube:ID");
 ```
 
 An invalid definition (unknown provider, missing target...) throws from the constructor.
@@ -186,7 +186,7 @@ new LinkPlayer({ /* all optional */ })
 | `definitions` | Array of code definitions |
 | `autoScan` | Scan at construction (default `true`; call `scan()` yourself otherwise) |
 | `defaultTarget` | Target for links and definitions without one |
-| `currentBehavior` | A **click** on the link of the info already shown: `"toggle"` (default, hides / shows the container), `"skip"` (nothing), `"playPause"` (plays or pauses, the visibility does not change). `lp.navigate()` always navigates, whatever this option says |
+| `currentBehavior` | A **click** on the link of the info already shown: `"toggle"` (default, hides / shows the container), `"skip"` (nothing), `"playPause"` (plays or pauses, the visibility does not change). `region.navigate()` always navigates, whatever this option says |
 | `boundaryBehavior` | `nextInfo()` / `previousInfo()` at the ends of the list: `"stop"` (default) or `"loop"` (needs 2 infos or more) |
 | `activeClass` | Class (or array / space-separated list) put on the links of the info being shown. Default `"is-active"`; `null` or `""` disables |
 | `activeWhenPlaying` | `true`: the active class is only there while the player plays (default `false`: while the info is shown) |
@@ -211,22 +211,21 @@ new LinkPlayer({ /* all optional */ })
 |---|---|
 | `scan()` | Discover what is new in the page (see below) |
 | `getRegion(name)` | The region of a target; **created when it does not exist yet** |
-| `navigate(name, key, options)` | `region.navigate(key, options)` by target id |
-| `nextInfo(name, options)`, `previousInfo(name, options)` | `region.nextInfo()` / `region.previousInfo()` by target id |
 | `refreshMeta(name, key?, {force})` | Ask the metadata of an info again (default: the current info, forced) → `Promise<boolean>` |
 | `on(type, handler)` / `off(type, handler)` | Events of every region (`change`, `state`, `sound`, `before`, `error`, or `"*"`). `on` returns an unsubscribe function |
 | `dispose()` | Remove listeners, regions, views and tooltips |
 | `id`, `isGlobal`, `regions` | Read-only state |
 
-The facade is deliberately small. For everything else, use the region:
+`LinkPlayer` does not wrap the region commands. To navigate, play, mute... get the region of a target and use it:
 
 ```js
 const region = lp.getRegion("main");
+region.navigate("youtube:ID");
 region.nextItem();
 region.toggleMute();
 ```
 
-`navigate` throws for an unknown **key** (a typo stays visible). An unknown **target** is fine: the region is created and waits for its container.
+`region.navigate()` throws for an unknown **key** (a typo stays visible). An unknown **target** is fine: `getRegion()` creates the region and it waits for its container.
 
 ---
 
@@ -299,7 +298,7 @@ off();                                            // stop listening
 ```js
 lp.on("state", ({region, state}) => {
   if (state === "ended" && !region.canGoNextItem) {
-    lp.nextInfo(region.name);                     // autoplay is on by default
+    region.nextInfo();                            // autoplay is on by default
   }
 });
 ```
@@ -343,7 +342,7 @@ region.afterNavigate(({item, index, params, reason, view}, from) => {
 
 ## Regions and containers
 
-A region can exist before its container does (a definition, a `lp.navigate()` call, a link whose target is added to the DOM later):
+A region can exist before its container does (a definition, a `region.navigate()` call, a link whose target is added to the DOM later):
 
 - Until the container is found, `navigate()` and friends only move the **journal**. Nothing is replayed: when `scan()` finds the container, the region shows its **current** state (the last navigation, not all of them).
 - An `autoplay` requested while there was no container is kept for 2 seconds only.
@@ -606,7 +605,7 @@ A **view** extends `MediaView`. It exposes `root` (the iframe), `owned`, `kind`,
 
 ```
 src/
-  LinkPlayer.js            facade and composition root
+  LinkPlayer.js            composition root: builds the parts, wires them, scans the page
   Region.js                single active item, journal, view, hooks, behaviors
   RegionHost.js            discovery of links, containers and frames
   RegionCatalog.js         name -> region, and the element of each region
@@ -638,7 +637,7 @@ tests/                     Vitest (jsdom)
 - **OK.ru cannot be muted** and has no volume control (see [Sound](#sound)). It has no playlists either.
 - **Format cannot be detected** from `youtu.be/ID` links or from embed URLs: declare it with `data-format` / `format`.
 - **YouTube list indexes can drift.** The YouTube player owns its internal list: a deleted or private video is skipped, and a list started at an index above 0 is re-based on it. The player's indexes can then differ from the panel's. Check that every id of a list is playable.
-- **YouTube playlists (`list=`) ignore `index`**: `&index=` in the URL and `data-index` apply to video lists only. Use `navigate(key, {index})` from code.
+- **YouTube playlists (`list=`) ignore `index`**: `&index=` in the URL and `data-index` apply to video lists only. Use `region.navigate(key, {index})` from code.
 - **A per-item `start` is not applied on YouTube lists and playlists** (they are loaded with `startSeconds: 0`). It works on a single video and on OK.ru lists.
 - **Autoplay is subject to browser policies**: autoplay on click works; autoplay at load only works muted (`data-mute`) and may still be blocked.
 - **`scan()` must be called again** after dynamic DOM changes.

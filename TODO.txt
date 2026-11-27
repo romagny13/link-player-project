@@ -1,5 +1,5 @@
 
-
+supprimer la facade
 
 ---------region host---------
 sert à decouvrir les regions elements dom

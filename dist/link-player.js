@@ -1019,7 +1019,7 @@
 			if (typeof value === "string" && value.trim().length === 0) throw new Error(`${name} must not be empty`);
 			if (Array.isArray(value) && value.length === 0) throw new Error(`${name} must not be empty`);
 			if ((value instanceof Map || value instanceof Set) && value.size === 0) throw new Error(`${name} must not be empty`);
-			if (typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0) throw new Error(`${name} must not be empty`);
+			if (typeof value === "object" && !Array.isArray(value) && !(value instanceof Map) && !(value instanceof Set) && Object.keys(value).length === 0) throw new Error(`${name} must not be empty`);
 		}
 	};
 	// src/models/VideoInfo.js
@@ -3725,6 +3725,7 @@
 		#headerRenderer = null;
 		#toggleRenderer = null;
 		#groupRenderer = null;
+		#revealRaf = 0;
 		#options = {
 			handleWidth: 10,
 			header: true,
@@ -3789,6 +3790,8 @@
 			}
 		}
 		clear() {
+			cancelAnimationFrame(this.#revealRaf);
+			this.#revealRaf = 0;
 			this.#releaseAnchor();
 			this.#panel?.remove();
 			this.#panel = null;
@@ -3978,7 +3981,8 @@
 				if (row) {
 					const group = row.closest(".lp-group");
 					if (group?.hasAttribute("data-collapsed")) this.#setCollapsed(group, false);
-					requestAnimationFrame(() => this.#reveal(row));
+					cancelAnimationFrame(this.#revealRaf);
+					this.#revealRaf = requestAnimationFrame(() => this.#reveal(row));
 				}
 			}
 		}
@@ -3997,6 +4001,7 @@
 		*/
 		#reveal(row) {
 			const scroll = this.#scroll;
+			if (!scroll || !row) return;
 			const box = scroll.getBoundingClientRect();
 			if (!box.height) return;
 			const rect = row.getBoundingClientRect();
@@ -4486,15 +4491,6 @@
 		}
 		getRegion(name) {
 			return this.#catalog.get(name);
-		}
-		navigate(name, key, options) {
-			return this.getRegion(name).navigate(key, options);
-		}
-		nextInfo(name, options) {
-			return this.getRegion(name).nextInfo(options);
-		}
-		previousInfo(name, options) {
-			return this.getRegion(name).previousInfo(options);
 		}
 		/** Asks the metadata of an info again (e.g. after the API key changed). */
 		async refreshMeta(name, key = this.getRegion(name).current?.key, { force = true } = {}) {

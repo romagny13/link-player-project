@@ -164,19 +164,6 @@ export class LinkPlayer {
         return this.#catalog.get(name);
     }
 
-    // facade: the same words as the region, by name
-    navigate(name, key, options) {
-        return this.getRegion(name).navigate(key, options);
-    }
-
-    nextInfo(name, options) {
-        return this.getRegion(name).nextInfo(options);
-    }
-
-    previousInfo(name, options) {
-        return this.getRegion(name).previousInfo(options);
-    }
-
     /** Asks the metadata of an info again (e.g. after the API key changed). */
     async refreshMeta(name, key = this.getRegion(name).current?.key, {force = true} = {}) {
         const region = this.getRegion(name);

@@ -89,6 +89,7 @@ export class PanelRenderer {
     #headerRenderer = null;
     #toggleRenderer = null;
     #groupRenderer = null;
+    #revealRaf = 0;
 
     #options = {
         handleWidth: 10,
@@ -189,6 +190,8 @@ export class PanelRenderer {
     }
 
     clear() {
+        cancelAnimationFrame(this.#revealRaf);
+        this.#revealRaf = 0;
         this.#releaseAnchor();
         this.#panel?.remove(); // the scroll area and the resize handle go with it
         this.#panel = null;
@@ -445,7 +448,8 @@ export class PanelRenderer {
                 if (group?.hasAttribute("data-collapsed")) {
                     this.#setCollapsed(group, false);
                 }
-                requestAnimationFrame(() => this.#reveal(row));
+                cancelAnimationFrame(this.#revealRaf);
+                this.#revealRaf = requestAnimationFrame(() => this.#reveal(row));
             }
         }
     }
@@ -473,8 +477,11 @@ export class PanelRenderer {
      */
     #reveal(row) {
         const scroll = this.#scroll;
+        if (!scroll || !row) return;
+
         const box = scroll.getBoundingClientRect();
         if (!box.height) return; // hidden (host hidden, display:none): nothing to measure
+
         const rect = row.getBoundingClientRect();
         const head = scroll.querySelector(".lp-head")?.offsetHeight ?? 0; // sticky: it covers the top of the list
         const top = box.top + head;
