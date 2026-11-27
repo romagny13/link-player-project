@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        [data-format="portrait"] {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+
+        [data-format="portrait"] iframe {
+            display: block;
+            width: 100%;
+            max-width: 360px;
+            max-height: 85dvh; /* Évite qu'un Short dépasse verticalement sur petit écran */
+            aspect-ratio: 9 / 16;
+            height: auto;
+            margin-inline: auto;
+            border: 0;
+            border-radius: 12px;
+            background-color: #000;
+        }
+    </style>
+</head>
+<body>
+<a data-link href="https://www.youtube.com/shorts/q6-rBc0OsSk" data-target="target">Short</a>
+
+<div id="target"></div>
+<script type="module">
+    import {LinkPlayer} from "../src/LinkPlayer.js";
+
+    // mute , il faudrait gerer mute, unmute, set valume;.. le plus gros probleme semble etre le post message vers iframe okru qui ne supporte pas mute
+    // event befor navigate
+    const lp = new LinkPlayer({
+        autoScan: false,
+        useStorage: false,
+        // onChange(e) {
+        //     console.log("change", e.region);
+        //     e.region.element.dataset.format = item?.format ?? "landscape";
+        // },
+    });
+
+    const region = lp.getRegion("target");
+    lp.on("*", (e) => {
+        console.log("on",e);
+        // if(reason === "restore"){
+        //     region.element.dataset.format = item?.format ?? "landscape";
+        // }
+        if(e.reason === "before"){
+            // différé
+            e.view.root.dataset.format = e.info?.format ?? "landscape";
+        }
+    });
+
+    // region.afterNavigate(({item}) => {
+    //     console.log("after navigate");
+    //     region.element.dataset.format = item?.format ?? "landscape";
+    // });
+
+    lp.scan();
+
+
+</script>
+
+</body>
+</html>

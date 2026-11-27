@@ -1,0 +1,491 @@
+/* ───────── Jetons ───────── */
+:root {
+    color-scheme: light dark;
+
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef0f4;
+    --ink: #18202b;
+    --ink-soft: #566274;
+    --line: #d9dde4;
+    --accent: #0b6e8e;
+    --accent-ink: #ffffff;
+    --accent-soft: #dff1f7;
+    --code-bg: #eaedf2;
+    --pre-bg: #14202b;
+    --pre-ink: #dbe6f0;
+    --player-bg: #0e141b;
+    --focus: #e08a00;
+
+    --font-text: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+
+    --radius: 8px;
+    --radius-s: 5px;
+    --gap: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0f151c;
+        --surface: #171f29;
+        --surface-2: #1f2933;
+        --ink: #e6ebf1;
+        --ink-soft: #9aa7b6;
+        --line: #2b3745;
+        --accent: #5cc3e4;
+        --accent-ink: #06222c;
+        --accent-soft: #14323f;
+        --code-bg: #212c38;
+        --pre-bg: #0a1017;
+        --pre-ink: #cfdbe8;
+        --player-bg: #05080c;
+        --focus: #ffb43b;
+    }
+}
+
+/* ───────── Base ───────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4.5rem; /* hauteur de la nav collante */
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 1rem/1.6 var(--font-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+}
+
+/* ───────── En-tête et navigation ───────── */
+body > header {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 2.5rem 1.25rem 0;
+}
+
+body > header h1 {
+    margin: 0 0 .5rem;
+    font-size: clamp(1.75rem, 4vw, 2.4rem);
+    line-height: 1.15;
+    letter-spacing: -.02em;
+}
+
+body > header > p {
+    max-width: 46rem;
+    margin: 0 0 .75rem;
+    color: var(--ink-soft);
+}
+
+body > header nav {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin: 1.25rem -1.25rem 1rem;
+    padding: .6rem 1.25rem;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+    font-size: .875rem;
+    /* le séparateur " | " du HTML devient invisible */
+    color: transparent;
+}
+
+body > header nav a {
+    padding: .25rem .65rem;
+    border-radius: 999px;
+    color: var(--ink);
+    text-decoration: none;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transition: background-color .15s, border-color .15s;
+}
+
+body > header nav a:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+
+/* Clé API */
+body > header details {
+    margin: 0 0 1rem;
+    padding: .6rem .9rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-size: .9rem;
+}
+
+body > header summary {
+    cursor: pointer;
+    color: var(--ink-soft);
+}
+
+body > header details[open] summary {
+    margin-bottom: .6rem;
+}
+
+body > header details input {
+    min-width: min(100%, 18rem);
+}
+
+/* ───────── Contenu ───────── */
+main {
+    max-width: 62rem;
+    margin: 0 auto;
+    padding: 0 1.25rem 4rem;
+}
+
+main > section {
+    margin: 0 0 1.75rem;
+    padding: 1.5rem 1.5rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius);
+}
+
+h2, h3, h4 {
+    line-height: 1.25;
+    letter-spacing: -.01em;
+}
+
+main h2 {
+    margin: 0 0 .75rem;
+    font-size: 1.4rem;
+}
+
+main h3 {
+    margin: 1.75rem 0 .5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+    font-size: 1.1rem;
+}
+
+main h4 {
+    margin: 1.25rem 0 .4rem;
+    font-size: .95rem;
+    color: var(--ink-soft);
+}
+
+main p {
+    max-width: 48rem;
+    margin: .5rem 0;
+}
+
+main ul, main ol {
+    margin: .4rem 0 .8rem;
+    padding-left: 1.25rem;
+}
+
+main li {
+    margin: .35rem 0;
+    padding-left: .15rem;
+}
+
+main li::marker {
+    color: var(--ink-soft);
+}
+
+small {
+    color: var(--ink-soft);
+    font-size: .85em;
+}
+
+em {
+    font-style: italic;
+}
+
+/* ───────── Code ───────── */
+code, kbd {
+    padding: .1em .4em;
+    background: var(--code-bg);
+    border-radius: 4px;
+    font: .88em/1.4 var(--font-mono);
+}
+
+pre {
+    margin: 1rem 0;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    background: var(--pre-bg);
+    color: var(--pre-ink);
+    border-radius: var(--radius);
+    font: .85rem/1.6 var(--font-mono);
+    tab-size: 2;
+}
+
+pre code {
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+}
+
+/* ───────── Liens de lecture (data-link) ───────── */
+a {
+    color: var(--accent);
+    text-underline-offset: .2em;
+}
+
+a[data-link] {
+    padding: .05em .4em;
+    margin-inline: -.1em;
+    border-radius: var(--radius-s);
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-decoration-thickness: 1px;
+    cursor: pointer;
+    transition: background-color .15s, color .15s;
+}
+
+a[data-link]:hover {
+    background: var(--accent-soft);
+    text-decoration-style: solid;
+}
+
+/* ───────── Barre de boutons ───────── */
+[data-controls] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem;
+    margin: .5rem 0;
+    padding: .5rem;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    font-size: .85rem;
+    color: var(--ink-soft);
+}
+
+[data-controls]:empty {
+    display: none;
+}
+
+[data-controls] span {
+    margin-left: auto;
+    padding-left: .5rem;
+    font-family: var(--font-mono);
+    font-size: .8rem;
+}
+
+button {
+    padding: .35rem .75rem;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-s);
+    font: inherit;
+    font-size: .875rem;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: background-color .15s, border-color .15s;
+}
+
+button:hover:not(:disabled) {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+
+button:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+[data-controls] button:disabled,
+button:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+/* ───────── Infos d'un lecteur (rendues par afterNavigate) ───────── */
+[data-info] {
+    margin: .5rem 0 1rem;
+    padding: .75rem 1rem;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    font-size: .9rem;
+}
+
+[data-info]:empty {
+    display: none;
+}
+
+[data-info] dl,
+#api-default dl,
+#api-loaded dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: .3rem 1rem;
+    margin: 0;
+}
+
+dt {
+    color: var(--ink-soft);
+    font: .8rem/1.9 var(--font-mono);
+}
+
+dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+dd img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--radius-s);
+}
+
+/* ───────── Formulaires ───────── */
+input {
+    padding: .35rem .6rem;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-s);
+    font: inherit;
+    font-size: .9rem;
+}
+
+input:focus-visible {
+    border-color: var(--accent);
+}
+
+output {
+    padding: .1em .4em;
+    background: var(--code-bg);
+    border-radius: 4px;
+    font: .85em var(--font-mono);
+}
+
+/* ───────── Colonnes (sections 4, 7, 8) ───────── */
+.row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+    gap: var(--gap);
+    align-items: start;
+}
+
+.row > div {
+    min-width: 0;
+}
+
+#sec-api .row > div,
+#zone-global-links,
+#zone-scoped,
+#behavior-zones > div {
+    padding: 0 1rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+#sec-api .row h3,
+#zone-global-links h3,
+#zone-scoped h3,
+#behavior-zones h3 {
+    margin: 1rem 0 .5rem;
+    padding-top: 0;
+    border-top: 0;
+    font-size: .95rem;
+}
+
+#behavior-zones h3 {
+    font: .78rem/1.5 var(--font-mono);
+    color: var(--ink-soft);
+    overflow-wrap: anywhere;
+}
+
+#zone-global-links > a[data-link],
+#zone-scoped > a[data-link] {
+    display: inline-block;
+    margin: .1rem .25rem .1rem 0;
+}
+
+#api-status {
+    padding: .5rem .8rem;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-s);
+    font-size: .9rem;
+}
+
+/* ───────── Journal ───────── */
+#sec-log {
+    border-left-color: var(--ink-soft);
+}
+
+#log {
+    max-height: 18rem;
+    margin: .75rem 0 0;
+    padding: .6rem .8rem;
+    overflow-y: auto;
+    list-style: none;
+    background: var(--pre-bg);
+    color: var(--pre-ink);
+    border-radius: var(--radius);
+    font: .8rem/1.7 var(--font-mono);
+}
+
+#log li {
+    margin: 0;
+    padding: 0;
+    overflow-wrap: anywhere;
+}
+
+#log li:empty {
+    display: none;
+}
+
+#log li + li {
+    border-top: 1px solid rgb(255 255 255 / .06);
+}
+
+/* ───────── Mobile ───────── */
+@media (max-width: 40rem) {
+    main > section {
+        padding: 1.1rem .9rem .9rem;
+    }
+
+    [data-info] dl,
+    #api-default dl,
+    #api-loaded dl {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    dt {
+        margin-top: .4rem;
+        line-height: 1.4;
+    }
+
+    [data-controls] span {
+        flex-basis: 100%;
+        margin-left: 0;
+        padding-left: 0;
+    }
+}

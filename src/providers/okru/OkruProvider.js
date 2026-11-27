@@ -1,51 +1,42 @@
-import {OkruInfoParser} from "./OkruInfoParser.js";
-import {OkruPlayer} from "./OkruPlayer.js";
 import {MediaProvider} from "../MediaProvider.js";
-import {makeIframe} from "../../utils/dom.js";
+import {OkruInfoParser} from "./OkruInfoParser.js";
+import {OkruEmbedSrcBuilder} from "./OkruEmbedSrcBuilder.js";
+import {OkruView} from "./OkruView.js";
+import {IframeFactory} from "../../views/IframeFactory.js";
 
 export class OkruProvider extends MediaProvider {
     id = "okru";
-    hosts = ["ok.ru","odnoklassniki.ru"];
-    togglePosition = "top-right";
+    hosts = ["ok.ru", "odnoklassniki.ru"];
+
     #infoParser;
-    #embedBaseUrl;
+    #urlBuilder;
+    #iframes;
 
-    constructor({infoParser = null, embedBaseUrl = null} = {}) {
+    constructor({infoParser = null, embedBaseUrl = null, urlBuilder = null, iframeFactory = null} = {}) {
         super();
-
         this.#infoParser = infoParser ?? new OkruInfoParser();
-        this.#embedBaseUrl = embedBaseUrl;
+        this.#urlBuilder = urlBuilder ?? new OkruEmbedSrcBuilder({relayBaseUrl: embedBaseUrl});
+        this.#iframes = iframeFactory ?? new IframeFactory();
     }
 
-    getInfoFromFrame(frame) { return this.#infoParser.parseFromFrame(frame); }
+    getInfoFromFrame(frame) {
+        return this.#infoParser.parseFromFrame(frame);
+    }
 
     getInfoFromLink(link) {
         return this.#infoParser.parseFromLink(link);
     }
 
     getInfoFromDefinition(definition) {
-        if(!definition.url)
-        {
-            definition.url = this.#infoParser.buildUrl(definition);
-        }
+        if (!definition.url) definition.url = this.#infoParser.buildUrl(definition);
         return this.#infoParser.parseDefinition(definition);
     }
 
-    createPlayer({iframe = null} = {}) {
-        return new OkruPlayer({
-            createIframe: (src) =>
-                makeIframe({
-                    width: "560",
-                    height: "315",
-                    src,
-                    title: "OK.ru video player",
-                    allow: "autoplay; fullscreen",
-                    referrerPolicy: "strict-origin-when-cross-origin",
-                    allowFullscreen: true,
-                    extraAttrs: {}
-                }),
-            iframe,
-            embedBaseUrl: this.#embedBaseUrl
+    createView({iframe = null} = {}) {
+        return new OkruView({
+            urlBuilder: this.#urlBuilder,
+            createIframe: (src) => this.#iframes.create("okru", src),
+            iframe
         });
     }
 }

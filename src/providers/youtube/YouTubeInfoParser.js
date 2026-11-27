@@ -6,7 +6,10 @@ import {
     toInt,
     toBool01,
     describe,
-    SOURCE_KINDS
+    SOURCE_KINDS,
+    FORMATS,
+    toFormat, toBoolean,
+
 } from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
@@ -119,6 +122,19 @@ export class YouTubeInfoParser extends InfoParser {
                     source: url
                 });
             }
+
+            // /shorts
+            if (path.startsWith("/shorts/")) {
+                const videoId = path.split("/")[2];
+                if (!this.isValidVideoId(videoId)) throw new Error("Invalid video ID");
+                return new UrlInfo({
+                    kind: "video",
+                    videoId,
+                    startSeconds: timeToSeconds(p.get("t")),
+                    format: FORMATS.PORTRAIT,
+                    source: url
+                });
+            }
         }
 
         throw new Error("Unsupported YouTube URL");
@@ -208,6 +224,7 @@ export class YouTubeInfoParser extends InfoParser {
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(urlInfos.autoplay),
                     startSeconds: urlInfos.startSeconds,
+                    mute: urlInfos.mute,
                     source
                 });
             case "videoList":
@@ -218,6 +235,7 @@ export class YouTubeInfoParser extends InfoParser {
                     videoIds: urlInfos.videoIds,
                     index: urlInfos.index,
                     autoplay: toAutoplayMode(urlInfos.autoplay),
+                    mute: urlInfos.mute,
                     source
                 });
             case "playlist":
@@ -227,6 +245,7 @@ export class YouTubeInfoParser extends InfoParser {
                     playlistId: urlInfos.playlistId,
                     videoId: urlInfos.videoId,
                     autoplay: toAutoplayMode(urlInfos.autoplay),
+                    mute: urlInfos.mute,
                     source
                 });
         }
@@ -263,6 +282,8 @@ export class YouTubeInfoParser extends InfoParser {
                     showOnInit: def.showOnInit,
                     key: def.key,
                     extra: def.extra,
+                    format: toFormat(def.format) ?? urlInfos.format,
+                    mute: def.mute,
                     source
                 });
             case "videoList": {
@@ -276,6 +297,8 @@ export class YouTubeInfoParser extends InfoParser {
                     autoplay: toAutoplayMode(def.autoplay),
                     key: def.key,
                     extra: def.extra,
+                    format: toFormat(def.format),
+                    mute: def.mute,
                     source
                 });
                 urlInfos.videoIds.forEach((videoId, i) => {
@@ -296,7 +319,8 @@ export class YouTubeInfoParser extends InfoParser {
                                 v.thumbnail ??
                                 this.#thumbnailUrlBuilder.getThumbnailUrl(videoId),
                             key: v.key,
-                            extra: v.extra
+                            extra: v.extra,
+                            format: toFormat(v.format ?? def.format),
                         })
                     );
                 });
@@ -313,6 +337,8 @@ export class YouTubeInfoParser extends InfoParser {
                     autoplay: toAutoplayMode(def.autoplay),
                     key: def.key,
                     extra: def.extra,
+                    format: toFormat(def.format),
+                    mute: def.mute,
                     source
                 });
                 const items = videos.length ? videos : [];
@@ -336,7 +362,8 @@ export class YouTubeInfoParser extends InfoParser {
                                     : ""),
                             duration: timeToSeconds(v.duration),
                             key: v.key,
-                            extra: v.extra
+                            extra: v.extra,
+                            format: toFormat(v.format ?? def.format),
                         })
                     );
                 });

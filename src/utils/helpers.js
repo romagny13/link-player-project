@@ -73,3 +73,18 @@ export function describe(el) {
 
 export const SOURCE_KINDS = Object.freeze({LINK: "link", FRAME: "frame", DEFINITION: "definition"});
 
+
+export const FORMATS = Object.freeze({
+    LANDSCAPE: "landscape",
+    PORTRAIT: "portrait",
+    SQUARE: "square"
+});
+/** Alias -> "landscape" | "portrait" | "square"; null. */
+export function toFormat(value) {
+    if (value == null) return null;
+    const v = String(value).trim().toLowerCase().replace(/\s+/g, "");
+    if (["portrait", "vertical", "short", "shorts", "reel", "9/16", "9:16"].includes(v)) return FORMATS.PORTRAIT;
+    if (["landscape", "horizontal", "wide", "16/9", "16:9"].includes(v)) return FORMATS.LANDSCAPE;
+    if (["square", "1/1", "1:1"].includes(v)) return FORMATS.SQUARE;
+    return null;
+}

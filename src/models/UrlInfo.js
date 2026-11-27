@@ -6,6 +6,7 @@ export class UrlInfo {
     #startSeconds;
     #index;
     #labels;
+    #format;
     #source;
 
     constructor({
@@ -16,6 +17,7 @@ export class UrlInfo {
                     startSeconds,
                     index,
                     labels,
+                    format,
                     source
                 }) {
         this.#kind = kind;
@@ -25,6 +27,7 @@ export class UrlInfo {
         this.#startSeconds = startSeconds;
         this.#index = index;
         this.#labels = labels;
+        this.#format = format;
         this.#source = source;
     }
 
@@ -56,6 +59,10 @@ export class UrlInfo {
         return this.#labels;
     }
 
+    get format() {
+        return this.#format;
+    }
+
     get source() {
         return this.#source;
     }
@@ -73,11 +80,12 @@ export class SrcInfo extends UrlInfo {
                     startSeconds,
                     index,
                     labels,
+                    format,
                     source,
                     autoplay,
                     mute
                 }) {
-        super({kind, videoId, videoIds, playlistId, startSeconds, index, labels, source});
+        super({kind, videoId, videoIds, playlistId, startSeconds, index, labels, format, source});
         this.#autoplay = autoplay;
         this.#mute = mute;
     }

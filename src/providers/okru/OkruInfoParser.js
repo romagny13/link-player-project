@@ -1,5 +1,14 @@
 import {InfoParser} from "../InfoParser.js";
-import {SOURCE_KINDS, timeToSeconds, toAutoplayMode, toBool01, toInt, describe} from "../../utils/helpers.js";
+import {
+    SOURCE_KINDS,
+    timeToSeconds,
+    toAutoplayMode,
+    toBool01,
+    toInt,
+    describe,
+    toFormat,
+    toBoolean
+} from "../../utils/helpers.js";
 import {VideoInfo} from "../../models/VideoInfo.js";
 import {VideoListInfo} from "../../models/VideoListInfo.js";
 import {UrlInfo, SrcInfo} from "../../models/UrlInfo.js";
@@ -158,6 +167,8 @@ export class OkruInfoParser extends InfoParser {
                     showOnInit: def.showOnInit,
                     key: def.key,
                     extra: def.extra,
+                    format: toFormat(def.format),
+                    mute: def.mute,
                     source
                 });
             case "videoList": {
@@ -179,6 +190,8 @@ export class OkruInfoParser extends InfoParser {
                     autoplay: toAutoplayMode(def.autoplay),
                     key: def.key,
                     extra: def.extra,
+                    format: toFormat(def.format),
+                    mute: def.mute,
                     source
                 });
 
@@ -199,7 +212,8 @@ export class OkruInfoParser extends InfoParser {
                         thumbnail: v?.thumbnail ?? "",
                         duration: timeToSeconds(v?.duration),
                         key: v?.key,
-                        extra: v?.extra
+                        extra: v?.extra,
+                        format: toFormat(v?.format ?? def.format),
                     }));
                 });
 

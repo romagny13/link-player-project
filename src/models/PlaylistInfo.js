@@ -1,4 +1,5 @@
 import {ValueChecks} from "../utils/ValueChecks.js";
+import {FORMATS, toBoolean, toFormat} from "../utils/helpers.js";
 
 export class PlaylistInfo {
     #key;
@@ -10,6 +11,8 @@ export class PlaylistInfo {
     #autoplay;
     #videos = [];
     #extra;
+    #format;
+    #mute;
     #source;
 
     constructor({
@@ -21,6 +24,8 @@ export class PlaylistInfo {
                     autoplay,
                     key,
                     extra,
+                    format,
+                    mute,
                     source
                 }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
@@ -34,6 +39,8 @@ export class PlaylistInfo {
         this.#showOnInit = showOnInit;
         this.#autoplay = autoplay;
         this.#extra = extra;
+        this.#format = toFormat(format) ?? FORMATS.LANDSCAPE;
+        this.#mute = toBoolean(mute);
         this.#source = source;
 
         this.#key = key ?? `${this.#provider}:playlist:${this.#playlistId}`;
@@ -77,6 +84,14 @@ export class PlaylistInfo {
 
     get extra() {
         return this.#extra;
+    }
+
+    get format() {
+        return this.#format;
+    }
+
+    get mute() {
+        return this.#mute;
     }
 
     get source() {

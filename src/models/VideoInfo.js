@@ -1,5 +1,5 @@
 import {ValueChecks} from "../utils/ValueChecks.js";
-import {isEmpty} from "../utils/helpers.js";
+import {FORMATS, isEmpty, toBoolean, toFormat} from "../utils/helpers.js";
 
 export class VideoInfo {
     #key;
@@ -16,6 +16,8 @@ export class VideoInfo {
     #duration;
     #showOnInit;
     #extra;
+    #format;
+    #mute;
     #source; //  { url?, element?, kind }
 
     constructor({
@@ -33,6 +35,8 @@ export class VideoInfo {
                     showOnInit,
                     key,
                     extra,
+                    format,
+                    mute,
                     source
                 }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
@@ -52,6 +56,8 @@ export class VideoInfo {
         this.#duration = duration;
         this.#showOnInit = showOnInit;
         this.#extra = extra;
+        this.#format = toFormat(format) ?? FORMATS.LANDSCAPE;
+        this.#mute = toBoolean(mute);
         this.#source = source;
 
         this.#key = key ?? `${this.#provider}:${this.#videoId}`;
@@ -115,6 +121,14 @@ export class VideoInfo {
 
     get extra() {
         return this.#extra;
+    }
+
+    get format() {
+        return this.#format;
+    }
+
+    get mute() {
+        return this.#mute;
     }
 
     get source() {

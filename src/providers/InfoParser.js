@@ -35,7 +35,9 @@ export class InfoParser {
             target: data.target ?? (element.tagName === "IFRAME" ? element.parentElement?.id : undefined),
             showOnInit: toBoolean(data.showOnInit),
             key: data.key,
-            extra: data.extra
+            extra: data.extra,
+            format: data.format,
+            mute: data.mute
         };
     }
 

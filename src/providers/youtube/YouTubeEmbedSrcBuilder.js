@@ -23,9 +23,9 @@ export class YouTubeEmbedSrcBuilder {
     // - videoId (MANDATORY) in the path src="https://www.youtube.com/embed/${videoId}"
     // - start (OPTIONAL) time in seconds
     // - autoplay (OPTIONAL) (1 to play) requires mute=1 otherwise it won't start
-    buildVideoSrc(videoId, {autoplay, startSeconds} = {}) {
+    buildVideoSrc(videoId, { autoplay, startSeconds, mute } = {}) {
         if (!videoId) throw new TypeError("buildVideoSrc(): videoId is required");
-        const q = this.#params({autoplay, startSeconds});
+        const q = this.#params({ autoplay, startSeconds, mute });
         return this.#url(encodeURIComponent(videoId), q);
     }
 
@@ -37,11 +37,11 @@ export class YouTubeEmbedSrcBuilder {
     // - start (OPTIONAL) time in seconds
     // - index (OPTIONAL, 1-based) used only if no videoId
     // - autoplay (OPTIONAL) (1 to play) requires mute=1 otherwise it won't start
-    buildVideoListSrc(videoIds, {autoplay, index, startSeconds} = {}) {
+    buildVideoListSrc(videoIds, { autoplay, index, startSeconds, mute } = {}) {
         if (!Array.isArray(videoIds) || !videoIds.length)
             throw new TypeError("buildVideoListSrc(): a non-empty array is required");
 
-        const q = this.#params({autoplay, startSeconds});
+        const q = this.#params({ autoplay, startSeconds, mute });
         q.set("playlist", videoIds.join(","));
         // if (index > 0) {
         //     q.set("index", String(Math.floor(index) + 1));
@@ -56,21 +56,22 @@ export class YouTubeEmbedSrcBuilder {
     // - videoId (OPTIONAL) in the path, otherwise videoseries
     // - list (MANDATORY) with the playlistId
     // - autoplay (OPTIONAL) (1 to play) requires mute=1 otherwise it won't start
-    buildPlaylistSrc(playlistId, {autoplay, videoId} = {}) {
+    buildPlaylistSrc(playlistId, { autoplay, videoId, mute } = {}) {
         if (!playlistId) throw new TypeError("buildPlaylistSrc(): playlistId is required");
 
-        const q = this.#params({autoplay});
+        const q = this.#params({ autoplay, mute });
         q.set("list", playlistId);
         return this.#url(videoId ? encodeURIComponent(videoId) : "videoseries", q);
     }
 
-    #params({autoplay, startSeconds} = {}) {
+    #params({ autoplay, startSeconds, mute } = {})  {
         const q = new URLSearchParams();
         if (this.#enablejsapi) {
             q.set("enablejsapi", "1");
             if (this.#origin) q.set("origin", this.#origin);
         }
         if (autoplay) q.set("autoplay", "1");
+        if (mute) q.set("mute", "1");
         if (startSeconds > 0) q.set("start", String(Math.floor(startSeconds)));
         return q;
     }

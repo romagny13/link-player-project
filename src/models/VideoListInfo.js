@@ -1,4 +1,5 @@
-import { ValueChecks } from "../utils/ValueChecks.js";
+import {ValueChecks} from "../utils/ValueChecks.js";
+import {FORMATS, toBoolean, toFormat} from "../utils/helpers.js";
 
 export class VideoListInfo {
     #key;
@@ -10,19 +11,23 @@ export class VideoListInfo {
     #autoplay;
     #videos = [];
     #extra;
+    #format;
+    #mute;
     #source;
 
     constructor({
-        provider,
-        target,
-        videoIds,
-        index,
-        showOnInit,
-        autoplay,
-        key,
-        extra,
-        source
-    }) {
+                    provider,
+                    target,
+                    videoIds,
+                    index,
+                    showOnInit,
+                    autoplay,
+                    key,
+                    extra,
+                    format,
+                    mute,
+                    source
+                }) {
         ValueChecks.requireNotNullOrEmpty(provider, "provider");
         ValueChecks.requireNotNullOrEmpty(target, "target");
         ValueChecks.requireNotNullOrEmpty(videoIds, "videoIds");
@@ -34,6 +39,8 @@ export class VideoListInfo {
         this.#autoplay = autoplay;
         this.#videoIds = [...videoIds];
         this.#extra = extra;
+        this.#format = toFormat(format) ?? FORMATS.LANDSCAPE;
+        this.#mute = toBoolean(mute);
         this.#source = source;
 
         this.#key = key ?? `${this.#provider}:list:${this.#videoIds.join(",")}`;
@@ -77,6 +84,14 @@ export class VideoListInfo {
 
     get extra() {
         return this.#extra;
+    }
+
+    get format() {
+        return this.#format;
+    }
+
+    get mute() {
+        return this.#mute;
     }
 
     get source() {

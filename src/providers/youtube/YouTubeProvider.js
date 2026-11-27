@@ -1,27 +1,22 @@
-import {YouTubeInfoParser} from "./YouTubeInfoParser.js";
-import {YouTubePlayer} from "./YouTubePlayer.js";
-import {makeIframe} from "../../utils/dom.js";
-import {YouTubeEmbedSrcBuilder} from "./YouTubeEmbedSrcBuilder.js";
 import {MediaProvider} from "../MediaProvider.js";
+import {YouTubeInfoParser} from "./YouTubeInfoParser.js";
+import {YouTubeEmbedSrcBuilder} from "./YouTubeEmbedSrcBuilder.js";
+import {YouTubeView} from "./YouTubeView.js";
+import {IframeFactory} from "../../views/IframeFactory.js";
 
 export class YouTubeProvider extends MediaProvider {
     id = "youtube";
     hosts = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
-    togglePosition = "bottom-left";
+
     #infoParser;
     #embedSrcBuilder;
+    #iframes;
 
-    constructor({
-                    infoParser = null,
-                    embedSrcBuilder = null,
-                    thumbnailUrlBuilder = null
-                } = {}) {
+    constructor({infoParser = null, embedSrcBuilder = null, thumbnailUrlBuilder = null, iframeFactory = null} = {}) {
         super();
-
-        this.#infoParser =
-            infoParser ?? new YouTubeInfoParser({thumbnailUrlBuilder});
-        this.#embedSrcBuilder =
-            embedSrcBuilder ?? new YouTubeEmbedSrcBuilder({enablejsapi: true});
+        this.#infoParser = infoParser ?? new YouTubeInfoParser({thumbnailUrlBuilder});
+        this.#embedSrcBuilder = embedSrcBuilder ?? new YouTubeEmbedSrcBuilder({enablejsapi: true});
+        this.#iframes = iframeFactory ?? new IframeFactory();
     }
 
     getInfoFromLink(link) {
@@ -33,28 +28,14 @@ export class YouTubeProvider extends MediaProvider {
     }
 
     getInfoFromDefinition(definition) {
-        if(!definition.url)
-        {
-            definition.url = this.#infoParser.buildUrl(definition);
-        }
+        if (!definition.url) definition.url = this.#infoParser.buildUrl(definition);
         return this.#infoParser.parseDefinition(definition);
     }
 
-    createPlayer({iframe = null} = {}) {
-        return new YouTubePlayer({
+    createView({iframe = null} = {}) {
+        return new YouTubeView({
             builder: this.#embedSrcBuilder,
-            createIframe: (src) =>
-                makeIframe({
-                    width: "560",
-                    height: "315",
-                    src,
-                    title: "YouTube video player",
-                    allow:
-                        "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
-                    referrerPolicy: "strict-origin-when-cross-origin",
-                    allowFullscreen: true,
-                    extraAttrs: {}
-                }),
+            createIframe: (src) => this.#iframes.create("youtube", src),
             iframe
         });
     }

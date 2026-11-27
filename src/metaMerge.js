@@ -1,5 +1,5 @@
 import {VideoInfo} from "./models/VideoInfo.js";
-import {isEmpty, toAutoplayMode} from "./utils/helpers.js";
+import {isEmpty, toAutoplayMode, toFormat} from "./utils/helpers.js";
 
 /** A text: what is declared, else the fallback, else "". A text is never undefined. */
 const text = (declared, fallback) => (isEmpty(declared) ? fallback ?? "" : declared);
@@ -42,7 +42,8 @@ export function applyItems(info, items) {
                 duration: fill(old?.duration, item.duration),
                 showOnInit: fill(old?.showOnInit, item.showOnInit),
                 key: fill(old?.key, item.key),
-                extra: fill(old?.extra, item.extra) ?? null
+                extra: fill(old?.extra, item.extra) ?? null,
+                format: old ? old.format : (toFormat(item.format) ?? info.format)
             });
         })
         .filter(Boolean);

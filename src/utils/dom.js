@@ -1,5 +1,6 @@
 export function resolveScope(scope) {
     if (scope == null) return null;
+    if (scope instanceof Element) return scope;
     if (typeof scope === "string") {
         let node = document.getElementById(scope);
         if (!node) {
