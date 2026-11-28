@@ -202,7 +202,7 @@ describe("LinkPlayer", () => {
 
             make({onError});
 
-            expect(onError.mock.calls[0][0].error.message).toBe("No provider handles 'example.com'");
+            expect(onError.mock.calls[0][0].error.message).toBe("No provider handles 'demo.com'");
             expect(onError.mock.calls[0][0].element).toBe($("bad"));
         });
 
@@ -359,7 +359,7 @@ describe("LinkPlayer", () => {
                 .toThrow('Unknown provider: "nope"');
             expect(() => make({definitions: [{url: `https://youtu.be/${A}`}]})).toThrow(/Target is required/);
             expect(() => make({definitions: [{url: "https://example.com/x", target: "main"}]}))
-                .toThrow("No provider handles 'example.com'");
+                .toThrow("No provider handles 'demo.com'");
         });
     });
 
