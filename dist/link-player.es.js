@@ -3832,7 +3832,6 @@ var PANEL_CSS = `
 :where(.lp-handle){position:absolute;top:0;bottom:0;left:-5px;z-index:2;width:10px;cursor:col-resize;touch-action:none}
 :where(.lp-handle)::after{content:"";position:absolute;top:0;bottom:0;left:4px;width:2px;background:var(--_accent);opacity:0;transition:opacity .15s}
 :where(.lp-handle:hover,.lp-handle:focus-visible,[data-lp-resizing] .lp-handle)::after{opacity:.8}
-:where(.lp-handle:focus-visible){outline:none}
 
 :where(.lp-head){position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 8px 7px 12px;background:var(--_bg);color:var(--_muted);font-size:10px;letter-spacing:.12em;text-transform:uppercase}
 :where(.lp-close){width:26px;height:26px;padding:0;cursor:pointer;border-radius:5px;border:1px solid color-mix(in srgb,var(--_accent) 35%,transparent);background:color-mix(in srgb,var(--_accent) 8%,transparent);color:var(--_accent);font:inherit}
@@ -3840,7 +3839,6 @@ var PANEL_CSS = `
 :where(.lp-item){position:relative;display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--_line);cursor:pointer;user-select:none}
 :where(.lp-item:hover,.lp-item[data-current]){background:var(--_hover)}
 :where(.lp-item[data-current])::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--_accent)}
-:where(.lp-item:focus-visible,.lp-group-head:focus-visible){outline:2px solid var(--_accent);outline-offset:-2px}
 :where(.lp-num){min-width:18px;font-size:11px;color:var(--_muted)}
 :where(.lp-item[data-current] .lp-num){color:var(--_accent)}
 :where(.lp-info){flex:1;min-width:0}
@@ -3848,9 +3846,8 @@ var PANEL_CSS = `
 :where(.lp-item[data-current] .lp-title){color:var(--_text-on);font-weight:500}
 :where(.lp-chan,.lp-dur){margin-top:2px;font-size:10px;color:var(--_muted)}
 
-/* Styles spécifiques pour le lien de la chaîne */
+/* Channel link */
 :where(a.lp-chan){text-decoration:none;display:inline-block}
-:where(a.lp-chan:hover){color:var(--_text-on);text-decoration:underline}
 
 :where(.lp-thumb){position:relative;width:80px;height:45px;flex-shrink:0;border-radius:3px;overflow:hidden;background:#1a1a1a}
 :where(.lp-thumb img){display:block;width:100%;height:100%;object-fit:cover}
@@ -3875,6 +3872,20 @@ var PANEL_CSS = `
   :where(.lp-host[data-lp-anchored] .lp-toggle[data-pos=top-right]){top:calc(anchor(top,0px) + 8px);right:calc(anchor(right,0px) + 60px)}
   :where(.lp-host[data-lp-anchored] .lp-toggle[data-pos=bottom-left]){left:calc(anchor(left,0px) + 140px);bottom:calc(anchor(bottom,0px) + 20px)}
 }
+
+/* ── Protection against page styles ──
+   The rules above use :where() (specificity 0): the page can restyle everything, and layout / position
+   stay easy to override. The few elements that a page reset usually hits (button, a, :focus-visible)
+   are restored below at a higher specificity, hover and active states included. */
+.lp-host .lp-panel button.lp-close{padding:0;border:1px solid color-mix(in srgb,var(--_accent) 35%,transparent);border-radius:5px;background:color-mix(in srgb,var(--_accent) 8%,transparent);color:var(--_accent);font:inherit;line-height:1;box-shadow:none;transform:none;transition:background-color .15s}
+.lp-host .lp-panel button.lp-close:hover{background:color-mix(in srgb,var(--_accent) 16%,transparent)}
+.lp-host .lp-panel button.lp-group-head{padding:8px 12px;border:0;border-bottom:1px solid var(--_line);border-radius:0;background:var(--_hover);color:var(--_text);font:inherit;font-size:11px;line-height:normal;box-shadow:none;transform:none;transition:none}
+.lp-host.lp-host button.lp-toggle{padding:0;border:0;border-radius:50%;background:var(--lp-toggle-bg,rgba(0,0,0,.55));color:var(--lp-toggle-color,#fff);font:inherit;font-size:18px;line-height:1;box-shadow:none;transform:none;transition:opacity .15s}
+.lp-host .lp-panel a.lp-chan{color:var(--_muted);text-decoration:none}
+.lp-host .lp-panel a.lp-chan:hover{color:var(--_text-on);text-decoration:underline}
+.lp-host .lp-panel :is(.lp-item,.lp-group-head,.lp-close):focus-visible{outline:2px solid var(--_accent);outline-offset:-2px}
+.lp-host .lp-panel .lp-handle:focus-visible{outline:none}
+.lp-host.lp-host .lp-toggle:focus-visible{outline:2px solid var(--lp-accent,#f7931e);outline-offset:2px}
 `;
 function ensureRelative(el) {
 	if (getComputedStyle(el).position === "static") el.style.position = "relative";
