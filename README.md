@@ -2,6 +2,8 @@
 
 **Playlist panels for YouTube embeds, a clean API to drive any video iframe, and plug-ins for everything else.**
 
+**[Live examples →](https://romagny13.github.io/link-player/demo/)**
+
 Turn plain links, code definitions or existing iframes into **YouTube** and **OK.ru** players, rendered in the container of your choice. Vanilla JS, ES modules, no framework, no DOM observer, and no YouTube API script to load.
 
 ```js
