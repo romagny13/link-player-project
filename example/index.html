@@ -1,17 +1,17 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LinkPlayer : page d'exemples</title>
+    <title>LinkPlayer: examples page</title>
     <link href="styles.css" rel="stylesheet" type="text/css"/>
     <style>
-        /* Règles fonctionnelles (le reste de l'apparence est dans styles.css). */
+        /* Functional rules (the rest of the look is in styles.css). */
         [hidden] {
             display: none !important;
         }
 
-        /* Lien actuellement affiché : pastille pleine + marqueur + gras */
+        /* Link currently shown: filled pill + marker + bold */
         a[data-link].is-active {
             position: relative;
             padding: .15em .6em .15em 1.55em;
@@ -65,7 +65,7 @@
             display: none;
         }
 
-        /* ───────── Zone du lecteur ───────── */
+        /* ───────── Player area ───────── */
         .player-zone {
             margin: 1rem 0 .5rem;
             overflow: hidden;
@@ -74,21 +74,21 @@
         }
 
         .player-zone:empty {
-            display: none; /* pas de bloc noir tant qu'aucune vue n'est affichée */
+            display: none; /* no black block until a view is shown */
         }
 
         .player-zone iframe {
             display: block;
             width: 100%;
-            height: auto; /* sinon l'attribut height="315" des iframes créées annule aspect-ratio */
+            height: auto; /* otherwise the height="315" attribute of created iframes cancels aspect-ratio */
             aspect-ratio: 16 / 9;
             border: 0;
         }
 
-        /* Format : data-lp-format est posé sur le conteneur par FormatBehavior */
+        /* Format: data-lp-format is set on the container by FormatBehavior */
         .player-zone[data-lp-format="portrait"] {
-            width: min(100%, 360px, 45vh); /* 45vh = 9/16 de 80vh : le lecteur ne dépasse jamais 80 % de la hauteur de l'écran */
-            margin-inline: auto;           /* centré ; retirez cette ligne pour l'aligner à gauche */
+            width: min(100%, 360px, 45vh); /* 45vh = 9/16 of 80vh: the player never exceeds 80% of the screen height */
+            margin-inline: auto;           /* centered; remove this line to align left */
         }
 
         .player-zone[data-lp-format="square"] {
@@ -103,32 +103,32 @@
 <body>
 
 <header>
-    <h1>LinkPlayer : page d'exemples</h1>
+    <h1>LinkPlayer: examples page</h1>
     <p>
-        Mini documentation vivante. Chaque section a son propre <code>scope</code> et ses propres cibles ;
-        les infos affichées sous chaque lecteur sont rendues par <code>region.afterNavigate()</code> ;
-        le journal (en bas) reçoit les événements <code>change</code> / <code>state</code> / <code>sound</code> /
-        <code>error</code>.
+        A living mini documentation. Each section has its own <code>scope</code> and its own targets;
+        the info shown under each player is rendered by <code>region.afterNavigate()</code>;
+        the log (at the bottom) receives the <code>change</code> / <code>state</code> / <code>sound</code> /
+        <code>error</code> events.
     </p>
-    <p>À servir en HTTP(S) (ex. <code>npx vite</code>), pas en <code>file://</code>. Adapter l'import en bas de page.
+    <p>Serve it over HTTP(S) (e.g. <code>npx vite</code>), not <code>file://</code>. Adapt the import at the bottom of the page.
     </p>
     <nav>
         <a href="#sec-link">1 · Link only</a> |
-        <a href="#sec-defs">2 · Avec définitions</a> |
-        <a href="#sec-adopt">3 · Adoption d'iframes</a> |
+        <a href="#sec-defs">2 · With definitions</a> |
+        <a href="#sec-adopt">3 · Adopting iframes</a> |
         <a href="#sec-api">4 · YouTube Data API</a> |
-        <a href="#sec-dyn">5 · Scan dynamique</a> |
+        <a href="#sec-dyn">5 · Dynamic scan</a> |
         <a href="#sec-code">6 · Code only</a> |
-        <a href="#sec-scope">7 · Global vs scopé</a> |
-        <a href="#sec-behavior">8 · Boutons &amp; comportements</a> |
+        <a href="#sec-scope">7 · Global vs scoped</a> |
+        <a href="#sec-behavior">8 · Buttons &amp; behaviors</a> |
         <a href="#sec-fmt">9 · Format &amp; mute</a> |
-        <a href="#sec-log">Journal</a>
+        <a href="#sec-log">Log</a>
     </nav>
     <details>
-        <summary>Clé YouTube Data API (stockée dans localStorage, jamais dans la page)</summary>
+        <summary>YouTube Data API key (stored in localStorage, never in the page)</summary>
         <input id="yt-key" type="password" placeholder="AIza…" autocomplete="off">
-        <button id="yt-save" type="button">Enregistrer + recharger</button>
-        <button id="yt-clear" type="button">Effacer</button>
+        <button id="yt-save" type="button">Save + reload</button>
+        <button id="yt-clear" type="button">Clear</button>
     </details>
 </header>
 
@@ -136,139 +136,136 @@
 
     <!-- ═════════════ 1. LINK ONLY ═════════════ -->
     <section id="sec-link">
-        <h2>1 · Link only : tout est défini sur les <code>data-link</code></h2>
+        <h2>1 · Link only: everything is defined on the <code>data-link</code> elements</h2>
         <p>
-            Aucune définition en code. Une seule zone cible (<code>player-link</code>) pour tous les liens ;
-            une zone d'infos commune en dessous, alimentée par <code>afterNavigate</code>.
-            Chaque lien a une <code>data-key</code> distincte (la clé par défaut est l'id de la vidéo / liste / playlist
-            :
-            deux liens vers la même vidéo partageraient la même info).
+            No definitions in code. A single target area (<code>player-link</code>) for all the links;
+            a shared info area below it, fed by <code>afterNavigate</code>.
+            Each link has a distinct <code>data-key</code> (the default key is the video / list / playlist id:
+            two links to the same video would share the same info).
         </p>
 
         <h3>1. YouTube</h3>
 
-        <h4>a. Vidéo seule</h4>
+        <h4>a. Single video</h4>
         <ul>
-            <li>Minimum :
+            <li>Minimum:
                 <a data-link data-key="yt-min" data-target="player-link"
                    href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives (minimum)</a></li>
-            <li>Autoplay au clic + start dans l'URL (<code>t=</code>) :
+            <li>Autoplay on click + start in the URL (<code>t=</code>):
                 <a data-link data-key="yt-autoplay" data-target="player-link" data-autoplay="click"
                    href="https://www.youtube.com/watch?v=YCfcg9gzCYc&t=2712s">Bahamas, autoplay + start 45m12s</a></li>
-            <li>Start dans <code>data-start</code> au format <code>1h20m3s</code> (prioritaire sur l'URL) :
+            <li>Start in <code>data-start</code> using the <code>1h20m3s</code> format (takes priority over the URL):
                 <a data-link data-key="yt-start" data-target="player-link" data-autoplay="click" data-start="1h20m3s"
                    href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives, start 1h20m3s</a></li>
-            <li>Avec infos (title, description, channel, channelUrl, thumbnail, duration, extra) + <code>data-show-on-init</code>
-                :
+            <li>With info (title, description, channel, channelUrl, thumbnail, duration, extra) + <code>data-show-on-init</code>:
                 <a data-link data-key="yt-infos" data-target="player-link" data-show-on-init
                    href="https://www.youtube.com/watch?v=69iUWLA0oVc"
                    data-title="Maldives: 6 Hours of Tranquil Tropical Drone Video (4K)"
-                   data-description="Six heures de vues aériennes des Maldives."
+                   data-description="Six hours of aerial views of the Maldives."
                    data-channel="MyTranquilitee"
                    data-channel-url="https://www.youtube.com/@MyTranquilitee"
                    data-thumbnail="https://static.promovacances.com/photos/vacances-maldives/male/vue-panoramique-cocoon-maldives_586764_panohd.jpg"
                    data-duration="6h6m46s"
-                   data-extra="Info libre (data-extra, chaîne brute)">Maldives, avec infos (showOnInit)</a></li>
+                   data-extra="Free-form info (data-extra, raw string)">Maldives, with info (showOnInit)</a></li>
         </ul>
 
-        <h4>b. Liste de vidéos (<code>watch_videos?video_ids=</code>)</h4>
+        <h4>b. Video list (<code>watch_videos?video_ids=</code>)</h4>
         <ul>
-            <li>Avec video ids :
+            <li>With video ids:
                 <a data-link data-key="yt-list" data-target="player-link"
-                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4">Liste de 2 vidéos</a>
+                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4">List of 2 videos</a>
             </li>
-            <li>Avec video ids et un index &gt; 1 (démarre sur la 2e) :
+            <li>With video ids and an index &gt; 0 (starts on the 2nd one):
                 <a data-link data-key="yt-list-index" data-target="player-link"
-                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=1">Liste,
+                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4&index=1">List,
                     index=1</a></li>
-            <li>Avec autoplay :
+            <li>With autoplay:
                 <a data-link data-key="yt-list-autoplay" data-target="player-link" data-autoplay="click"
-                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4">Liste, autoplay au
-                    clic</a></li>
-            <li>Avec infos par vidéo (<code>data-videos</code>) + extra :
+                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4">List, autoplay on
+                    click</a></li>
+            <li>With info per video (<code>data-videos</code>) + extra:
                 <a data-link data-key="yt-list-infos" data-target="player-link"
                    href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4"
-                   data-extra="Extra de la liste"
-                   data-videos='[{"title":"ASMR","start":"30","duration":"5m1s"},{"title":"Trains","channel":"Me","start":"1m","duration":"2m28s"}]'>Liste,
-                    avec infos</a></li>
+                   data-extra="Extra of the list"
+                   data-videos='[{"title":"ASMR","start":"30","duration":"5m1s"},{"title":"Trains","channel":"Me","start":"1m","duration":"2m28s"}]'>List,
+                    with info</a></li>
         </ul>
 
         <h4>c. Playlist (<code>list=</code>)</h4>
         <ul>
-            <li>Avec playlistId et videoId (1re vidéo) :
+            <li>With playlistId and videoId (1st video):
                 <a data-link data-key="yt-pl-first" data-target="player-link"
-                   href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ">Playlist, 1re vidéo</a></li>
-            <li>Avec playlistId et videoId ne correspondant pas à la 1re vidéo :
+                   href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ">Playlist, 1st video</a></li>
+            <li>With playlistId and a videoId that is not the 1st video:
                 <a data-link data-key="yt-pl-other" data-target="player-link"
-                   href="https://www.youtube.com/watch?v=C_dEl2cMCEA&list=PLYALQE76y6LQ">Playlist, départ sur la 2e</a>
+                   href="https://www.youtube.com/watch?v=C_dEl2cMCEA&list=PLYALQE76y6LQ">Playlist, starting on the 2nd</a>
             </li>
-            <li>Avec infos des vidéos + extra :
+            <li>With video info + extra:
                 <a data-link data-key="yt-pl-infos" data-target="player-link" data-channel="ReTime Clips"
                    href="https://www.youtube.com/watch?v=C_dEl2cMCEA&list=PLYALQE76y6LQ"
-                   data-extra="Extra de la playlist"
+                   data-extra="Extra of the playlist"
                    data-videos='[{"videoId":"s11CNT_hQTg","title":"V (1983) – L’arrivée des Visiteurs"},{"videoId":"C_dEl2cMCEA","title":"V (1983) – Diana propose son expérience"}]'>Playlist,
-                    avec infos</a></li>
+                    with info</a></li>
         </ul>
-        <p><small>Le <code>start</code> d'une vidéo <em>à l'intérieur</em> d'une liste est lu par le parser mais pas
-            appliqué par <code>YouTubeView</code> (chargement avec <code>startSeconds = 0</code>).
-            L'id <code>PLYALQE76y6LQ</code> semble tronqué (une vraie playlist fait 34 caractères).</small></p>
+        <p><small>The <code>start</code> of a video <em>inside</em> a list is read by the parser but not
+            applied by <code>YouTubeView</code> (it loads with <code>startSeconds = 0</code>).
+            The id <code>PLYALQE76y6LQ</code> looks truncated (a real playlist id is 34 characters long).</small></p>
 
         <h3>2. OK.ru</h3>
 
-        <h4>a. Vidéo seule</h4>
+        <h4>a. Single video</h4>
         <ul>
-            <li>Minimum :
+            <li>Minimum:
                 <a data-link data-key="ok-min" data-target="player-link"
                    href="https://ok.ru/video/17222095800962">OK.ru (minimum)</a></li>
-            <li>Avec autoplay :
+            <li>With autoplay:
                 <a data-link data-key="ok-autoplay" data-target="player-link" data-autoplay="click"
-                   href="https://ok.ru/video/17222095800962">OK.ru, autoplay au clic</a></li>
-            <li>Avec start :
+                   href="https://ok.ru/video/17222095800962">OK.ru, autoplay on click</a></li>
+            <li>With start:
                 <a data-link data-key="ok-start" data-target="player-link" data-autoplay="click" data-start="1m30s"
                    href="https://ok.ru/video/17222095800962">OK.ru, start 1m30s</a></li>
-            <li>Avec infos :
+            <li>With info:
                 <a data-link data-key="ok-infos" data-target="player-link"
                    href="https://ok.ru/video/17222095800962"
                    data-title="MacGyver S03E08 VF | Accident en Haute Montagne"
                    data-channel="Test channel"
                    data-channel-url="https://ok.ru/profile/910108373634"
                    data-duration="44m57s"
-                   data-extra="Info libre OK.ru">OK.ru, avec infos</a></li>
+                   data-extra="Free-form info (OK.ru)">OK.ru, with info</a></li>
         </ul>
 
-        <h4>b. Liste de vidéos : ancienne version (<code>video_ids</code> + <code>labels</code> dans l'URL)</h4>
+        <h4>b. Video list: old format (<code>video_ids</code> + <code>labels</code> in the URL)</h4>
         <ul>
             <li>
                 <a data-link data-key="ok-old" data-target="player-link"
-                   href="https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF">Ancienne
-                    version (video_ids + labels)</a>
-                <small>(une virgule dans un titre s'écrit <code>%2C</code>)</small></li>
+                   href="https://ok.ru/video/3953767680692?video_ids=3953767680692,3953767877300,3953768270516,3953768532660&labels=La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.01%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.02%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.03%20-%20BluRay%20720p%20VF,La%20Caverne%20de%20la%20Rose%20d'Or%2C%20%C3%A9p.04%20-%20BluRay%20720p%20VF">Old
+                    format (video_ids + labels)</a>
+                <small>(a comma inside a title is written <code>%2C</code>)</small></li>
         </ul>
 
-        <h4>c. Liste de vidéos avec video ids et infos</h4>
+        <h4>c. Video list with video ids and info</h4>
         <ul>
             <li>
                 <a data-link data-key="ok-list-infos" data-target="player-link"
                    href="https://ok.ru/video?video_ids=17192094206594,17222095800962,17659571866242"
-                   data-extra="Extra de la liste OK.ru"
-                   data-videos='[{"title":"MacGyver S03E02 VF | À la Recherche de l’Amour Perdu 2/2"},{"title":"MacGyver S03E08 VF | Accident en Haute Montagne"},{"title":"MacGyver S03E15 VF | La Négociatrice"}]'>Liste
-                    OK.ru, avec infos</a></li>
+                   data-extra="Extra of the OK.ru list"
+                   data-videos='[{"title":"MacGyver S03E02 VF | À la Recherche de l’Amour Perdu 2/2"},{"title":"MacGyver S03E08 VF | Accident en Haute Montagne"},{"title":"MacGyver S03E15 VF | La Négociatrice"}]'>OK.ru
+                    list, with info</a></li>
         </ul>
 
-        <h3>Zone cible commune</h3>
+        <h3>Shared target area</h3>
         <div class="player-zone" id="player-link"></div>
         <div data-controls="player-link"></div>
         <div data-info="player-link"></div>
     </section>
 
-    <!-- ═════════════ 2. AVEC DEFINITIONS ═════════════ -->
+    <!-- ═════════════ 2. WITH DEFINITIONS ═════════════ -->
     <section id="sec-defs">
-        <h2>2 · Avec définitions : les liens naviguent, les définitions décrivent</h2>
+        <h2>2 · With definitions: links navigate, definitions describe</h2>
         <p>
-            Le lien ne porte que <code>data-link</code>, <code>data-key</code> et <code>data-target</code> ;
-            les infos viennent du tableau <code>definitions</code> (même <code>key</code>). Les définitions sont
-            enregistrées
-            avant le scan : elles gagnent sur les infos du lien. Survole les liens : l'infobulle montre la définition.
+            The link only carries <code>data-link</code>, <code>data-key</code> and <code>data-target</code>;
+            the info comes from the <code>definitions</code> array (same <code>key</code>). Definitions are registered
+            before the scan: they win over the info on the link. Hover the links: the tooltip shows the definition.
         </p>
 
         <h3>YouTube</h3>
@@ -298,47 +295,47 @@
 new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
     </section>
 
-    <!-- ═════════════ 3. ADOPTION D'IFRAMES ═════════════ -->
+    <!-- ═════════════ 3. ADOPTING IFRAMES ═════════════ -->
     <section id="sec-adopt">
-        <h2>3 · Adoption d'iframes existantes</h2>
+        <h2>3 · Adopting existing iframes</h2>
         <p>
-            Ces iframes sont déjà dans la page ; le LinkPlayer lit leur <code>src</code>, les pilote et ajoute le
-            panneau.
-            Un conteneur = une région. YouTube : l'iframe est rechargée une fois avec <code>enablejsapi=1</code> et
+            These iframes are already in the page; LinkPlayer reads their <code>src</code>, drives them and adds the
+            panel.
+            One container = one region. YouTube: the iframe is reloaded once with <code>enablejsapi=1</code> and
             <code>origin</code>.
         </p>
 
-        <h3>YouTube : playlist (<code>embed/videoseries?list=…</code>)</h3>
+        <h3>YouTube: playlist (<code>embed/videoseries?list=…</code>)</h3>
         <div class="player-zone" id="adopt-yt-playlist">
-            <iframe src="https://www.youtube.com/embed/videoseries?list=PLYALQE76y6LQ" title="Playlist adoptée"
+            <iframe src="https://www.youtube.com/embed/videoseries?list=PLYALQE76y6LQ" title="Adopted playlist"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
         <div data-controls="adopt-yt-playlist"></div>
         <div data-info="adopt-yt-playlist"></div>
 
-        <h3>YouTube : liste de vidéos (<code>embed/?playlist=a,b&amp;index=1&amp;start=120</code>)</h3>
+        <h3>YouTube: video list (<code>embed/?playlist=a,b&amp;index=1&amp;start=120</code>)</h3>
         <div class="player-zone" id="adopt-yt-list">
             <iframe src="https://www.youtube.com/embed/?playlist=z2sv_RsNwM4,-xiF9YIIUk4&index=1&start=120"
-                    title="Liste adoptée"
+                    title="Adopted list"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
         <div data-controls="adopt-yt-list"></div>
         <div data-info="adopt-yt-list"></div>
 
-        <h3>YouTube : vidéo seule (<code>embed/ID?start=…</code>)</h3>
+        <h3>YouTube: single video (<code>embed/ID?start=…</code>)</h3>
         <div class="player-zone" id="adopt-yt-video">
-            <iframe src="https://www.youtube.com/embed/69iUWLA0oVc?start=60" title="Vidéo adoptée"
+            <iframe src="https://www.youtube.com/embed/69iUWLA0oVc?start=60" title="Adopted video"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
         </div>
         <div data-controls="adopt-yt-video"></div>
         <div data-info="adopt-yt-video"></div>
 
-        <h3>OK.ru : vidéo seule (<code>videoembed/ID</code>)</h3>
+        <h3>OK.ru: single video (<code>videoembed/ID</code>)</h3>
         <div class="player-zone" id="adopt-ok-video">
-            <iframe src="https://ok.ru/videoembed/17222095800962" title="Vidéo OK.ru adoptée"
+            <iframe src="https://ok.ru/videoembed/17222095800962" title="Adopted OK.ru video"
                     allow="autoplay; fullscreen" allowfullscreen></iframe>
         </div>
         <div data-controls="adopt-ok-video"></div>
@@ -347,85 +344,85 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
 
     <!-- ═════════════ 4. YOUTUBE DATA API ═════════════ -->
     <section id="sec-api">
-        <h2>4 · YouTube Data API : infos par défaut, puis infos chargées</h2>
+        <h2>4 · YouTube Data API: default info, then loaded info</h2>
         <p>
-            Montre deux états de la même info : (1) les infos <strong>par défaut</strong> (données sur le lien ou en
-            définition,
-            puis <code>fallbackTitle</code>) ; (2) les infos <strong>chargées via l'API</strong> (événement
-            <code>change</code> avec
-            <code>reason = "meta"</code>). Ordre de priorité du resolver : valeurs déclarées &gt; API &gt; fallback.
-            <em>Une valeur déjà déclarée n'est pas écrasée</em> : l'API complète les champs vides.
-            Sans clé (voir en haut de page), seul le fallback s'applique.
+            Shows two states of the same info: (1) the <strong>default</strong> info (data on the link or in a
+            definition,
+            then <code>fallbackTitle</code>); (2) the info <strong>loaded through the API</strong> (<code>change</code>
+            event with
+            <code>reason = "meta"</code>). Resolver priority: declared values &gt; API &gt; fallback.
+            <em>A value that is already declared is not overwritten</em>: the API fills in the empty fields.
+            Without a key (see the top of the page), only the fallback applies.
         </p>
         <p id="api-status"></p>
         <ul>
             <li><a data-link data-key="api-video" data-target="player-api"
-                   data-title="Titre déclaré sur le lien (fallback)"
-                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Vidéo seule (titre déclaré, reste à compléter)</a>
+                   data-title="Title declared on the link (fallback)"
+                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Single video (declared title, rest to complete)</a>
             </li>
             <li><a data-link data-key="api-list" data-target="player-api"
-                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4">Liste sans titres</a>
+                   href="https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4">List without titles</a>
             </li>
             <li><a data-link data-key="api-playlist" data-target="player-api"
-                   href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ">Playlist sans titres</a></li>
+                   href="https://www.youtube.com/watch?v=s11CNT_hQTg&list=PLYALQE76y6LQ">Playlist without titles</a></li>
         </ul>
         <div class="player-zone" id="player-api"></div>
         <div data-controls="player-api"></div>
         <div class="row">
-            <div><h3>Infos par défaut (avant API)</h3>
-                <div id="api-default">(rien)</div>
+            <div><h3>Default info (before the API)</h3>
+                <div id="api-default">(nothing)</div>
             </div>
-            <div><h3>Infos chargées (après API)</h3>
-                <div id="api-loaded">(en attente d'un événement "meta")</div>
+            <div><h3>Loaded info (after the API)</h3>
+                <div id="api-loaded">(waiting for a "meta" event)</div>
             </div>
         </div>
-        <button id="api-refresh" type="button">refreshMeta() (redemander à l'API)</button>
+        <button id="api-refresh" type="button">refreshMeta() (ask the API again)</button>
     </section>
 
-    <!-- ═════════════ 5. SCAN DYNAMIQUE ═════════════ -->
+    <!-- ═════════════ 5. DYNAMIC SCAN ═════════════ -->
     <section id="sec-dyn">
-        <h2>5 · Scan dynamique</h2>
+        <h2>5 · Dynamic scan</h2>
         <p>
-            Pas d'observer : un élément ajouté n'est pris en compte qu'après <code>lp.scan()</code>.
-            Une région existe avant son élément (« deux temps ») : la navigation est dans le journal, et la vue apparaît
-            quand
-            l'élément est lié.
+            No observer: an element that is added is only picked up after <code>lp.scan()</code>.
+            A region exists before its element ("two-step life"): the navigation is kept in the journal, and the view
+            appears
+            when the element is bound.
         </p>
 
-        <h3>a. Ajout d'un lien</h3>
+        <h3>a. Adding a link</h3>
         <ul id="dyn-links">
             <li><a data-link data-key="dyn-1" data-target="player-dyn" data-autoplay="click"
-                   href="https://www.youtube.com/watch?v=5drmgVauSMg">Tahiti (présent dès le départ)</a></li>
+                   href="https://www.youtube.com/watch?v=5drmgVauSMg">Tahiti (present from the start)</a></li>
         </ul>
-        <button id="dyn-add-link" type="button">+ ajouter un lien puis scan()</button>
+        <button id="dyn-add-link" type="button">+ add a link, then scan()</button>
         <div class="player-zone" id="player-dyn"></div>
         <div data-controls="player-dyn"></div>
         <div data-info="player-dyn"></div>
 
-        <h3>b. Ajout d'une div cible qui n'existe pas encore</h3>
+        <h3>b. Adding a target div that does not exist yet</h3>
         <ol>
             <li><a data-link data-key="dyn-late" data-target="player-dyn-late" data-autoplay="click"
-                   href="https://www.youtube.com/watch?v=YCfcg9gzCYc">Cliquer d'abord ici (la cible n'existe pas)</a>
+                   href="https://www.youtube.com/watch?v=YCfcg9gzCYc">Click here first (the target does not exist)</a>
             </li>
             <li>
-                <button id="dyn-add-target" type="button">Puis ajouter la div cible + scan()</button>
+                <button id="dyn-add-target" type="button">Then add the target div + scan()</button>
             </li>
         </ol>
         <div id="dyn-late-host"></div>
         <div data-controls="player-dyn-late"></div>
         <div data-info="player-dyn-late"></div>
-        <p>Dernière navigation affichée :
-            <output id="dyn-last">(aucune)</output>
+        <p>Last navigation shown:
+            <output id="dyn-last">(none)</output>
         </p>
     </section>
 
     <!-- ═════════════ 6. CODE ONLY ═════════════ -->
     <section id="sec-code">
-        <h2>6 · Code only : définitions + méthodes de navigation</h2>
+        <h2>6 · Code only: definitions + navigation methods</h2>
         <p>
-            Aucun lien dans le HTML. <code>autoScan: false</code>, puis <code>scan()</code> à la main ; la première
-            définition a
-            <code>showOnInit: true</code>. Les boutons sont générés depuis <code>region.infos</code> et appellent
+            No links in the HTML. <code>autoScan: false</code>, then <code>scan()</code> by hand; the first
+            definition has
+            <code>showOnInit: true</code>. The buttons are generated from <code>region.infos</code> and call
             <code>region.navigate(key, {autoplay})</code>.
         </p>
         <div id="code-buttons"></div>
@@ -434,15 +431,15 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         <div data-info="player-code"></div>
     </section>
 
-    <!-- ═════════════ 7. GLOBAL VS SCOPÉ ═════════════ -->
+    <!-- ═════════════ 7. GLOBAL VS SCOPED ═════════════ -->
     <section id="sec-scope">
-        <h2>7 · Un LinkPlayer global et un LinkPlayer scopé (sans conflit)</h2>
+        <h2>7 · A global LinkPlayer and a scoped LinkPlayer (no conflict)</h2>
         <p>
-            Le global (sans <code>scope</code>) : infobulle activée, <code>"toggle"</code>. Le scopé
-            (<code>#zone-scoped</code>) :
-            <code>tooltip: false</code>, <code>"skip"</code>. Un élément déjà pris en charge (<code>data-lp</code>) est
-            ignoré par l'autre :
-            <strong>les scopés sont créés avant le global</strong>.
+            The global one (no <code>scope</code>): tooltip enabled, <code>"toggle"</code>. The scoped one
+            (<code>#zone-scoped</code>):
+            <code>tooltip: false</code>, <code>"skip"</code>. An element that is already handled (<code>data-lp</code>) is
+            ignored by the other one:
+            <strong>scoped instances are created before the global one</strong>.
         </p>
         <div class="row">
             <div id="zone-global-links">
@@ -456,9 +453,9 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
                 <div data-info="player-global"></div>
             </div>
             <div id="zone-scoped">
-                <h3>Scopé · sans tooltip</h3>
+                <h3>Scoped · no tooltip</h3>
                 <a data-link data-key="s-yt" data-target="player-scoped" data-show-on-init data-title="Scoped only"
-                   href="https://www.youtube.com/watch?v=YCfcg9gzCYc">Vidéo scopée (showOnInit)</a>
+                   href="https://www.youtube.com/watch?v=YCfcg9gzCYc">Scoped video (showOnInit)</a>
                 <div class="player-zone" id="player-scoped"></div>
                 <div data-controls="player-scoped"></div>
                 <div data-info="player-scoped"></div>
@@ -466,26 +463,25 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         </div>
     </section>
 
-    <!-- ═════════════ 8. BOUTONS & COMPORTEMENTS ═════════════ -->
+    <!-- ═════════════ 8. BUTTONS & BEHAVIORS ═════════════ -->
     <section id="sec-behavior">
-        <h2>8 · Boutons de navigation et comportements</h2>
+        <h2>8 · Navigation buttons and behaviors</h2>
         <p>
-            Chaque barre de boutons est branchée sur la région : back / forward, info précédente / suivante,
-            item précédent / suivant (liste ou playlist), afficher / masquer. Les boutons sont grisés selon
+            Each button bar is wired to its region: back / forward, previous / next info,
+            previous / next item (list or playlist), show / hide. Buttons are greyed out according to
             <code>canGoBack</code>, <code>canGoForward</code>, <code>canGoPreviousInfo</code>,
             <code>canGoNextInfo</code>,
             <code>canGoPreviousItem</code>, <code>canGoNextItem</code>.
         </p>
         <ul>
-            <li><code>currentBehavior</code> (clic sur le lien déjà affiché) : <code>"toggle"</code> masque/ré-affiche,
-                <code>"skip"</code> ne fait rien, <code>"playPause"</code> bascule lecture/pause.
+            <li><code>currentBehavior</code> (click on the link already shown): <code>"toggle"</code> hides / shows again,
+                <code>"skip"</code> does nothing, <code>"playPause"</code> switches between play and pause.
             </li>
-            <li><code>boundaryBehavior</code> (aux extrémités de <code>nextInfo()</code> / <code>previousInfo()</code>)
-                :
-                <code>"stop"</code> s'arrête, <code>"loop"</code> boucle (il faut au moins 2 infos).
+            <li><code>boundaryBehavior</code> (at the ends of <code>nextInfo()</code> / <code>previousInfo()</code>):
+                <code>"stop"</code> stops, <code>"loop"</code> wraps around (at least 2 infos are needed).
             </li>
-            <li><code>useStorage</code> et <code>showOnInit</code> : zone « toggle » avec <code>useStorage: true</code>
-                (recharge la page : le dernier lien est restauré et prime sur <code>showOnInit</code>).
+            <li><code>useStorage</code> and <code>showOnInit</code>: the "toggle" zone has <code>useStorage: true</code>
+                (reload the page: the last link is restored and wins over <code>showOnInit</code>).
             </li>
         </ul>
         <div class="row" id="behavior-zones"></div>
@@ -506,62 +502,62 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
 
     <!-- ═════════════ 9. FORMAT & MUTE ═════════════ -->
     <section id="sec-fmt">
-        <h2>9 · Format (short) et démarrage muet</h2>
+        <h2>9 · Format (short) and muted start</h2>
         <p>
-            <code>FormatBehavior</code> pose <code>data-lp-format</code> sur le conteneur : cliquez d'un lien à l'autre,
-            la zone change de forme. Le format vient de l'URL (<code>/shorts/ID</code> → <code>portrait</code>) ou de
-            <code>data-format</code> (<code>portrait</code>, <code>9/16</code>, <code>square</code>,
-            <code>landscape</code>).
+            <code>FormatBehavior</code> sets <code>data-lp-format</code> on the container: click from one link to
+            another and the area changes shape. The format comes from the URL (<code>/shorts/ID</code> →
+            <code>portrait</code>) or from <code>data-format</code> (<code>portrait</code>, <code>9/16</code>,
+            <code>square</code>, <code>landscape</code>).
         </p>
 
-        <h3>a. Format et mute au clic</h3>
+        <h3>a. Format and mute on click</h3>
         <ul>
-            <li>Short détecté dans l'URL :
+            <li>Short detected from the URL:
                 <a data-link data-key="fmt-short" data-target="player-fmt"
-                   href="https://www.youtube.com/shorts/6g_mFIRqSso">Short (portrait détecté)</a></li>
-            <li>Short, autoplay + muet (<code>data-autoplay="click" data-mute</code>) :
+                   href="https://www.youtube.com/shorts/6g_mFIRqSso">Short (portrait detected)</a></li>
+            <li>Short, autoplay + muted (<code>data-autoplay="click" data-mute</code>):
                 <a data-link data-key="fmt-short-mute" data-target="player-fmt" data-autoplay="click" data-mute
-                   href="https://www.youtube.com/shorts/urnPpXD8el0">Short, autoplay muet</a></li>
-            <li>Format forcé sur une vidéo ordinaire :
+                   href="https://www.youtube.com/shorts/urnPpXD8el0">Short, muted autoplay</a></li>
+            <li>Forced format on an ordinary video:
                 <a data-link data-key="fmt-forced" data-target="player-fmt" data-format="9/16"
-                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives en 9/16 (forcé)</a>
+                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives in 9/16 (forced)</a>
                 |
                 <a data-link data-key="fmt-square" data-target="player-fmt" data-format="square"
-                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives en carré</a></li>
-            <li>YouTube, autoplay + muet :
+                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives in square</a></li>
+            <li>YouTube, autoplay + muted:
                 <a data-link data-key="mute-yt" data-target="player-fmt" data-autoplay="click" data-mute
-                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives, autoplay muet</a></li>
-            <li>OK.ru, autoplay + muet (<em>seulement si le relais applique <code>mute</code></em>) :
+                   href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives, muted autoplay</a></li>
+            <li>OK.ru, autoplay + muted (<em>only if the relay applies <code>mute</code></em>):
                 <a data-link data-key="mute-ok" data-target="player-fmt" data-autoplay="click" data-mute
-                   href="https://ok.ru/video/17222095800962">OK.ru, autoplay muet</a></li>
-            <li>Contrôle, autoplay avec le son :
+                   href="https://ok.ru/video/17222095800962">OK.ru, muted autoplay</a></li>
+            <li>Control, autoplay with sound:
                 <a data-link data-key="mute-none" data-target="player-fmt" data-autoplay="click"
-                   href="https://www.youtube.com/watch?v=5drmgVauSMg">Tahiti, autoplay avec le son</a></li>
+                   href="https://www.youtube.com/watch?v=5drmgVauSMg">Tahiti, autoplay with sound</a></li>
         </ul>
         <div class="player-zone" id="player-fmt"></div>
         <div data-controls="player-fmt"></div>
         <div data-sound="player-fmt"></div>
         <div data-info="player-fmt"></div>
 
-        <h3>b. Au chargement de la page, sans geste de l'utilisateur</h3>
+        <h3>b. On page load, without a user gesture</h3>
         <p>
-            <code>data-show-on-init data-autoplay data-mute</code> : seul le démarrage muet est autorisé par les
-            navigateurs. Le bouton active le son.
+            <code>data-show-on-init data-autoplay data-mute</code>: browsers only allow a muted start. The button turns
+            the sound on.
         </p>
         <p>
             <a data-link data-key="fmt-init" data-target="player-fmt-init" data-show-on-init data-autoplay data-mute
-               href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives, autoplay muet au chargement</a>
+               href="https://www.youtube.com/watch?v=69iUWLA0oVc">Maldives, muted autoplay on load</a>
         </p>
         <div class="player-zone" id="player-fmt-init"></div>
         <div data-controls="player-fmt-init"></div>
         <div data-sound="player-fmt-init"></div>
     </section>
 
-    <!-- ═════════════ JOURNAL ═════════════ -->
+    <!-- ═════════════ LOG ═════════════ -->
     <section id="sec-log">
-        <h2>Journal des événements</h2>
-        <button id="log-clear" type="button">Effacer</button>
-        <button id="reset-storage" type="button">Oublier l'état sauvegardé + recharger</button>
+        <h2>Event log</h2>
+        <button id="log-clear" type="button">Clear</button>
+        <button id="reset-storage" type="button">Forget saved state + reload</button>
         <ul id="log"></ul>
     </section>
 
@@ -580,14 +576,14 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
             return "";
         }
     })();
-    const fallbackTitle = (i) => `Épisode ${i + 1}`;
+    const fallbackTitle = (i) => `Episode ${i + 1}`;
 
-    // ───────── journal ─────────
+    // ───────── log ─────────
     const logEl = $("#log");
 
     function log(who, type, text) {
         const li = document.createElement("li");
-        li.textContent = `${new Date().toLocaleTimeString("fr-FR")} [${who}] ${type} : ${text}`;
+        li.textContent = `${new Date().toLocaleTimeString("en-GB")} [${who}] ${type}: ${text}`;
         logEl.prepend(li);
         while (logEl.children.length > 80) logEl.lastChild.remove();
     }
@@ -601,11 +597,11 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
     });
     const base = (who, extra = {}) => ({useStorage: false, okruEmbedBaseUrl: OKRU_BASE, ...hooks(who), ...extra});
 
-    // ───────── helpers de page ─────────
-    const regions = new Map(); // nom de cible -> region
+    // ───────── page helpers ─────────
+    const regions = new Map(); // target name -> region
     const track = (lp, ...targets) => targets.forEach((t) => regions.set(t, lp.getRegion(t)));
 
-    /** secondes -> h:mm:ss */
+    /** seconds -> h:mm:ss */
     function fmt(sec) {
         if (sec == null || sec === "") return "";
         const s = Math.floor(sec), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
@@ -613,11 +609,11 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         return h ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
     }
 
-    /** Rend le contexte d'une navigation (ctx de afterNavigate) dans `host`. */
+    /** Renders the context of a navigation (the ctx of afterNavigate) into `host`. */
     function renderInfo(host, ctx) {
         host.replaceChildren();
         if (!ctx) {
-            host.textContent = "(aucune info affichée)";
+            host.textContent = "(nothing shown)";
             return;
         }
         const {info, item, index, reason} = ctx;
@@ -655,7 +651,7 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         add("extra", extra && typeof extra === "object" ? JSON.stringify(extra) : extra);
         add("key", info.key);
         add("format", pick("format"));
-        add("mute au départ", info.mute ? "oui" : "");
+        add("muted at start", info.mute ? "yes" : "");
         if (info.isPlaylist) add("item", `${index + 1} / ${info.videoIds?.length ?? info.videos.length ?? "?"}`);
         add("reason", reason);
         host.append(dl);
@@ -666,13 +662,13 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         if (!region.current) renderInfo(host, null);
     }
 
-    /** Barre de navigation d'une région (boutons grisés selon la disponibilité). */
+    /** Navigation bar of a region (buttons are greyed out according to availability). */
     function mountControls(host, region) {
         const actions = [
             ["◀ Back", "goBack", "canGoBack"], ["Forward ▶", "goForward", "canGoForward"], null,
-            ["⏮ Info préc.", "previousInfo", "canGoPreviousInfo"], ["Info suiv. ⏭", "nextInfo", "canGoNextInfo"], null,
-            ["‹ Item préc.", "previousItem", "canGoPreviousItem"], ["Item suiv. ›", "nextItem", "canGoNextItem"], null,
-            ["Afficher / masquer", "toggle", null]
+            ["⏮ Prev. info", "previousInfo", "canGoPreviousInfo"], ["Next info ⏭", "nextInfo", "canGoNextInfo"], null,
+            ["‹ Prev. item", "previousItem", "canGoPreviousItem"], ["Next item ›", "nextItem", "canGoNextItem"], null,
+            ["Show / hide", "toggle", null]
         ];
         const buttons = [];
         for (const a of actions) {
@@ -695,22 +691,22 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
             for (const b of buttons) b.disabled = b.dataset.can ? !region[b.dataset.can] : false;
             status.textContent = region.current
                 ? `${region.current.key}${region.current.isPlaylist ? " · item " + (region.currentIndex + 1) : ""}${region.isVisible ?
-                    "" : " · masqué"}`
-                : "aucune info affichée";
+                    "" : " · hidden"}`
+                : "nothing shown";
         };
         region.on("change", refresh);
         region.on("state", refresh);
         refresh();
     }
 
-    /** Bouton de son : l'état vient de region.muted, mis à jour par l'événement "sound". */
+    /** Sound button: the state comes from region.muted, updated by the "sound" event. */
     function mountSound(host, region) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.onclick = () => region.toggleMute();
         const refresh = () => {
-            btn.textContent = region.muted === true ? "🔇 Activer le son"
-                : region.muted === false ? "🔊 Couper le son" : "🔈 Son (état inconnu)";
+            btn.textContent = region.muted === true ? "🔇 Unmute"
+                : region.muted === false ? "🔊 Mute" : "🔈 Sound (state unknown)";
         };
         region.on("sound", refresh);
         region.on("change", refresh);
@@ -718,7 +714,7 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         refresh();
     }
 
-    // ═══════════ 8 (préparation) : zones de comportements, créées AVANT les LinkPlayer ═══════════
+    // ═══════════ 8 (setup): behavior zones, created BEFORE the LinkPlayers ═══════════
     const BEHAVIORS = [
         {id: "toggle", cur: "toggle", boundary: "stop", storage: true},
         {id: "skip", cur: "skip", boundary: "stop", storage: false},
@@ -728,8 +724,7 @@ new LinkPlayer({ scope: "sec-defs", definitions });</code></pre>
         const zone = document.createElement("div");
         zone.id = `zone-${b.id}`;
         zone.append($("#tpl-behavior").content.cloneNode(true));
-        $("[data-title]", zone).textContent = `currentBehavior: "${b.cur}" · boundaryBehavior: "${b.boundary}" · useStorage:
-${b.storage}`;
+        $("[data-title]", zone).textContent = `currentBehavior: "${b.cur}" · boundaryBehavior: "${b.boundary}" · useStorage: ${b.storage}`;
         $(".player-zone", zone).id = `player-${b.id}`;
         $("[data-controls]", zone).dataset.controls = `player-${b.id}`;
         $("[data-info]", zone).dataset.info = `player-${b.id}`;
@@ -740,7 +735,7 @@ ${b.storage}`;
     const lpLink = new LinkPlayer({scope: "sec-link", tooltip: true, ...base("1-link")});
     track(lpLink, "player-link");
 
-    // ═══════════ 2. AVEC DÉFINITIONS ═══════════
+    // ═══════════ 2. WITH DEFINITIONS ═══════════
     const yt = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
     const defs = [
         {
@@ -817,27 +812,27 @@ ${b.storage}`;
     const lpApi = new LinkPlayer({
         scope: "sec-api", tooltip: false,
         youtubeApiKey: YT_KEY || null,
-        youtubeMetaScope: "all", // aussi les vidéos seules
-        youtubeMetaRequired: ["title", "description", "channel"], // l'API est appelée si un de ces champs est vide
+        youtubeMetaScope: "all", // single videos too
+        youtubeMetaRequired: ["title", "description", "channel"], // the API is called if one of these fields is empty
         fallbackTitle,
         ...base("4-api")
     });
     track(lpApi, "player-api");
     $("#api-status").textContent = YT_KEY
-        ? "Clé API présente : les champs vides sont demandés à YouTube Data (fallbackTitle si la requête échoue)."
-        : "Pas de clé API : seules les infos déclarées et fallbackTitle (« Épisode 1 »…) s'affichent.";
+        ? "API key present: empty fields are requested from YouTube Data (fallbackTitle if the request fails)."
+        : "No API key: only declared info and fallbackTitle (“Episode 1”…) are shown.";
     {
         const region = regions.get("player-api");
         const dflt = $("#api-default"), loaded = $("#api-loaded");
         region.afterNavigate((ctx) => renderInfo(ctx.reason === "meta" ? loaded : dflt, ctx));
         region.on("change", (e) => {
-            if (e.reason === "navigate") loaded.textContent = "(en attente d'un événement \"meta\")";
+            if (e.reason === "navigate") loaded.textContent = "(waiting for a \"meta\" event)";
         });
         $("#api-refresh").onclick = () => lpApi.refreshMeta("player-api").then((c) => log("4-api", "change", `refreshMeta → ${c
-            ? "modifié" : "rien de nouveau"}`));
+            ? "changed" : "nothing new"}`));
     }
 
-    // ═══════════ 5. SCAN DYNAMIQUE ═══════════
+    // ═══════════ 5. DYNAMIC SCAN ═══════════
     const lpDyn = new LinkPlayer({scope: "sec-dyn", tooltip: false, ...base("5-dyn")});
     track(lpDyn, "player-dyn", "player-dyn-late");
     let dynCount = 0;
@@ -848,20 +843,20 @@ ${b.storage}`;
         a.dataset.key = `dyn-added-${n}`;
         a.dataset.target = "player-dyn";
         a.href = `https://www.youtube.com/watch?v=69iUWLA0oVc&t=${n * 60}s`;
-        a.textContent = `Maldives ajouté #${n} (start ${n}m)`;
+        a.textContent = `Maldives added #${n} (start ${n}m)`;
         li.append(a);
         $("#dyn-links").append(li);
         lpDyn.scan();
-        log("5-dyn", "change", "lien ajouté puis scan()");
+        log("5-dyn", "change", "link added, then scan()");
     };
     $("#dyn-add-target").onclick = (e) => {
         const div = document.createElement("div");
         div.id = "player-dyn-late";
         div.className = "player-zone";
         $("#dyn-late-host").append(div);
-        lpDyn.scan(); // la région 'player-dyn-late' existe déjà : elle reçoit son élément et affiche son état courant
+        lpDyn.scan(); // the region 'player-dyn-late' already exists: it receives its element and shows its current state
         e.currentTarget.disabled = true;
-        log("5-dyn", "change", "div cible ajoutée puis scan()");
+        log("5-dyn", "change", "target div added, then scan()");
     };
     for (const name of ["player-dyn", "player-dyn-late"]) {
         regions.get(name).on("change", (e) => {
@@ -876,7 +871,7 @@ ${b.storage}`;
         key: title.toLowerCase(), title,
         url: `https://www.youtube.com/watch?v=${videoId}`,
         target: T_CODE, start: startSeconds, autoplay: "click",
-        extra: {description: LOREM, link: {href: `https://example.com/${title}`, text: `Guide de ${title}`}},
+        extra: {description: LOREM, link: {href: `https://example.com/${title}`, text: `${title} guide`}},
         ...rest
     });
     const codeDefs = [
@@ -884,9 +879,9 @@ ${b.storage}`;
             dest({title: "Maldives", videoId: "69iUWLA0oVc"}),
             {
                 key: "trip", url: "https://www.youtube.com/watch_videos?video_ids=z2sv_RsNwM4,-xiF9YIIUk4,69iUWLA0oVc",
-                target: T_CODE, title: "Trip (liste)", index: 1, autoplay: "click",
+                target: T_CODE, title: "Trip (list)", index: 1, autoplay: "click",
                 videos: [{title: "ASMR"}, {title: "Trains", channel: "Me"}, {title: "Maldives"}],
-                extra: {description: "Liste de trois vidéos, démarrage sur la 2e (index 1)."}
+                extra: {description: "List of three videos, starting on the 2nd one (index 1)."}
             },
             {
                 key: "v1983",
@@ -897,20 +892,20 @@ ${b.storage}`;
                     videoId: "C_dEl2cMCEA", title: "V(1983) – Diana propose son expérience"
                 }],
                 extra: {
-                    description: "Playlist avec vidéo de départ."
+                    description: "Playlist with a starting video."
                 }
             },
             {
                 key: "macgyver", url: "https://ok.ru/video/17222095800962", target: T_CODE,
                 title: "MacGyver S03E08 VF | Accident en Haute Montagne", channel: "Retime Clips Okru", extra:
                     {
-                        description: "Vidéo OK.ru simple."
+                        description: "Single OK.ru video."
                     }
             },
             {
                 key: "short", url: "https://www.youtube.com/shorts/zpSEQLVqeE8", target: T_CODE,
-                title: "Short (définition)", format: "portrait", mute: true, autoplay: "click",
-                extra: {description: "Short YouTube : format portrait, démarrage muet."}
+                title: "Short (definition)", format: "portrait", mute: true, autoplay: "click",
+                extra: {description: "YouTube Short: portrait format, muted start."}
             }
         ]
     ;
@@ -929,7 +924,7 @@ ${b.storage}`;
         $("#code-buttons").append(b, " ");
     }
 
-    // ═══════════ 8. COMPORTEMENTS (LinkPlayer par zone) ═══════════
+    // ═══════════ 8. BEHAVIORS (one LinkPlayer per zone) ═══════════
     const lpBehaviors = BEHAVIORS.map((b) => {
         const lp = new LinkPlayer({
             scope: `zone-${b.id}`, defaultTarget: `player-${b.id}`, tooltip: true,
@@ -940,12 +935,12 @@ ${b.storage}`;
         return lp;
     });
 
-    // ═══════════ 9. FORMAT & MUTE (scopé : avant le global) ═══════════
+    // ═══════════ 9. FORMAT & MUTE (scoped: before the global one) ═══════════
     const lpFmt = new LinkPlayer({scope: "sec-fmt", tooltip: false, ...base("9-fmt")});
     track(lpFmt, "player-fmt", "player-fmt-init");
     lpFmt.on("sound", (e) => log("9-fmt", "sound", `${e.region.name} · muted=${e.muted} · volume=${e.volume ?? "?"}`));
 
-    // ═══════════ 7. SCOPÉ puis GLOBAL (l'ordre compte) ═══════════
+    // ═══════════ 7. SCOPED then GLOBAL (order matters) ═══════════
     const lpScoped = new LinkPlayer({
         scope: "zone-scoped",
         tooltip: false,
@@ -953,17 +948,17 @@ ${b.storage}`;
     });
     track(lpScoped, "player-scoped");
 
-    // Créé EN DERNIER : les liens déjà marqués data-lp par un scopé sont ignorés par le global.
+    // Created LAST: links already marked data-lp by a scoped instance are ignored by the global one.
     const lpGlobal = new LinkPlayer({
         tooltip: true, currentBehavior: "toggle", defaultTarget: "player-global",
         youtubeApiKey: YT_KEY || null, fallbackTitle, ...base("7-global")
     });
     track(lpGlobal, "player-global");
 
-    // ───────── barres de navigation + zones d'infos + boutons de son ─────────
+    // ───────── navigation bars + info areas + sound buttons ─────────
     for (const host of document.querySelectorAll("[data-controls]")) {
         const region = regions.get(host.dataset.controls);
-        region ? mountControls(host, region) : (host.textContent = `(pas de région « ${host.dataset.controls} »)`);
+        region ? mountControls(host, region) : (host.textContent = `(no region “${host.dataset.controls}”)`);
     }
     for (const host of document.querySelectorAll("[data-sound]")) {
         const region = regions.get(host.dataset.sound);
@@ -974,7 +969,7 @@ ${b.storage}`;
         if (region && host.id !== "api-default") mountInfo(host, region);
     }
 
-    // ───────── réglages ─────────
+    // ───────── settings ─────────
     const keyInput = $("#yt-key");
     keyInput.value = YT_KEY;
     $("#yt-save").onclick = () => {
@@ -999,7 +994,7 @@ ${b.storage}`;
         location.reload();
     };
 
-    // pour tester dans la console
+    // to test from the console
     window.lps = {lpLink, lpDefs, lpAdopt, lpApi, lpDyn, lpCode, lpBehaviors, lpFmt, lpScoped, lpGlobal};
 </script>
 </body>
