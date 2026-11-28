@@ -1,14 +1,20 @@
 {
+  "main": "./dist/link-player.js",
+  "module": "./dist/link-player.es.js",
+  "unpkg": "./dist/link-player.min.js",
+  "exports": {
+    ".": { "import": "./dist/link-player.es.js", "default": "./dist/link-player.js" },
+    "./src/*": "./src/*"
+  },
+  "sideEffects": false,
   "type": "module",
-  "main": "dist/link-player.min.js",
-  "module": "dist/link-player.es.js",
   "files": [
     "dist"
   ],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "vite build && vite build --mode min"
+    "build": "vite build --mode es && vite build --mode umd && vite build --mode min"
   },
   "keywords": [],
   "author": "",

@@ -1,21 +1,36 @@
 # LinkPlayer
 
-Turn plain links, code definitions or existing iframes into **YouTube** and **OK.ru** players, rendered in the container of your choice. Vanilla JS, ES modules, no framework, no DOM observer.
+**Playlist panels for YouTube embeds, a clean API to drive any video iframe, and plug-ins for everything else.**
+
+Turn plain links, code definitions or existing iframes into **YouTube** and **OK.ru** players, rendered in the container of your choice. Vanilla JS, ES modules, no framework, no DOM observer, and no YouTube API script to load.
+
+```js
+const lp = new LinkPlayer();                          // links with [data-link] become players
+lp.getRegion("main").use(myBehavior);                 // add your own behavior in one line
+lp.on("state", ({region, state}) => { /* playing, paused, ended */ });
+```
 
 ---
 
 ## Highlights
 
-- **Three ways to declare videos**: HTML links, JavaScript definitions, or adopted `<iframe>`s.
-- **Two providers**: YouTube (videos, video lists, playlists, Shorts) and OK.ru (videos and video lists), behind a common provider interface.
-- **Smart iframe handling**: a new iframe is created only when the *info* changes (new video, new list, new playlist). Same info + another item = a single player command (YouTube) or a `src` change (OK.ru), never a new player.
-- **Regions**: each target container is a `Region` with one active item, a navigation journal (back / forward), behaviors and after-navigation hooks.
-- **Two-step life**: a region exists before its container does. Navigation only moves its state; when the container is found, the region shows the *current* state.
-- **Behaviors**: panel, metadata, persistence, active link, format and mute are small plug-ins of a region, built on the public hook API. You can add your own.
-- **Format**: landscape, portrait (9/16, YouTube Shorts are detected) or square, exposed on the container for your CSS.
-- **Sound**: start muted, mute / unmute / volume, `muted` state and a `sound` event (YouTube).
-- **Persistence**: optional storage of the last item per region.
-- **Pluggable UI**: panel, items, header, toggle, groups and tooltip renderers can all be replaced.
+**What you get out of the box**
+
+- **A playlist panel for YouTube embeds.** Playlists and lists of video ids get a built-in panel (resizable, collapsible, keyboard-friendly, grouped by season if you want), even on an iframe that is already in your page.
+- **A clean API to drive the iframe.** Play, pause, seek, next / previous item, mute and volume, plus events (`change`, `state`, `sound`, `error`). It talks to the player through `postMessage`: no `iframe_api` script, no global callback.
+- **Smart iframe handling.** A new iframe is created only when the *info* changes. Same info + another item = a single player command (YouTube) or a `src` change (OK.ru), never a new player.
+- **Three ways to declare videos**: HTML links, JavaScript definitions, or adopted `<iframe>`s. Without JavaScript, links still open the video page.
+- **YouTube Shorts and formats.** Landscape, portrait (9/16, Shorts are detected) or square, exposed on the container for your CSS.
+- **Autoplay that works.** Start muted to play on page load, mute / unmute from your own button.
+- **Titles, channels and durations** completed through the YouTube Data API (cached), with your declared values always winning.
+- **Resume where you left off.** Optional persistence of the last item per region.
+
+**Built to be extended**
+
+- **Behaviors.** Panel, metadata, persistence, active link, format and mute are small plug-ins of a region. Write your own on the public hook API (`afterNavigate`, events, commands): skip-intro buttons, analytics, auto-next...
+- **Providers.** Support another platform by writing a provider and a view. YouTube and OK.ru are built the same way.
+- **Pluggable UI.** Panel, items, header, toggle, groups and tooltip renderers can all be replaced or extended (vertical cards for Shorts, for example).
+- **Regions.** Each container is a `Region`: one active item, a navigation journal (back / forward), hooks and behaviors. A region exists before its container does, and shows its *current* state as soon as the container is found.
 
 ---
 

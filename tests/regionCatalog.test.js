@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { RegionCatalog } from "../src/RegionCatalog.js";
+import { RegionCatalog } from "../src/core/RegionCatalog.js";
 
 /** Faux Region : seulement ce que le catalogue utilise (attach / detach / dispose / element). */
 const makeRegion = (name) => ({

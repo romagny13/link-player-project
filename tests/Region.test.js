@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from "vitest";
 
-import {Region} from "../src/Region.js";
+import {Region} from "../src/core/Region.js";
 import {LinkPlayer} from "../src/LinkPlayer.js";
-import {SingleActiveAdapter} from "../src/adapters/SingleActiveAdapter.js";
+import {SingleActiveAdapter} from "../src/views/adapters/SingleActiveAdapter.js";
 import {MediaView} from "../src/views/MediaView.js";
 import {VideoInfo} from "../src/models/VideoInfo.js";
 import {VideoListInfo} from "../src/models/VideoListInfo.js";
 import {PlaylistInfo} from "../src/models/PlaylistInfo.js";
-import {MemoryStore} from "../src/storage.js";
+import {MemoryStore} from "../src/utils/storage.js";
 
 /* ------------------------------------------------------------------ */
 /* Shared helpers                                                      */

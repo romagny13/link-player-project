@@ -2,7 +2,7 @@ import {MediaProvider} from "../MediaProvider.js";
 import {YouTubeInfoParser} from "./YouTubeInfoParser.js";
 import {YouTubeEmbedSrcBuilder} from "./YouTubeEmbedSrcBuilder.js";
 import {YouTubeView} from "./YouTubeView.js";
-import {IframeFactory} from "../../views/IframeFactory.js";
+import {IframeFactory} from "../IframeFactory.js";
 
 export class YouTubeProvider extends MediaProvider {
     id = "youtube";

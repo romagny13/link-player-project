@@ -1,5 +1,5 @@
 import {beforeEach, describe, expect, it} from "vitest";
-import {NavigationJournal} from "../src/NavigationJournal.js";
+import {NavigationJournal} from "../src/core/NavigationJournal.js";
 
 const entree = (nom, index = 0, extra = {}) => ({info: {key: nom}, index, ...extra});
 

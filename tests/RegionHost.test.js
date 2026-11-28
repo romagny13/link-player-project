@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { RegionHost } from "../src/RegionHost.js";
+import { RegionHost } from "../src/page/RegionHost.js";
 
 const html = (markup) => { document.body.innerHTML = markup; };
 const $ = (sel, root = document) => root.querySelector(sel);

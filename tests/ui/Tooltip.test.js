@@ -4,7 +4,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
 vi.mock("../../utils/dom.js", () => ({injectStyles: vi.fn()}));
 
 import {injectStyles} from "../../src/utils/dom.js";
-import {Tooltip} from "../../src/ui/Tooltip.js";
+import {Tooltip} from "../../src/ui/tooltip/Tooltip.js";
 
 // ───────── faux navigateur ─────────
 

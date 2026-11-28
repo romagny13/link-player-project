@@ -2,7 +2,7 @@ import {MediaProvider} from "../MediaProvider.js";
 import {OkruInfoParser} from "./OkruInfoParser.js";
 import {OkruEmbedSrcBuilder} from "./OkruEmbedSrcBuilder.js";
 import {OkruView} from "./OkruView.js";
-import {IframeFactory} from "../../views/IframeFactory.js";
+import {IframeFactory} from "../IframeFactory.js";
 
 export class OkruProvider extends MediaProvider {
     id = "okru";

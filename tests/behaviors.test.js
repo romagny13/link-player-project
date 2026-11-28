@@ -7,7 +7,7 @@ import {MetaBehavior} from "../src/behaviors/MetaBehavior.js";
 import {PanelBehavior} from "../src/behaviors/PanelBehavior.js";
 import {PersistenceBehavior} from "../src/behaviors/PersistenceBehavior.js";
 import {ActiveLinkBehavior} from "../src/behaviors/ActiveLinkBehavior.js";
-import {MemoryStore} from "../src/storage.js";
+import {MemoryStore} from "../src/utils/storage.js";
 
 afterEach(() => {
     document.body.innerHTML = "";

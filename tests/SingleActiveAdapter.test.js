@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from "vitest";
 
-import {SingleActiveAdapter} from "../src/adapters/SingleActiveAdapter.js";
+import {SingleActiveAdapter} from "../src/views/adapters/SingleActiveAdapter.js";
 
 afterEach(() => {
     document.body.innerHTML = "";

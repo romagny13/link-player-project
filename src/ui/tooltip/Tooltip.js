@@ -1,4 +1,5 @@
-import {injectStyles} from "../utils/dom.js";
+import {injectStyles} from "../../utils/dom.js";
+import {TooltipRenderer} from "./TooltipRenderer.js";
 
 const TOOLTIP_CSS = `
 @layer lp-tooltip {
@@ -34,58 +35,6 @@ const HIDE_DELAY_MS = 150;
 const THUMB_TIMEOUT_MS = 3000;
 const CURSOR_MARGIN = 14;
 const YOUTUBE_MISSING_WIDTH = 120;
-
-/** Default Renderer mis à jour avec le nouveau design */
-export class TooltipRenderer {
-    render() {
-        const tip = document.createElement("div");
-        tip.className = "lp-tip";
-
-        const loader = document.createElement("div");
-        loader.className = "lp-tip-loader";
-
-        const img = document.createElement("img");
-        img.alt = "";
-
-        const play = document.createElement("div");
-        play.className = "lp-tip-play";
-
-        const span = document.createElement("span");
-        span.className = "lp-tip-title";
-
-        tip.append(loader, img, play, span);
-        return tip;
-    }
-
-    onShow(tip, { title, provider }) {
-        const [loader, img] = tip.children;
-        tip.dataset.provider = provider.id ?? "";
-        tip.dataset.name = provider.name ?? "";
-        tip.classList.remove("lp-nothumb");
-        tip.lastChild.textContent = title;
-        loader.hidden = false;
-        img.hidden = true;
-        img.removeAttribute("src");
-    }
-
-    onLoading(tip) {
-        const [loader] = tip.children;
-        loader.hidden = false;
-    }
-
-    onThumbLoaded(tip, url) {
-        const [loader, img] = tip.children;
-        loader.hidden = true;
-        img.src = url;
-        img.hidden = false;
-    }
-
-    onFallback(tip) {
-        const [loader] = tip.children;
-        loader.hidden = true;
-        tip.classList.add("lp-nothumb");
-    }
-}
 
 /** Thumbnail tooltip on hover (not on touch devices). One shared element. */
 export class Tooltip {

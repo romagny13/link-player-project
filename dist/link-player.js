@@ -1,6 +1,17 @@
 (function(global, factory) {
 	typeof exports === "object" && typeof module !== "undefined" ? module.exports = factory() : typeof define === "function" && define.amd ? define([], factory) : (global = typeof globalThis !== "undefined" ? globalThis : global || self, global.LinkPlayer = factory());
 })(this, function() {
+	// \0rolldown/runtime.js
+	var __defProp = Object.defineProperty;
+	var __exportAll = (all, no_symbols) => {
+		let target = {};
+		for (var name in all) __defProp(target, name, {
+			get: all[name],
+			enumerable: true
+		});
+		if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+		return target;
+	};
 	// src/utils/dom.js
 	function resolveScope(scope) {
 		if (scope == null) return null;
@@ -184,7 +195,7 @@
 		if (element.dataset) delete element.dataset.lp;
 	}
 	var isClaimed = (element) => owners.has(element);
-	// src/storage.js
+	// src/utils/storage.js
 	var MemoryStore = class {
 		#m = /* @__PURE__ */ new Map();
 		get(key) {
@@ -251,7 +262,7 @@
 			return new MemoryStore();
 		}
 	}
-	// src/RegionHost.js
+	// src/page/RegionHost.js
 	/**
 	* ROLE: look at a DOM scope and say what is in it. Nothing else.
 	*
@@ -312,7 +323,7 @@
 	function cssEscape(id) {
 		return typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id.replace(/([ !"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
 	}
-	// src/RegionCatalog.js
+	// src/core/RegionCatalog.js
 	/**
 	* ROLE: name -> Region, and which element each region lives in.
 	*
@@ -371,7 +382,7 @@
 			this.#regions.clear();
 		}
 	};
-	// src/views/CommandBinder.js
+	// src/page/CommandBinder.js
 	/**
 	* ROLE: turn a trigger element (a `data-link`) into a command: click -> region.activate(key).
 	* It knows nothing about providers or infos: it is given (element, region, key).
@@ -420,7 +431,7 @@
 			for (const element of [...this.#bindings.keys()]) this.unbind(element);
 		}
 	};
-	// src/NavigationJournal.js
+	// src/core/NavigationJournal.js
 	/**
 	* History of a region: stores navigation STATE ({info, index}), never views.
 	* Going back / forward only moves the cursor; it never adds an entry.
@@ -470,7 +481,7 @@
 	}
 	/** A position is a whole number >= 0; anything else (undefined, null, -1...) is the first item. */
 	var toIndex = (value) => Number.isInteger(value) && value >= 0 ? value : 0;
-	// src/Region.js
+	// src/core/Region.js
 	/** Navigation params are a SNAPSHOT: later changes of the caller's object do not leak into the history. */
 	var freezeParams = (params) => params ? Object.freeze({ ...params }) : NO_PARAMS;
 	/** A navigation requested before the element exists keeps its autoplay only if the element comes soon. */
@@ -1147,7 +1158,7 @@
 			return changed;
 		}
 	};
-	// src/metaMerge.js
+	// src/meta/metaMerge.js
 	/** A text: what is declared, else the fallback, else "". A text is never undefined. */
 	var text = (declared, fallback) => isEmpty(declared) ? fallback ?? "" : declared;
 	/**
@@ -1206,7 +1217,7 @@
 		applyItems(info, items);
 		return true;
 	}
-	// src/MetaService.js
+	// src/meta/MetaService.js
 	/**
 	* ROLE: complete the metadata of an info (items of a playlist, title / channel of a video) with the provider's API.
 	* It knows nothing about regions or the DOM. It mutates the info (metaMerge) and says whether something changed.
@@ -1239,7 +1250,7 @@
 			return applyDefinition(info, items[0]);
 		}
 	};
-	// src/adapters/ContentAdapter.js
+	// src/views/adapters/ContentAdapter.js
 	/**
 	* ROLE (contract): how the views of a region are laid out in the region's element.
 	*
@@ -1279,7 +1290,7 @@
 			throw new Error(`${this.constructor.name} must implement setVisible().`);
 		}
 	};
-	// src/adapters/SingleActiveAdapter.js
+	// src/views/adapters/SingleActiveAdapter.js
 	/** One view at a time. A new view takes the place of the previous one (same position in the host). */
 	var SingleActiveAdapter = class extends ContentAdapter {
 		#element = null;
@@ -2699,7 +2710,7 @@
 			return Math.max(0, info.videos.findIndex((v) => v.videoId === info.videoId));
 		}
 	};
-	// src/views/IframeFactory.js
+	// src/providers/IframeFactory.js
 	/**
 	* ROLE: create an iframe with the usual attributes of a provider (shortcuts per provider).
 	* It does not know what goes in the iframe, only how it is made. The `src` comes from an EmbedSrcBuilder.
@@ -3614,6 +3625,65 @@
 			});
 		}
 	};
+	// src/ui/panel/GroupRenderer.js
+	/** The head of a season: the button that folds / unfolds it. */
+	var GroupRenderer = class {
+		render({ label, count, collapsed }) {
+			const head = document.createElement("button");
+			head.type = "button";
+			head.className = "lp-group-head";
+			head.textContent = `${label} · ${count}`;
+			head.dataset.lpAction = "toggle-group";
+			head.setAttribute("aria-expanded", String(!collapsed));
+			return head;
+		}
+	};
+	// src/ui/panel/HeaderRenderer.js
+	/**
+	* The panel reacts to `data-lp-action` on any element of its content, so a custom renderer only has to set it:
+	*   "close"         hides the panel
+	*   "toggle-group"  folds / unfolds the season the element belongs to
+	* and to `data-index` on an item (selects it).
+	*/
+	var HeaderRenderer = class {
+		render({ count, canClose }) {
+			const head = document.createElement("div");
+			head.className = "lp-head";
+			const title = document.createElement("span");
+			title.className = "lp-head-title";
+			title.textContent = `Playlist · ${count}`;
+			head.append(title);
+			if (canClose) {
+				const close = document.createElement("button");
+				close.type = "button";
+				close.className = "lp-close";
+				close.textContent = "»";
+				close.title = "Hide playlist";
+				close.setAttribute("aria-label", "Hide playlist");
+				close.dataset.lpAction = "close";
+				head.append(close);
+			}
+			return head;
+		}
+	};
+	// src/ui/panel/ToggleRenderer.js
+	var ToggleRenderer = class {
+		/** @param {{ position?: string | object }} options Default position, used when the panel does not give one. */
+		constructor({ position = "top-right" } = {}) {
+			this.defaultPosition = position;
+		}
+		render({ position = this.defaultPosition } = {}) {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "lp-toggle";
+			button.textContent = "☰";
+			button.title = "Show playlist";
+			button.setAttribute("aria-label", "Show playlist");
+			if (typeof position === "string") button.dataset.pos = position;
+			else Object.assign(button.style, position);
+			return button;
+		}
+	};
 	// src/ui/ThumbnailService.js
 	var ThumbnailService = class {
 		#pending = /* @__PURE__ */ new Map();
@@ -3642,7 +3712,125 @@
 			});
 		}
 	};
-	// src/ui/PanelRenderer.js
+	// src/ui/panel/ItemRenderer.js
+	function safeHttpUrl(value) {
+		try {
+			const u = new URL(String(value).trim(), globalThis.location?.href);
+			return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+		} catch {
+			return null;
+		}
+	}
+	var ItemRenderer = class {
+		constructor(thumbnails = null) {
+			this._thumbnails = thumbnails ?? new ThumbnailService();
+		}
+		render(item, index, isCurrent = false) {
+			const title = item.title || `Video ${index + 1}`;
+			const row = document.createElement("div");
+			row.className = "lp-item";
+			row.dataset.index = String(index);
+			row.title = title;
+			row.tabIndex = 0;
+			row.setAttribute("role", "button");
+			if (isCurrent) {
+				row.dataset.current = "";
+				row.setAttribute("aria-current", "true");
+			}
+			const text = document.createElement("div");
+			text.className = "lp-info";
+			const titleEl = document.createElement("div");
+			titleEl.className = "lp-title";
+			titleEl.textContent = title;
+			text.append(titleEl);
+			if (item.channel) {
+				const href = safeHttpUrl(item.channelUrl);
+				const chan = document.createElement(href ? "a" : "div");
+				chan.className = "lp-chan";
+				chan.textContent = item.channel;
+				if (href) {
+					chan.href = href;
+					chan.target = "_blank";
+					chan.rel = "noopener noreferrer";
+					chan.addEventListener("click", (e) => e.stopPropagation());
+				}
+				text.append(chan);
+			}
+			if (item.thumbnail) {
+				const thumb = document.createElement("div");
+				thumb.className = "lp-thumb";
+				const image = document.createElement("img");
+				image.alt = "";
+				image.loading = "lazy";
+				this._thumbnails.resolve(item.thumbnail).then((url) => {
+					if (url) image.src = url;
+					else thumb.remove();
+				});
+				const tn = document.createElement("span");
+				tn.className = "lp-tn";
+				tn.textContent = String(index + 1);
+				thumb.append(image, tn);
+				row.append(thumb, text);
+			} else {
+				const num = document.createElement("span");
+				num.className = "lp-num";
+				num.textContent = String(index + 1).padStart(2, "0");
+				row.append(num, text);
+			}
+			return row;
+		}
+	};
+	// src/ui/panel/GroupBySeason.js
+	var SEASON_RE$1 = /\b(?:saison|season)\s*0*(\d{1,3})\b|\bs0*(\d{1,2})(?:\b|(?=e\d))/i;
+	/**
+	* Splits the items into seasons: [{ label, start, end }] (end exclusive), or null when grouping is useless.
+	* @param {Array} items Items with `item.title`.
+	* @param {number[]|null} counts Explicit number of items per season; when absent, "Season 2" / "S02E05" are read from the titles.
+	*/
+	function groupBySeason$1(items, counts = null) {
+		const n = items.length;
+		if (counts?.length) {
+			const groups = [];
+			let start = 0;
+			counts.forEach((count, i) => {
+				if (start < n) {
+					groups.push({
+						label: `Season ${i + 1}`,
+						start,
+						end: Math.min(start + count, n)
+					});
+					start += count;
+				}
+			});
+			if (start < n) groups.push({
+				label: "Other",
+				start,
+				end: n
+			});
+			return groups.length > 1 ? groups : null;
+		}
+		const seasons = items.map((item) => {
+			const match = SEASON_RE$1.exec(item.title ?? "");
+			return match ? +(match[1] || match[2]) : null;
+		});
+		const first = seasons.find((season) => season !== null);
+		if (first === void 0) return null;
+		let current = first > 1 ? 1 : null;
+		const groups = [];
+		seasons.forEach((season, i) => {
+			if (season !== null) current = season;
+			const last = groups[groups.length - 1];
+			if (last && last.key === current) last.end = i + 1;
+			else groups.push({
+				key: current,
+				label: current === null ? "Other" : `Season ${current}`,
+				start: i,
+				end: i + 1
+			});
+		});
+		return groups.length > 1 ? groups : null;
+	}
+	// src/ui/panel/PanelRenderer.js
 	var PANEL_CSS = `
 :where(.lp-panel){
   --_bg:var(--lp-bg,#141414);--_line:var(--lp-border,#2a2a2a);--_hover:var(--lp-hover,#1e1e1e);
@@ -3952,7 +4140,7 @@
 				canClose: true
 			}));
 			const seasons = this.#options.seasons;
-			const groups = seasons === false ? null : groupBySeason(items, Array.isArray(seasons) ? seasons : null);
+			const groups = seasons === false ? null : groupBySeason$1(items, Array.isArray(seasons) ? seasons : null);
 			if (!groups) {
 				for (let index = 0; index < items.length; index++) scroll.appendChild(this.#renderItem(items, index));
 				return;
@@ -4027,212 +4215,7 @@
 			if (this.#toggle) this.#toggle.hidden = open;
 		}
 	};
-	var SEASON_RE = /\b(?:saison|season)\s*0*(\d{1,3})\b|\bs0*(\d{1,2})(?:\b|(?=e\d))/i;
-	/**
-	* Splits the items into seasons: [{ label, start, end }] (end exclusive), or null when grouping is useless.
-	* @param {Array} items Items with `item.title`.
-	* @param {number[]|null} counts Explicit number of items per season; when absent, "Season 2" / "S02E05" are read from the titles.
-	*/
-	function groupBySeason(items, counts = null) {
-		const n = items.length;
-		if (counts?.length) {
-			const groups = [];
-			let start = 0;
-			counts.forEach((count, i) => {
-				if (start < n) {
-					groups.push({
-						label: `Season ${i + 1}`,
-						start,
-						end: Math.min(start + count, n)
-					});
-					start += count;
-				}
-			});
-			if (start < n) groups.push({
-				label: "Other",
-				start,
-				end: n
-			});
-			return groups.length > 1 ? groups : null;
-		}
-		const seasons = items.map((item) => {
-			const match = SEASON_RE.exec(item.title ?? "");
-			return match ? +(match[1] || match[2]) : null;
-		});
-		const first = seasons.find((season) => season !== null);
-		if (first === void 0) return null;
-		let current = first > 1 ? 1 : null;
-		const groups = [];
-		seasons.forEach((season, i) => {
-			if (season !== null) current = season;
-			const last = groups[groups.length - 1];
-			if (last && last.key === current) last.end = i + 1;
-			else groups.push({
-				key: current,
-				label: current === null ? "Other" : `Season ${current}`,
-				start: i,
-				end: i + 1
-			});
-		});
-		return groups.length > 1 ? groups : null;
-	}
-	/** The head of a season: the button that folds / unfolds it. */
-	var GroupRenderer = class {
-		render({ label, count, collapsed }) {
-			const head = document.createElement("button");
-			head.type = "button";
-			head.className = "lp-group-head";
-			head.textContent = `${label} · ${count}`;
-			head.dataset.lpAction = "toggle-group";
-			head.setAttribute("aria-expanded", String(!collapsed));
-			return head;
-		}
-	};
-	/**
-	* The panel reacts to `data-lp-action` on any element of its content, so a custom renderer only has to set it:
-	*   "close"         hides the panel
-	*   "toggle-group"  folds / unfolds the season the element belongs to
-	* and to `data-index` on an item (selects it).
-	*/
-	var HeaderRenderer = class {
-		render({ count, canClose }) {
-			const head = document.createElement("div");
-			head.className = "lp-head";
-			const title = document.createElement("span");
-			title.className = "lp-head-title";
-			title.textContent = `Playlist · ${count}`;
-			head.append(title);
-			if (canClose) {
-				const close = document.createElement("button");
-				close.type = "button";
-				close.className = "lp-close";
-				close.textContent = "»";
-				close.title = "Hide playlist";
-				close.setAttribute("aria-label", "Hide playlist");
-				close.dataset.lpAction = "close";
-				head.append(close);
-			}
-			return head;
-		}
-	};
-	function safeHttpUrl(value) {
-		try {
-			const u = new URL(String(value).trim(), globalThis.location?.href);
-			return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
-		} catch {
-			return null;
-		}
-	}
-	var ItemRenderer = class {
-		constructor(thumbnails = null) {
-			this._thumbnails = thumbnails ?? new ThumbnailService();
-		}
-		render(item, index, isCurrent = false) {
-			const title = item.title || `Video ${index + 1}`;
-			const row = document.createElement("div");
-			row.className = "lp-item";
-			row.dataset.index = String(index);
-			row.title = title;
-			row.tabIndex = 0;
-			row.setAttribute("role", "button");
-			if (isCurrent) {
-				row.dataset.current = "";
-				row.setAttribute("aria-current", "true");
-			}
-			const text = document.createElement("div");
-			text.className = "lp-info";
-			const titleEl = document.createElement("div");
-			titleEl.className = "lp-title";
-			titleEl.textContent = title;
-			text.append(titleEl);
-			if (item.channel) {
-				const href = safeHttpUrl(item.channelUrl);
-				const chan = document.createElement(href ? "a" : "div");
-				chan.className = "lp-chan";
-				chan.textContent = item.channel;
-				if (href) {
-					chan.href = href;
-					chan.target = "_blank";
-					chan.rel = "noopener noreferrer";
-					chan.addEventListener("click", (e) => e.stopPropagation());
-				}
-				text.append(chan);
-			}
-			if (item.thumbnail) {
-				const thumb = document.createElement("div");
-				thumb.className = "lp-thumb";
-				const image = document.createElement("img");
-				image.alt = "";
-				image.loading = "lazy";
-				this._thumbnails.resolve(item.thumbnail).then((url) => {
-					if (url) image.src = url;
-					else thumb.remove();
-				});
-				const tn = document.createElement("span");
-				tn.className = "lp-tn";
-				tn.textContent = String(index + 1);
-				thumb.append(image, tn);
-				row.append(thumb, text);
-			} else {
-				const num = document.createElement("span");
-				num.className = "lp-num";
-				num.textContent = String(index + 1).padStart(2, "0");
-				row.append(num, text);
-			}
-			return row;
-		}
-	};
-	var ToggleRenderer = class {
-		/** @param {{ position?: string | object }} options Default position, used when the panel does not give one. */
-		constructor({ position = "top-right" } = {}) {
-			this.defaultPosition = position;
-		}
-		render({ position = this.defaultPosition } = {}) {
-			const button = document.createElement("button");
-			button.type = "button";
-			button.className = "lp-toggle";
-			button.textContent = "☰";
-			button.title = "Show playlist";
-			button.setAttribute("aria-label", "Show playlist");
-			if (typeof position === "string") button.dataset.pos = position;
-			else Object.assign(button.style, position);
-			return button;
-		}
-	};
-	// src/ui/Tooltip.js
-	var TOOLTIP_CSS = `
-@layer lp-tooltip {
-    .lp-tip{position:fixed;z-index:99999;display:none;width:280px;height:158px;border-radius:8px;overflow:hidden;pointer-events:none;background:radial-gradient(circle at 50% 30%, #1a1a1a 0%, #0d0d0d 70%);box-shadow:0 8px 24px rgba(0,0,0,.55);opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;font:500 14px var(--lp-font,system-ui,sans-serif);color:#fff}
-    .lp-tip.lp-show{opacity:1;transform:none}
-    .lp-tip[data-provider=youtube]{background:radial-gradient(circle at 50% 30%, #1c1111 0%, #0d0d0d 70%); --fa:#4d1414; --fb:#141414}
-    .lp-tip[data-provider=okru]{background:radial-gradient(circle at 50% 30%, #1c1510 0%, #0d0d0d 70%); --fa:#5a3508; --fb:#181108}
-    
-    .lp-tip img,.lp-tip-loader{display:block;width:100%;height:100%;object-fit:cover}
-    .lp-tip img[hidden],.lp-tip-loader[hidden]{display:none}
-    
-    .lp-tip-loader{background:linear-gradient(90deg,transparent,#2a2a2a 50%,transparent) 0 0/200% 100% #111;animation:lp-shimmer 1.2s infinite}
-    @keyframes lp-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
-    
-    .lp-tip-play{position:absolute;top:50%;left:50%;width:52px;height:52px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;transition:background 0.2s ease}
-    .lp-tip-play::after{content:"";display:block;width:0;height:0;border-style:solid;border-width:8px 0 8px 14px;border-color:transparent transparent transparent #ffffff;margin-left:3px}
-    
-    .lp-tip-title{position:absolute;bottom:0;left:0;right:0;padding:24px 12px 12px 12px;background:linear-gradient(transparent,rgba(0,0,0,0.8));z-index:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;text-shadow:1px 1px 2px rgba(0,0,0,.5)}
-    
-    .lp-tip.lp-nothumb{background:linear-gradient(135deg,var(--fa,#2f2f2f),var(--fb,#141414))}
-    .lp-tip.lp-nothumb::before{content:attr(data-name);position:absolute;top:10px;left:12px;font:600 10px var(--lp-font,system-ui,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55)}
-    .lp-tip.lp-nothumb .lp-tip-play{top:42%}
-    .lp-tip.lp-nothumb .lp-tip-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.3}
-}
-.lp-nav-item{display:flex;align-items:center;gap:8px;padding:0;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;overflow:hidden;font:inherit;color:inherit}
-.lp-nav-item img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
-.lp-nav-item.lp-active{border-color:var(--lp-accent,#f7931e)}
-.lp-nav-item:focus-visible{outline:2px solid var(--lp-accent,#f7931e);outline-offset:2px}
-`;
-	var SHOW_DELAY_MS = 120;
-	var HIDE_DELAY_MS = 150;
-	var THUMB_TIMEOUT_MS = 3e3;
-	var CURSOR_MARGIN = 14;
-	var YOUTUBE_MISSING_WIDTH = 120;
+	// src/ui/tooltip/TooltipRenderer.js
 	/** Default Renderer mis à jour avec le nouveau design */
 	var TooltipRenderer = class {
 		render() {
@@ -4275,6 +4258,40 @@
 			tip.classList.add("lp-nothumb");
 		}
 	};
+	// src/ui/tooltip/Tooltip.js
+	var TOOLTIP_CSS = `
+@layer lp-tooltip {
+    .lp-tip{position:fixed;z-index:99999;display:none;width:280px;height:158px;border-radius:8px;overflow:hidden;pointer-events:none;background:radial-gradient(circle at 50% 30%, #1a1a1a 0%, #0d0d0d 70%);box-shadow:0 8px 24px rgba(0,0,0,.55);opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;font:500 14px var(--lp-font,system-ui,sans-serif);color:#fff}
+    .lp-tip.lp-show{opacity:1;transform:none}
+    .lp-tip[data-provider=youtube]{background:radial-gradient(circle at 50% 30%, #1c1111 0%, #0d0d0d 70%); --fa:#4d1414; --fb:#141414}
+    .lp-tip[data-provider=okru]{background:radial-gradient(circle at 50% 30%, #1c1510 0%, #0d0d0d 70%); --fa:#5a3508; --fb:#181108}
+    
+    .lp-tip img,.lp-tip-loader{display:block;width:100%;height:100%;object-fit:cover}
+    .lp-tip img[hidden],.lp-tip-loader[hidden]{display:none}
+    
+    .lp-tip-loader{background:linear-gradient(90deg,transparent,#2a2a2a 50%,transparent) 0 0/200% 100% #111;animation:lp-shimmer 1.2s infinite}
+    @keyframes lp-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+    
+    .lp-tip-play{position:absolute;top:50%;left:50%;width:52px;height:52px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,0.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;transition:background 0.2s ease}
+    .lp-tip-play::after{content:"";display:block;width:0;height:0;border-style:solid;border-width:8px 0 8px 14px;border-color:transparent transparent transparent #ffffff;margin-left:3px}
+    
+    .lp-tip-title{position:absolute;bottom:0;left:0;right:0;padding:24px 12px 12px 12px;background:linear-gradient(transparent,rgba(0,0,0,0.8));z-index:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;text-shadow:1px 1px 2px rgba(0,0,0,.5)}
+    
+    .lp-tip.lp-nothumb{background:linear-gradient(135deg,var(--fa,#2f2f2f),var(--fb,#141414))}
+    .lp-tip.lp-nothumb::before{content:attr(data-name);position:absolute;top:10px;left:12px;font:600 10px var(--lp-font,system-ui,sans-serif);letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+    .lp-tip.lp-nothumb .lp-tip-play{top:42%}
+    .lp-tip.lp-nothumb .lp-tip-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.3}
+}
+.lp-nav-item{display:flex;align-items:center;gap:8px;padding:0;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;overflow:hidden;font:inherit;color:inherit}
+.lp-nav-item img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+.lp-nav-item.lp-active{border-color:var(--lp-accent,#f7931e)}
+.lp-nav-item:focus-visible{outline:2px solid var(--lp-accent,#f7931e);outline-offset:2px}
+`;
+	var SHOW_DELAY_MS = 120;
+	var HIDE_DELAY_MS = 150;
+	var THUMB_TIMEOUT_MS = 3e3;
+	var CURSOR_MARGIN = 14;
+	var YOUTUBE_MISSING_WIDTH = 120;
 	/** Thumbnail tooltip on hover (not on touch devices). One shared element. */
 	var Tooltip = class {
 		#token = 0;
@@ -4627,7 +4644,102 @@
 			thumbnail: first?.thumbnail || null
 		};
 	}
-	return LinkPlayer;
+	// src/ui/panel/groupBySeason.js
+	var SEASON_RE = /\b(?:saison|season)\s*0*(\d{1,3})\b|\bs0*(\d{1,2})(?:\b|(?=e\d))/i;
+	/**
+	* Splits the items into seasons: [{ label, start, end }] (end exclusive), or null when grouping is useless.
+	* @param {Array} items Items with `item.title`.
+	* @param {number[]|null} counts Explicit number of items per season; when absent, "Season 2" / "S02E05" are read from the titles.
+	*/
+	function groupBySeason(items, counts = null) {
+		const n = items.length;
+		if (counts?.length) {
+			const groups = [];
+			let start = 0;
+			counts.forEach((count, i) => {
+				if (start < n) {
+					groups.push({
+						label: `Season ${i + 1}`,
+						start,
+						end: Math.min(start + count, n)
+					});
+					start += count;
+				}
+			});
+			if (start < n) groups.push({
+				label: "Other",
+				start,
+				end: n
+			});
+			return groups.length > 1 ? groups : null;
+		}
+		const seasons = items.map((item) => {
+			const match = SEASON_RE.exec(item.title ?? "");
+			return match ? +(match[1] || match[2]) : null;
+		});
+		const first = seasons.find((season) => season !== null);
+		if (first === void 0) return null;
+		let current = first > 1 ? 1 : null;
+		const groups = [];
+		seasons.forEach((season, i) => {
+			if (season !== null) current = season;
+			const last = groups[groups.length - 1];
+			if (last && last.key === current) last.end = i + 1;
+			else groups.push({
+				key: current,
+				label: current === null ? "Other" : `Season ${current}`,
+				start: i,
+				end: i + 1
+			});
+		});
+		return groups.length > 1 ? groups : null;
+	}
+	return Object.assign(LinkPlayer, /* @__PURE__ */ __exportAll({
+		AUTOPLAY_MODES: () => AUTOPLAY_MODES,
+		ActiveLinkBehavior: () => ActiveLinkBehavior,
+		ContentAdapter: () => ContentAdapter,
+		Emitter: () => Emitter,
+		FORMATS: () => FORMATS$1,
+		FormatBehavior: () => FormatBehavior,
+		GroupRenderer: () => GroupRenderer,
+		HeaderRenderer: () => HeaderRenderer,
+		IframeFactory: () => IframeFactory,
+		InfoParser: () => InfoParser,
+		ItemRenderer: () => ItemRenderer,
+		JsonStore: () => JsonStore,
+		LinkPlayer: () => LinkPlayer,
+		MediaProvider: () => MediaProvider,
+		MediaView: () => MediaView,
+		MemoryStore: () => MemoryStore,
+		MetaBehavior: () => MetaBehavior,
+		MetaService: () => MetaService,
+		MuteBehavior: () => MuteBehavior,
+		OkruProvider: () => OkruProvider,
+		PanelBehavior: () => PanelBehavior,
+		PanelRenderer: () => PanelRenderer,
+		PersistenceBehavior: () => PersistenceBehavior,
+		PlaylistInfo: () => PlaylistInfo,
+		ProviderRegistry: () => ProviderRegistry,
+		Region: () => Region,
+		RegionHost: () => RegionHost,
+		SOURCE_KINDS: () => SOURCE_KINDS,
+		SingleActiveAdapter: () => SingleActiveAdapter,
+		SrcInfo: () => SrcInfo,
+		ThumbnailService: () => ThumbnailService,
+		ToggleRenderer: () => ToggleRenderer,
+		Tooltip: () => Tooltip,
+		TooltipRenderer: () => TooltipRenderer,
+		UrlInfo: () => UrlInfo,
+		VideoInfo: () => VideoInfo,
+		VideoListInfo: () => VideoListInfo,
+		YouTubeDataApi: () => YouTubeDataApi,
+		YouTubeMetaResolver: () => YouTubeMetaResolver,
+		YouTubeProvider: () => YouTubeProvider,
+		applyDefinition: () => applyDefinition,
+		applyItems: () => applyItems,
+		defaultStore: () => defaultStore,
+		groupBySeason: () => groupBySeason
+	}));
 });
 
 //# sourceMappingURL=link-player.js.map

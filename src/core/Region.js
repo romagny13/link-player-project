@@ -1,7 +1,7 @@
 import {NavigationJournal} from "./NavigationJournal.js";
-import {Emitter} from "./utils/Emitter.js";
-import {claim, release} from "./utils/ownership.js";
-import {itemCountOf, toIndex} from "./utils/items.js";
+import {Emitter} from "../utils/Emitter.js";
+import {claim, release} from "../utils/ownership.js";
+import {itemCountOf, toIndex} from "../utils/items.js";
 
 /** Navigation params are a SNAPSHOT: later changes of the caller's object do not leak into the history. */
 const freezeParams = (params) => (params ? Object.freeze({...params}) : NO_PARAMS);

@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
     PanelRenderer,
-    groupBySeason,
     ensureRelative,
-    GroupRenderer,
-    HeaderRenderer,
-    ItemRenderer,
-    ToggleRenderer,
-} from "../../src/ui/PanelRenderer.js"; // adapte le chemin
+
+
+} from "../../src/ui/panel/PanelRenderer.js"; // adapte le chemin
+import {groupBySeason, GroupRenderer, HeaderRenderer, ItemRenderer, ToggleRenderer} from "../../src/index.js";
 
 vi.mock("../utils/dom.js", () => ({
     injectStyles: vi.fn(),

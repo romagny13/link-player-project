@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from "vitest";
 import {YouTubeMetaResolver} from "../../../src/providers/youtube/YouTubeMetaResolver.js";
 import {VideoInfo} from "../../../src/models/VideoInfo.js";
 import {PlaylistInfo} from "../../../src/models/PlaylistInfo.js";
-import {MemoryStore} from "../../../src/storage.js";
+import {MemoryStore} from "../../../src/utils/storage.js";
 
 const apiMeta = {
     title: "Vrai titre",

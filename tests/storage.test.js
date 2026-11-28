@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { MemoryStore, JsonStore, defaultStore } from "../src/storage.js";
+import { MemoryStore, JsonStore, defaultStore } from "../src/utils/storage.js";
 
 /* ------------------------------------------------------------------ */
 /*  MemoryStore                                                       */

@@ -1,5 +1,5 @@
-import {VideoInfo} from "./models/VideoInfo.js";
-import {isEmpty, toAutoplayMode, toFormat} from "./utils/helpers.js";
+import {VideoInfo} from "../models/VideoInfo.js";
+import {isEmpty, toAutoplayMode, toFormat} from "../utils/helpers.js";
 
 /** A text: what is declared, else the fallback, else "". A text is never undefined. */
 const text = (declared, fallback) => (isEmpty(declared) ? fallback ?? "" : declared);

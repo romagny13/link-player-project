@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from "vitest";
 
-import {CommandBinder} from "../src/views/CommandBinder.js";
-import {IframeFactory} from "../src/views/IframeFactory.js";
+import {CommandBinder} from "../src/page/CommandBinder.js";
+import {IframeFactory} from "../src/providers/IframeFactory.js";
 import {MediaView} from "../src/views/MediaView.js";
 import {ViewFactory} from "../src/views/ViewFactory.js";
 import {ProviderRegistry} from "../src/providers/ProviderRegistry.js";
